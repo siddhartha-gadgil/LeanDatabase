@@ -169,6 +169,9 @@ deriving Inhabited
 def emptyRel (l : Fin n → String) : TypedRelation types :=
   { labels := l, rows := ∅ }
 
+def emptyListRel (l : Fin n → String) : TypedListRelation types :=
+  { labels := l, rows := [] }
+
 -- Convert List-Relation to Finset-Relation
 @[simp, grind .]
 def toFinsetRelation (r : TypedListRelation types) : TypedRelation types :=
@@ -183,14 +186,16 @@ def toListRelation (r : TypedRelation types) : TypedListRelation types :=
     rows   := r.rows.toListSorted
   }
 
+omit [(i : Fin n) → LinearOrder (types i)] in
 theorem permutation_implies_finset_equality
     (l1 l2 : TypedListRelation types) :
     l1.labels = l2.labels →
     List.Perm l1.rows l2.rows →
     toFinsetRelation l1 = toFinsetRelation l2 := by
   intro h_labels h_perm
-  simp_all [toFinsetRelation]
-  exact List.toFinset_eq_of_perm l1.rows l2.rows h_perm
+  grind only [toFinsetRelation, List.toFinset_eq_of_perm]
+  -- simp_all [toFinsetRelation]
+  -- exact List.toFinset_eq_of_perm l1.rows l2.rows h_perm
 
 /-! ## Relational Algebra Operations on Finsets -/
 
@@ -206,6 +211,16 @@ def projection {m : Nat} (indices : Fin m → Fin n) (rel : TypedRelation types)
   }
 
 @[simp]
+def projection' {m : Nat} (indices : Fin m → Fin n) (rel : TypedListRelation types) :
+  TypedListRelation (fun j ↦ types (indices j)) :=
+  let _ : ∀ j, DecidableEq (types (indices j)) := fun _ => inferInstance
+  {
+    labels := fun j => rel.labels (indices j),
+    rows   := (rel.rows.map (fun t j => t (indices j))).dedup --dedup to keep it same as Finset version
+  }
+
+
+@[simp]
 def typedColumn {α : Type} [DecidableEq α]
     (index : Fin n) (rel : TypedRelation types) (h : types index = α := by simp) : Finset α :=
   -- Cast the tuple value to alpha and image it
@@ -215,6 +230,13 @@ def typedColumn {α : Type} [DecidableEq α]
 @[simp, grind]
 def restriction (predicate : TypedTuple types → Bool) (rel : TypedRelation types) :
     TypedRelation types :=
+  {
+    labels := rel.labels,
+    rows   := rel.rows.filter (fun t => predicate t)
+  }
+
+def restriction' (predicate : TypedTuple types → Bool) (rel : TypedListRelation types) :
+    TypedListRelation types :=
   {
     labels := rel.labels,
     rows   := rel.rows.filter (fun t => predicate t)
@@ -233,6 +255,12 @@ def union (r1 r2 : TypedRelation types) : TypedRelation types :=
     rows   := r1.rows ∪ r2.rows -- Finset Union
   }
 
+def union' (r1 r2 : TypedListRelation types) : TypedListRelation types :=
+  {
+    labels := r1.labels,
+    rows   := r1.rows ++ r2.rows -- Finset Union
+  }
+
 -- Intersection
 @[simp, grind]
 def intersection (r1 r2 : TypedRelation types) : TypedRelation types :=
@@ -240,6 +268,14 @@ def intersection (r1 r2 : TypedRelation types) : TypedRelation types :=
     labels := r1.labels,
     rows   := r1.rows ∩ r2.rows -- Finset Intersection
   }
+
+@[simp, grind]
+def intersection' (r1 r2 : TypedListRelation types) : TypedListRelation types :=
+  {
+    labels := r1.labels,
+    rows   := r1.rows.filter (fun t => r2.rows.contains t) -- O (|r1|*|r2|)
+  }
+-- Intersect sorted lists if this is slow
 
 -- Minus / Difference
 @[simp, grind]
@@ -249,6 +285,15 @@ def minus (r1 r2 : TypedRelation types) : TypedRelation types :=
     rows   := r1.rows \ r2.rows -- Finset Difference (sdiff)
   }
 
+@[simp, grind]
+def minus' (r1 r2 : TypedListRelation types) : TypedListRelation types :=
+  {
+    labels := r1.labels,
+    rows   := r1.rows.filter (fun t => ¬ r2.rows.contains t) -- O (|r1|*|r2|)
+  }
+-- Again explore sorted lists if this is slow
+
+
 -- RENAME operator: Changes labels, keeps data exactly the same.
 @[simp, grind]
 def rename (newLabels : Fin n → String) (rel : TypedRelation types) : TypedRelation types :=
@@ -257,8 +302,21 @@ def rename (newLabels : Fin n → String) (rel : TypedRelation types) : TypedRel
     rows   := rel.rows
   }
 
+@[simp, grind]
+def rename' (newLabels : Fin n → String) (rel : TypedListRelation types) : TypedListRelation types :=
+  {
+    labels := newLabels,
+    rows   := rel.rows
+  }
+
 -- Helper: Rename a specific column by index
 def renameColumn (idx : Fin n) (newName : String) (rel : TypedRelation types) : TypedRelation types :=
+  {
+    labels := Function.update rel.labels idx newName,
+    rows   := rel.rows
+  }
+
+def renameColumn' (idx : Fin n) (newName : String) (rel : TypedListRelation types) : TypedListRelation types :=
   {
     labels := Function.update rel.labels idx newName,
     rows   := rel.rows
@@ -272,9 +330,17 @@ def prefixLabels (prefixStr : String) (rel : TypedRelation types) : TypedRelatio
     rows   := rel.rows
   }
 
+@[simp]
+def prefixLabels' (prefixStr : String) (rel : TypedListRelation types) : TypedListRelation types :=
+  {
+    labels := fun i => prefixStr ++ "." ++ rel.labels i,
+    rows   := rel.rows
+  }
+
 
 /-! ## Theorems -/
 
+omit [(i : Fin n) → LinearOrder (types i)] in
 theorem projection_compose {m p : Nat}
     (indices1 : Fin m → Fin n) (indices2 : Fin p → Fin m)
     (rel : TypedRelation types) :
@@ -282,29 +348,81 @@ theorem projection_compose {m p : Nat}
     projection (fun j => indices1 (indices2 j)) rel := by
   simp only [projection]
   apply TypedRelation.ext
-  · simp
+  · simp only
   · simp only [Finset.image_image]
     grind
 
+lemma dedup_map_dedup_eq {α β} [DecidableEq α] [DecidableEq β]
+    (f : α → β) (l : List α) : (l.dedup.map f).dedup = (l.map f).dedup := by
+    induction l with
+    | nil => simp only [List.dedup_nil, List.map_nil]
+    | cons x xs ih =>
+      simp only [List.dedup_cons, List.map_cons]
+      split_ifs with h₁ h₂ h₂
+      -- x ∈ xs and f x ∈ f xs
+      · exact ih
+      -- x ∈ xs but f x ∉ f xs
+      · exfalso; grind only [List.mem_map]
+      -- x ∉ xs but f x ∈ f xs
+      · have : f x ∈ List.map f xs.dedup := by
+          grind only [List.mem_map, List.mem_dedup]
+        simp only [List.map_cons, this, List.dedup_cons_of_mem, ih]
+      -- x ∉ xs and f x ∉ f xs
+      · simp only [List.dedup_cons, List.map_cons, ih]
+        have : f x ∉ List.map f xs.dedup := by
+          grind only [List.mem_map, List.mem_dedup]
+        simp only [this, ↓reduceIte]
+
+omit [(i : Fin n) → LinearOrder (types i)] in
+theorem prejection_compose' {m p : Nat}
+    (indices1 : Fin m → Fin n) (indices2 : Fin p → Fin m)
+    (rel : TypedListRelation types) :
+    projection' indices2 (projection' indices1 rel) =
+    projection' (fun j ↦ indices1 (indices2 j)) rel := by
+    simp only [projection']
+    apply TypedListRelation.ext
+    · simp only
+    · simp only
+      have := dedup_map_dedup_eq (fun t j ↦ t (indices2 j)) (List.map (fun t j ↦ t (indices1 j)) rel.rows)
+      rw [this]; congr 1
+      simp only [List.map_map]; congr
+
 -- Projection removes duplicates, so size is <= original, not equal.
+omit [(i : Fin n) → LinearOrder (types i)] in
 theorem projection_card_le {m : Nat} (indices : Fin m → Fin n)
     (rel : TypedRelation types) :
     (projection indices rel).rows.card ≤ rel.rows.card := by
-  simp [projection]
+  simp only [projection]
   -- Law: |image f S| ≤ |S|
   apply Finset.card_image_le
 
-omit [∀ i, DecidableEq (types i)] in
+omit [(i : Fin n) → LinearOrder (types i)] in
+theorem projection'_length_le {m : Nat} (indices : Fin m → Fin n)
+    (rel : TypedListRelation types) :
+    (projection' indices rel).rows.length ≤ rel.rows.length := by
+    simp only [projection']
+    have : (List.map (fun t j ↦ t (indices j)) rel.rows).length = rel.rows.length := by
+      simp only [List.length_map]
+    rw [← this]
+    apply List.Sublist.length_le
+    apply List.dedup_sublist
+
 -- Theorem: Restriction Cardinality
 -- |σ(R)| ≤ |R|
 -- "Filtering rows can never increase the number of rows."
+omit [(i : Fin n) → DecidableEq (types i)] [(i : Fin n) → LinearOrder (types i)] in
 theorem restriction_card_le
     (predicate : TypedTuple types → Bool) (rel : TypedRelation types) :
     (restriction predicate rel).rows.card ≤ rel.rows.card := by
-  simp [restriction]
+  simp only [restriction]
   -- |filter p S| ≤ |S|
   apply Finset.card_filter_le
 
+omit [(i : Fin n) → DecidableEq (types i)] [(i : Fin n) → LinearOrder (types i)] in
+theorem restriction'_length_le
+    (predicate : TypedTuple types → Bool) (rel : TypedListRelation types) :
+    (restriction' predicate rel).rows.length ≤ rel.rows.length := by
+    simp only [restriction', List.length_filter_le ]
 
 /-
 ### Formatting to print
