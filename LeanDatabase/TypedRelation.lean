@@ -47,7 +47,6 @@ variable (r s t : TypedTuple types)
 omit [(i : Fin n) → DecidableEq (types i)] [(i : Fin n) → LinearOrder (types i)] in
 theorem eq_iff : r = s ↔ ∀ i, r i = s i := by grind only
 
-@[simp, grind .]
 def lt : Prop := ∃ i : Fin n, (r i < s i) ∧ (∀ j : Fin n, j < i → r j = s j)
 instance : LT (TypedTuple types) := ⟨lt⟩
 instance : Decidable (lt r s) := by unfold lt; infer_instance
@@ -58,7 +57,6 @@ instance : DecidableLT (TypedTuple types) := by infer_instance
 omit [(i : Fin n) → DecidableEq (types i)] in
 theorem lt_iff : r < s ↔ ∃ i : Fin n, (r i < s i) ∧ (∀ j : Fin n, j < i → r j = s j) := by rfl
 
-@[simp, grind .]
 def le : Prop := r < s ∨ r = s
 instance : LE (TypedTuple types) := ⟨le⟩
 instance : Decidable (le r s) := by unfold le; infer_instance
@@ -67,13 +65,13 @@ instance : DecidableLE (TypedTuple types) := by infer_instance
 
 
 omit [(i : Fin n) → DecidableEq (types i)] in
-@[simp, grind =] theorem le_iff : r ≤ s ↔ r < s ∨ r = s := by rfl
+theorem le_iff : r ≤ s ↔ r < s ∨ r = s := by rfl
 
 def min := if r ≤ s then r else s
 def max := if r ≤ s then s else r
 
 omit [(i : Fin n) → DecidableEq (types i)] in
-@[simp, grind .] theorem le_refl : r ≤ r := by grind only [le_iff]
+theorem le_refl : r ≤ r := by grind only [le_iff]
 
 omit [(i : Fin n) → DecidableEq (types i)] in
 theorem lt_trans : r < s → s < t → r < t := by
@@ -88,7 +86,7 @@ theorem lt_trans : r < s → s < t → r < t := by
   · grind only
 
 omit [(i : Fin n) → DecidableEq (types i)] in
-@[simp, grind .] theorem le_trans : r ≤ s → s ≤ t → r ≤ t := by
+theorem le_trans : r ≤ s → s ≤ t → r ≤ t := by
   simp only [le_iff]; intro h₁ h₂
   rcases h₁ with h₁ | h₁ <;> rcases h₂ with h₂ | h₂ <;> grind only [lt_trans]
 
@@ -107,7 +105,7 @@ omit [(i : Fin n) → DecidableEq (types i)] in
 theorem not_eq_of_lt : r < s → ¬ r = s := by grind only [lt_iff]
 
 omit [(i : Fin n) → DecidableEq (types i)] in
-@[simp, grind .] theorem lt_iff_le_not_ge : r < s ↔ r ≤ s ∧ ¬s ≤ r := by
+theorem lt_iff_le_not_ge : r < s ↔ r ≤ s ∧ ¬s ≤ r := by
   constructor
   · intro h; constructor
     · left; exact h
@@ -117,12 +115,12 @@ omit [(i : Fin n) → DecidableEq (types i)] in
     grind only
 
 omit [(i : Fin n) → DecidableEq (types i)] in
-@[simp, grind .] theorem le_antisymm : r ≤ s → s ≤ r → r = s := by
+theorem le_antisymm : r ≤ s → s ≤ r → r = s := by
   simp only [le_iff]; intro h₁ h₂
   rcases h₁ with h₁ | h₁ <;> rcases h₂ with h₂ | h₂ <;> grind only [lt_iff_le_not_ge, le_iff]
 
 omit [(i : Fin n) → LinearOrder (types i)] in
-@[simp] theorem exists_first_diff (h : ¬ r = s) : ∃ i, ¬ r i = s i ∧ ∀ j < i, r j = s j := by
+theorem exists_first_diff (h : ¬ r = s) : ∃ i, ¬ r i = s i ∧ ∀ j < i, r j = s j := by
   let p : Fin n → Bool := fun i ↦ r i ≠ s i
   match h_find : Fin.find? p with
   | none =>
@@ -135,7 +133,7 @@ omit [(i : Fin n) → LinearOrder (types i)] in
       Bool.not_false, decide_eq_true_eq, ↓existsAndEq, true_and, p] at h_find
     use i
 
-@[simp, grind .] theorem le_total : r ≤ s ∨ s ≤ r := by
+theorem le_total : r ≤ s ∨ s ≤ r := by
   if h : r = s then grind only [le_iff]
   else
     simp only [le_iff, h, or_false]; rw [eq_comm] at h
@@ -204,6 +202,7 @@ def typedColumn {α : Type} [DecidableEq α]
   rel.rows.map (fun tuple => h ▸ tuple index)
 
 -- Restriction (uses Finset.filter)
+@[simp, grind .]
 def restriction (predicate : TypedTuple types → Bool) (rel : TypedRelation types) :
     TypedRelation types :=
   {
@@ -212,11 +211,13 @@ def restriction (predicate : TypedTuple types → Bool) (rel : TypedRelation typ
   }
 
 -- Selection is same as restriction, but is also commonly used
+@[simp, grind .]
 def selection (predicate : TypedTuple types → Bool) (rel : TypedRelation types) :
     TypedRelation types :=
   restriction predicate rel
 
 -- Union
+@[simp, grind .]
 def union (r1 r2 : TypedRelation types) : TypedRelation types :=
   {
     labels := r1.labels,
@@ -224,6 +225,7 @@ def union (r1 r2 : TypedRelation types) : TypedRelation types :=
   }
 
 -- Intersection
+@[simp, grind .]
 def intersection (r1 r2 : TypedRelation types) : TypedRelation types :=
   {
     labels := r1.labels,
@@ -232,6 +234,7 @@ def intersection (r1 r2 : TypedRelation types) : TypedRelation types :=
 
 
 -- Minus / Difference
+@[simp, grind .]
 def minus (r1 r2 : TypedRelation types) : TypedRelation types :=
   {
     labels := r1.labels,
@@ -240,6 +243,7 @@ def minus (r1 r2 : TypedRelation types) : TypedRelation types :=
 
 
 -- RENAME operator: Changes labels, keeps data exactly the same.
+@[simp, grind .]
 def rename (newLabels : Fin n → String) (rel : TypedRelation types) : TypedRelation types :=
   {
     labels := newLabels,
@@ -291,7 +295,8 @@ omit [(i : Fin n) → LinearOrder (types i)] in
 theorem projection_card_le {m : Nat} (indices : Fin m → Fin n)
     (rel : TypedRelation types) :
     (projection indices rel).rows.card ≤ rel.rows.card := by
-  sorry
+  simp_all only [projection]
+  simp only [Multiset.card_map, _root_.le_refl]
 
   -- Law: |image f S| ≤ |S|
 
@@ -303,10 +308,10 @@ omit [(i : Fin n) → DecidableEq (types i)] [(i : Fin n) → LinearOrder (types
 theorem restriction_card_le
     (predicate : TypedTuple types → Bool) (rel : TypedRelation types) :
     (restriction predicate rel).rows.card ≤ rel.rows.card := by
-  simp only [restriction]
+  simp_all [restriction]
   -- |filter p S| ≤ |S|
-  refine Multiset.card_le_card ?_
-  grind [Multiset.filter_le]
+  congr 1
+  sorry
 
 /-
 ### Formatting to print
