@@ -104,7 +104,7 @@ omit [(i : Fin n) → DecidableEq (types i)] in
 theorem not_eq_of_lt : r < s → ¬ r = s := by grind only [lt_iff]
 
 omit [(i : Fin n) → DecidableEq (types i)] in
-@[simp, grind .] theorem lt_iff_le_not_ge : r < s ↔ r ≤ s ∧ ¬s ≤ r := by
+@[grind .] theorem lt_iff_le_not_ge : r < s ↔ r ≤ s ∧ ¬s ≤ r := by
   constructor
   · intro h; constructor
     · left; exact h
