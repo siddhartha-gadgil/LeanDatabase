@@ -241,6 +241,14 @@ def prefixLabels (prefixStr : String) (rel : TypedRelation types) : TypedRelatio
     labels := fun i => prefixStr ++ "." ++ rel.labels i,
     rows   := rel.rows
   }
+/-
+@[simp]
+def prefixLabels' (prefixStr : String) (rel : TypedListRelation types) : TypedListRelation types :=
+  {
+    labels := fun i => prefixStr ++ "." ++ rel.labels i,
+    rows   := rel.rows
+  }
+-/
 
 /-! ## Theorems -/
 
@@ -276,6 +284,13 @@ theorem restriction_card_le
   -- |filter p S| ≤ |S|
   apply Finset.card_filter_le
 
+/-
+omit [(i : Fin n) → DecidableEq (types i)] [(i : Fin n) → LinearOrder (types i)] in
+theorem restriction'_length_le
+    (predicate : TypedTuple types → Bool) (rel : TypedListRelation types) :
+    (restriction' predicate rel).rows.length ≤ rel.rows.length := by
+    simp only [restriction', List.length_filter_le ]
+-/
 /-
 ### Formatting to print
 -/
