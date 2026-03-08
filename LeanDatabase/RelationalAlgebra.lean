@@ -77,21 +77,22 @@ theorem inter_absorb_union (r1 r2 : TypedRelation types) :
 -- "Excluding S then excluding T is the same as excluding (S or T) at once."
 theorem diff_diff_eq_diff_union (r s t : TypedRelation types) :
     minus (minus r s) t = minus r (union s t) := by
-  simp [minus, union]
+  simp only [minus, union]
   ext x
+  grind
   grind
 
 -- Theorem: Identity for Difference
 -- R - ∅ = R
 theorem diff_empty (r : TypedRelation types) :
     minus r (emptyRel r.labels) = r := by
-  simp [minus, emptyRel, Finset.sdiff_empty]
+  simp only[minus, emptyRel, Finset.sdiff_empty]
 
 -- Theorem: Zero for Difference (Left)
 -- ∅ - R = ∅
 theorem empty_diff (r : TypedRelation types) :
     (minus (emptyRel r.labels) r).rows = ∅ := by
-  simp [minus, emptyRel, Finset.empty_sdiff]
+  simp only [minus, emptyRel, Finset.empty_sdiff]
 
 -- Theorem: Self-Difference is Empty
 -- R - R = ∅
@@ -126,8 +127,10 @@ theorem restriction_inter_distrib (p : TypedTuple types → Bool)
 omit [∀ i, DecidableEq (types i)] in
 theorem restriction_comm (p1 p2 : (TypedTuple types → Bool)) (r : TypedRelation types) :
     restriction p1 (restriction p2 r) = restriction p2 (restriction p1 r) := by
-  simp_all [restriction]
-  grind
+  simp_all only [restriction]
+  ext x
+  · grind
+  · grind
 
 -- Theorem: Idempotence of Selection
 -- σ_p ( σ_p ( R ) ) = σ_p( R )
@@ -159,9 +162,10 @@ theorem restriction_cascade (p1 p2 : (TypedTuple types → Bool)) (r : TypedRela
 -- "You can filter the rows before calculating the difference."
 theorem restriction_diff_distrib (p : TypedTuple types → Bool) (r1 r2 : TypedRelation types) :
     restriction p (minus r1 r2) = minus (restriction p r1) (restriction p r2) := by
-  simp [restriction, minus]
+  simp only [restriction, minus]
   ext x
-  grind
+  · grind
+  · grind
 
 -- Theorem: Difference of Restrictions
 -- σ_P(R) - σ_Q(R) = σ_{P ∧ ¬Q}(R)
@@ -180,7 +184,8 @@ theorem restriction_diff_conj_restriction (p q : TypedTuple types → Bool) (r :
 omit [∀ i, DecidableEq (types i)] in
 theorem restriction_empty (p :  TypedTuple types → Bool) (l : Fin n → String) :
     (restriction p (emptyRel l)).rows = ∅ := by
-  simp [restriction, emptyRel]
+  simp only [restriction, emptyRel]
+  grind
 
 -- Theorem: Identity for Union
 -- R ∪ ∅ = R
@@ -210,14 +215,18 @@ theorem restriction_monotone (p : (TypedTuple types → Bool)) (r1 r2 : TypedRel
 -- "If you join two tables and then filter, it is slow. You can filter first and then join."
 theorem restriction_push_inter_left (p : TypedTuple types → Bool) (r1 r2 : TypedRelation types) :
     restriction p (intersection r1 r2) = intersection (restriction p r1) r2 := by
-  simp [restriction, intersection]
-  grind
+  simp only [restriction, intersection]
+  ext x
+  · grind
+  · grind
 
 -- Theorem: De Morgan's Law for Difference
 -- R - (S ∪ T) = (R - S) ∩ (R - T)
 theorem diff_union_distrib (r s t : TypedRelation types) :
     minus r (union s t) = intersection (minus r s) (minus r t) := by
-  simp [minus, union, intersection]
-  grind
+  simp only [minus, union, intersection]
+  ext x
+  · grind
+  · grind
 
 end LeanDatabase

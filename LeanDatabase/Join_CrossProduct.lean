@@ -13,18 +13,18 @@ omit [∀ i, DecidableEq (types1 i)] [∀ i, DecidableEq (types2 i)] in
 theorem append_types_eq (i : Fin (n + m)) :
   (Fin.append types1 types2 i) =
   (Fin.addCases types1 types2 i) := by
-  simp [Fin.append, Fin.addCases]
+  simp only [Fin.append, Fin.addCases]
 
 @[simp]
 instance instDecidableEqAppend : ∀ i, DecidableEq (Fin.append types1 types2 i) := fun i =>
   Fin.addCases
     (fun i =>
       -- Left Case: Fin.append reduces to types1
-      have h : Fin.append types1 types2 (Fin.castAdd m i) = types1 i := by simp
+      have h : Fin.append types1 types2 (Fin.castAdd m i) = types1 i := by simp [Fin.append, Fin.addCases]
       h ▸ inferInstance)
     (fun i =>
       -- Right Case: Fin.append reduces to types2
-      have h : Fin.append types1 types2 (Fin.natAdd n i) = types2 i := by simp
+      have h : Fin.append types1 types2 (Fin.natAdd n i) = types2 i := by simp [Fin.append, Fin.addCases]
       h ▸ inferInstance)
     i
 
@@ -35,10 +35,10 @@ instance instToStringAppend {n m : Nat}
     ∀ i, ToString (Fin.append types1 types2 i) := fun i =>
   Fin.addCases
     (fun i =>
-      have h : Fin.append types1 types2 (Fin.castAdd m i) = types1 i := by simp
+      have h : Fin.append types1 types2 (Fin.castAdd m i) = types1 i := by simp [Fin.append, Fin.addCases]
       h ▸ inferInstance)
     (fun i =>
-      have h : Fin.append types1 types2 (Fin.natAdd n i) = types2 i := by simp
+      have h : Fin.append types1 types2 (Fin.natAdd n i) = types2 i := by simp [Fin.append, Fin.addCases]
       h ▸ inferInstance)
     i
 
@@ -70,12 +70,12 @@ def crossProductRel (r1 : TypedRelation types1) (r2 : TypedRelation types2) (tab
          Fin.addCases
            (fun i =>
              -- PROOF 1: The complex type equals the simple type
-             have h : Fin.append types1 types2 (Fin.castAdd m i) = types1 i := by simp
+             have h : Fin.append types1 types2 (Fin.castAdd m i) = types1 i := by simp [Fin.append, Fin.addCases]
              -- REWRITE: Cast 'pair.1 i' (simple) to the complex type
              h.symm ▸ pair.1 i)
            (fun i =>
              -- PROOF 2: The complex type equals the simple type
-             have h : Fin.append types1 types2 (Fin.natAdd n i) = types2 i := by simp
+             have h : Fin.append types1 types2 (Fin.natAdd n i) = types2 i := by simp [Fin.append, Fin.addCases]
              -- REWRITE: Cast 'pair.2 i' (simple) to the complex type
              h.symm ▸ pair.2 i)
            i
@@ -91,15 +91,15 @@ theorem combine_tuples_injective :
        fun i =>
          (Fin.addCases
            (fun i =>
-             have h : Fin.append types1 types2 (Fin.castAdd m i) = types1 i := by simp
+             have h : Fin.append types1 types2 (Fin.castAdd m i) = types1 i := by simp [Fin.append, Fin.addCases]
              h.symm ▸ pair.1 i)
            (fun i =>
-             have h : Fin.append types1 types2 (Fin.natAdd n i) = types2 i := by simp
+             have h : Fin.append types1 types2 (Fin.natAdd n i) = types2 i := by simp [Fin.append, Fin.addCases]
              h.symm ▸ pair.2 i)
            i : Fin.append types1 types2 i)
        ) := by
   intro (a1, b1) (a2, b2) h_eq
-  simp at h_eq
+  simp only at h_eq
   ext i
   · have h_left := congr_fun h_eq (Fin.castAdd m i)
     simp_all only [Fin.addCases_left]
@@ -128,7 +128,8 @@ theorem crossProduct_card (r1 : TypedRelation types1) (r2 : TypedRelation types2
 theorem crossProduct_empty_left (r1 : TypedRelation types1) (r2 : TypedRelation types2)
     (a1 a2 : String) (h : r1.rows = ∅) :
     (crossProductRel r1 r2 a1 a2).rows = ∅ := by
-  simp [crossProductRel, h]
+  simp only [crossProductRel, h]
+  grind
 
 -- Theorem: Zero Propagation (Right)
 -- R1 × ∅ = ∅
@@ -136,7 +137,8 @@ theorem crossProduct_empty_left (r1 : TypedRelation types1) (r2 : TypedRelation 
 theorem crossProduct_empty_right (r1 : TypedRelation types1) (r2 : TypedRelation types2)
     (a1 a2 : String) (h : r2.rows = ∅) :
     (crossProductRel r1 r2 a1 a2).rows = ∅ := by
-  simp [crossProductRel, h]
+  simp only [crossProductRel, h]
+  grind
 
 
 -- Helper: Split Tuple
@@ -146,10 +148,10 @@ def splitTuple (t : TypedTuple (Fin.append types1 types2)) :
     TypedTuple types1 × TypedTuple types2 :=
   (
     fun i =>
-      have h : Fin.append types1 types2 (Fin.castAdd m i) = types1 i := by simp
+      have h : Fin.append types1 types2 (Fin.castAdd m i) = types1 i := by simp [Fin.append, Fin.addCases]
       h ▸ t (Fin.castAdd m i),
     fun i =>
-      have h : Fin.append types1 types2 (Fin.natAdd n i) = types2 i := by simp
+      have h : Fin.append types1 types2 (Fin.natAdd n i) = types2 i := by simp [Fin.append, Fin.addCases]
       h ▸ t (Fin.natAdd n i)
   )
 
@@ -180,18 +182,12 @@ theorem mem_crossProduct (r1 : TypedRelation types1) (r2 : TypedRelation types2)
       grind
 
   -- Backward (If parts are in R1 and R2, their combination is t)
-  · intro h
-    rcases h with ⟨h1, h2⟩
-    simp_all
-
+  · simp_all only [splitTuple, Finset.mem_product, Prod.exists]
+    intro h
     use (splitTuple t).1, (splitTuple t).2
-
     constructor
-    -- 1. Prove the witness is in the source tables (Easy)
-    · grind
-    -- 2. Prove combine(split(t)) = t
+    · assumption
     · ext i
-      simp_all
       induction i using Fin.addCases
       · simp_all only [Fin.addCases_left]
         grind
@@ -221,7 +217,7 @@ theorem join_empty_left (r1 : TypedRelation types1) (r2 : TypedRelation types2)
     (condition : TypedTuple (Fin.append types1 types2) → Bool) (a1 a2 : String)
     (h : r1.rows = ∅) :
     (join r1 r2 a1 a2 condition).rows = ∅ := by
-  simp_all
+  grind
 
 -- Theorem: Join Empty Right
 -- R ⋈ ∅ = ∅
@@ -229,7 +225,7 @@ theorem join_empty_right (r1 : TypedRelation types1) (r2 : TypedRelation types2)
     (condition : TypedTuple (Fin.append types1 types2) → Bool) (a1 a2 : String)
     (h : r2.rows = ∅) :
     (join r1 r2 a1 a2 condition).rows = ∅ := by
-  simp_all
+  grind
 
 -- Theorem: Join Size Upper Bound
 -- |R ⋈ S| <= |R| * |S|
@@ -237,7 +233,7 @@ theorem join_empty_right (r1 : TypedRelation types1) (r2 : TypedRelation types2)
 theorem join_card_bound (r1 : TypedRelation types1) (r2 : TypedRelation types2)
     (condition : TypedTuple (Fin.append types1 types2) → Bool) (a1 a2 : String) :
     (join r1 r2 a1 a2 condition).rows.card ≤ r1.rows.card * r2.rows.card := by
-  simp [join]
+  simp only [join]
   have h_filter : (Finset.filter (fun t => condition t) (crossProductRel r1 r2 a1 a2).rows).card
                   ≤ (crossProductRel r1 r2 a1 a2).rows.card := by
     apply Finset.card_filter_le
@@ -262,6 +258,6 @@ theorem join_filter_merge (r1 : TypedRelation types1) (r2 : TypedRelation types2
 theorem join_subset_crossProduct (r1 : TypedRelation types1) (r2 : TypedRelation types2)
     (condition : TypedTuple (Fin.append types1 types2) → Bool) (a1 a2 : String) :
     (join r1 r2 a1 a2 condition).rows ⊆ (crossProductRel r1 r2 a1 a2).rows := by
-  simp [join]
+  grind
 
 end LeanDatabase

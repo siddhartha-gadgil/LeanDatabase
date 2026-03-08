@@ -1,0 +1,100 @@
+import LeanDatabase.TypedRelation
+
+namespace LeanDatabase
+
+/- ## SQL Column Def-/
+
+structure ColumnDef where
+  name : String
+  typeStr: String
+  isPrimaryKey : Bool := false
+  isNullable : Bool := true
+  isUnique : Bool := false
+  defaultValue : Option String := none
+deriving Repr, Inhabited, BEq
+
+/- ## Table Schema built upon TypedRelation -/
+
+structure TableSchema (n : Nat) where
+  tableName : String
+  columns : List ColumnDef
+  columnIndex: String -> Option (Fin n)
+deriving Inhabited
+
+/-! ## Enhanced TypedRelation with Schema -/
+
+structure TypedTableRelation (types : Fin n → Type) where
+  schema : TableSchema n
+  relation : TypedRelation types
+  -- Invariant: schema.columns.length = n
+deriving Inhabited
+
+namespace SqlDsl
+
+/-! ## SQL DSL-/
+
+inductive SQLType where
+  | INT
+  | VARCHAR (maxLen : Nat)
+  | BOOL
+  | FLOAT
+  | TEXT
+deriving Repr, BEq
+
+def SQLType.toLeanType : SQLType → Type
+  | SQLType.INT => Int
+  | SQLType.VARCHAR _ => String
+  | SQLType.BOOL => Bool
+  | SQLType.FLOAT => Float
+  | SQLType.TEXT => String
+
+instance : ToString SQLType where
+  toString
+    | SQLType.INT => "INT"
+    | SQLType.VARCHAR maxLen => s!"VARCHAR({maxLen})"
+    | SQLType.BOOL => "BOOL"
+    | SQLType.FLOAT => "FLOAT"
+    | SQLType.TEXT => "TEXT"
+
+/-! ## Column Constraint -/
+
+structure ColConstraint where
+  primaryKey : Bool := false
+  notNull : Bool := false
+  unique : Bool := false
+  default : Option String := none
+deriving Repr, BEq
+
+/-! ## SQL Column Definition (Parser-friendly) -/
+
+structure SQLColumn where
+  name : String
+  sqlType : SQLType
+  constraints : ColConstraint := {}
+deriving Repr, BEq
+
+/-! ## SQL CREATE TABLE Statement -/
+
+structure CreateTableStmt where
+  tableName : String
+  columns : List SQLColumn
+deriving Repr, BEq
+
+/-! ## Helper: Convert SQLColumn to ColumnDef -/
+
+def SQLColumn.toColumnDef (col : SQLColumn) : ColumnDef :=
+  {
+    name := col.name,
+    typeStr := s!"{col.sqlType}",
+    isPrimaryKey := col.constraints.primaryKey,
+    isNullable := !col.constraints.notNull,
+    isUnique := col.constraints.unique,
+    defaultValue := col.constraints.default
+  }
+
+/-! ## Helper to create a table from a simple list of columns -/
+
+
+end SqlDsl
+
+end LeanDatabase
