@@ -4,41 +4,41 @@ import LeanDatabase.TypedRelation
 namespace LeanDatabase
 
 variable {n m : Nat}
-variable {types1 : Fin n → Type} [∀ i, DecidableEq (types1 i)]
-variable {types2 : Fin m → Type} [∀ i, DecidableEq (types2 i)]
+variable {colType1 : Fin n → Type} [∀ i, DecidableEq (colType1 i)]
+variable {colType2 : Fin m → Type} [∀ i, DecidableEq (colType2 i)]
 
 -- Helper: Prove that the type (Fin.append t1 t2) i is definitionally equal
 -- to the result of combining them.
-omit [∀ i, DecidableEq (types1 i)] [∀ i, DecidableEq (types2 i)] in
-theorem append_types_eq (i : Fin (n + m)) :
-  (Fin.append types1 types2 i) =
-  (Fin.addCases types1 types2 i) := by
+omit [∀ i, DecidableEq (colType1 i)] [∀ i, DecidableEq (colType2 i)] in
+theorem append_colType_eq (i : Fin (n + m)) :
+  (Fin.append colType1 colType2 i) =
+  (Fin.addCases colType1 colType2 i) := by
   simp only [Fin.append, Fin.addCases]
 
 @[simp]
-instance instDecidableEqAppend : ∀ i, DecidableEq (Fin.append types1 types2 i) := fun i =>
+instance instDecidableEqAppend : ∀ i, DecidableEq (Fin.append colType1 colType2 i) := fun i =>
   Fin.addCases
     (fun i =>
-      -- Left Case: Fin.append reduces to types1
-      have h : Fin.append types1 types2 (Fin.castAdd m i) = types1 i := by simp [Fin.append, Fin.addCases]
+      -- Left Case: Fin.append reduces to colType1
+      have h : Fin.append colType1 colType2 (Fin.castAdd m i) = colType1 i := by simp [Fin.append, Fin.addCases]
       h ▸ inferInstance)
     (fun i =>
-      -- Right Case: Fin.append reduces to types2
-      have h : Fin.append types1 types2 (Fin.natAdd n i) = types2 i := by simp [Fin.append, Fin.addCases]
+      -- Right Case: Fin.append reduces to colType2
+      have h : Fin.append colType1 colType2 (Fin.natAdd n i) = colType2 i := by simp [Fin.append, Fin.addCases]
       h ▸ inferInstance)
     i
 
 @[simp]
 instance instToStringAppend {n m : Nat}
-    {types1 : Fin n → Type} [∀ i, ToString (types1 i)]
-    {types2 : Fin m → Type} [∀ i, ToString (types2 i)] :
-    ∀ i, ToString (Fin.append types1 types2 i) := fun i =>
+    {colType1 : Fin n → Type} [∀ i, ToString (colType1 i)]
+    {colType2 : Fin m → Type} [∀ i, ToString (colType2 i)] :
+    ∀ i, ToString (Fin.append colType1 colType2 i) := fun i =>
   Fin.addCases
     (fun i =>
-      have h : Fin.append types1 types2 (Fin.castAdd m i) = types1 i := by simp [Fin.append, Fin.addCases]
+      have h : Fin.append colType1 colType2 (Fin.castAdd m i) = colType1 i := by simp [Fin.append, Fin.addCases]
       h ▸ inferInstance)
     (fun i =>
-      have h : Fin.append types1 types2 (Fin.natAdd n i) = types2 i := by simp [Fin.append, Fin.addCases]
+      have h : Fin.append colType1 colType2 (Fin.natAdd n i) = colType2 i := by simp [Fin.append, Fin.addCases]
       h ▸ inferInstance)
     i
 
@@ -48,8 +48,8 @@ Note: we rename labels if they are same bases on given aliases prefix
 -/
 
 @[simp, grind .]
-def crossProductRel (r1 : TypedRelation types1) (r2 : TypedRelation types2) (table1_alias: String := "L") (table2_alias: String := "R") :
-    TypedRelation (Fin.append types1 types2) :=
+def crossProductRel (r1 : TypedRelation colType1) (r2 : TypedRelation colType2) (table1_alias: String := "L") (table2_alias: String := "R") :
+    TypedRelation (Fin.append colType1 colType2) :=
 
   -- Check if labels are not same, then prefixLabel them
   let l1_list := List.ofFn r1.labels
@@ -65,17 +65,17 @@ def crossProductRel (r1 : TypedRelation types1) (r2 : TypedRelation types2) (tab
     labels := Fin.append l1_labels l2_labels,
 
     -- Combine Rows (Cartesian Product)
-    rows := (r1.rows ×ˢ r2.rows).image (fun (pair : TypedTuple types1 × TypedTuple types2) =>
+    rows := (r1.rows ×ˢ r2.rows).image (fun (pair : TypedTuple colType1 × TypedTuple colType2) =>
        fun i =>
          Fin.addCases
            (fun i =>
              -- PROOF 1: The complex type equals the simple type
-             have h : Fin.append types1 types2 (Fin.castAdd m i) = types1 i := by simp [Fin.append, Fin.addCases]
+             have h : Fin.append colType1 colType2 (Fin.castAdd m i) = colType1 i := by simp [Fin.append, Fin.addCases]
              -- REWRITE: Cast 'pair.1 i' (simple) to the complex type
              h.symm ▸ pair.1 i)
            (fun i =>
              -- PROOF 2: The complex type equals the simple type
-             have h : Fin.append types1 types2 (Fin.natAdd n i) = types2 i := by simp [Fin.append, Fin.addCases]
+             have h : Fin.append colType1 colType2 (Fin.natAdd n i) = colType2 i := by simp [Fin.append, Fin.addCases]
              -- REWRITE: Cast 'pair.2 i' (simple) to the complex type
              h.symm ▸ pair.2 i)
            i
@@ -84,19 +84,19 @@ def crossProductRel (r1 : TypedRelation types1) (r2 : TypedRelation types2) (tab
 
 -- Helper Lemma: Injectivity of Tuple Combination
 -- Proves that gluing two tuples together preserves unique data.
-omit [∀ i, DecidableEq (types1 i)] [∀ i, DecidableEq (types2 i)] in
+omit [∀ i, DecidableEq (colType1 i)] [∀ i, DecidableEq (colType2 i)] in
 @[simp]
 theorem combine_tuples_injective :
-  Function.Injective (fun (pair : TypedTuple types1 × TypedTuple types2) =>
+  Function.Injective (fun (pair : TypedTuple colType1 × TypedTuple colType2) =>
        fun i =>
          (Fin.addCases
            (fun i =>
-             have h : Fin.append types1 types2 (Fin.castAdd m i) = types1 i := by simp [Fin.append, Fin.addCases]
+             have h : Fin.append colType1 colType2 (Fin.castAdd m i) = colType1 i := by simp [Fin.append, Fin.addCases]
              h.symm ▸ pair.1 i)
            (fun i =>
-             have h : Fin.append types1 types2 (Fin.natAdd n i) = types2 i := by simp [Fin.append, Fin.addCases]
+             have h : Fin.append colType1 colType2 (Fin.natAdd n i) = colType2 i := by simp [Fin.append, Fin.addCases]
              h.symm ▸ pair.2 i)
-           i : Fin.append types1 types2 i)
+           i : Fin.append colType1 colType2 i)
        ) := by
   intro (a1, b1) (a2, b2) h_eq
   simp only at h_eq
@@ -112,7 +112,7 @@ theorem combine_tuples_injective :
 -- Theorem: Cardinality of Cross Product
 -- |R1 × R2| = |R1| * |R2|
 -- "The size of the product is the product of the sizes"
-theorem crossProduct_card (r1 : TypedRelation types1) (r2 : TypedRelation types2)
+theorem crossProduct_card (r1 : TypedRelation colType1) (r2 : TypedRelation colType2)
     (a1 a2 : String) :
     (crossProductRel r1 r2 a1 a2).rows.card = r1.rows.card * r2.rows.card := by
   simp_all only [crossProductRel, List.contains_eq_mem, List.mem_ofFn, List.any_eq_true,
@@ -125,7 +125,7 @@ theorem crossProduct_card (r1 : TypedRelation types1) (r2 : TypedRelation types2
 -- Theorem: Zero Propagation (Left)
 -- ∅ × R2 = ∅
 -- "Crossing with an empty table yields an empty table"
-theorem crossProduct_empty_left (r1 : TypedRelation types1) (r2 : TypedRelation types2)
+theorem crossProduct_empty_left (r1 : TypedRelation colType1) (r2 : TypedRelation colType2)
     (a1 a2 : String) (h : r1.rows = ∅) :
     (crossProductRel r1 r2 a1 a2).rows = ∅ := by
   simp only [crossProductRel, h]
@@ -134,7 +134,7 @@ theorem crossProduct_empty_left (r1 : TypedRelation types1) (r2 : TypedRelation 
 -- Theorem: Zero Propagation (Right)
 -- R1 × ∅ = ∅
 -- "Crossing with an empty table yields an empty table"
-theorem crossProduct_empty_right (r1 : TypedRelation types1) (r2 : TypedRelation types2)
+theorem crossProduct_empty_right (r1 : TypedRelation colType1) (r2 : TypedRelation colType2)
     (a1 a2 : String) (h : r2.rows = ∅) :
     (crossProductRel r1 r2 a1 a2).rows = ∅ := by
   simp only [crossProductRel, h]
@@ -144,22 +144,22 @@ theorem crossProduct_empty_right (r1 : TypedRelation types1) (r2 : TypedRelation
 -- Helper: Split Tuple
 -- Needed for the Membership theorem. Deconstructs a big tuple back into two small ones.
 @[simp, grind .]
-def splitTuple (t : TypedTuple (Fin.append types1 types2)) :
-    TypedTuple types1 × TypedTuple types2 :=
+def splitTuple (t : TypedTuple (Fin.append colType1 colType2)) :
+    TypedTuple colType1 × TypedTuple colType2 :=
   (
     fun i =>
-      have h : Fin.append types1 types2 (Fin.castAdd m i) = types1 i := by simp [Fin.append, Fin.addCases]
+      have h : Fin.append colType1 colType2 (Fin.castAdd m i) = colType1 i := by simp [Fin.append, Fin.addCases]
       h ▸ t (Fin.castAdd m i),
     fun i =>
-      have h : Fin.append types1 types2 (Fin.natAdd n i) = types2 i := by simp [Fin.append, Fin.addCases]
+      have h : Fin.append colType1 colType2 (Fin.natAdd n i) = colType2 i := by simp [Fin.append, Fin.addCases]
       h ▸ t (Fin.natAdd n i)
   )
 
 -- Theorem: Membership of Cross Product
 -- t ∈ (R1 × R2) ↔ t_left ∈ R1 ∧ t_right ∈ R2
 -- "A row is in the product if and only if its parts are in the source tables"
-theorem mem_crossProduct (r1 : TypedRelation types1) (r2 : TypedRelation types2)
-    (a1 a2 : String) (t : TypedTuple (Fin.append types1 types2)) :
+theorem mem_crossProduct (r1 : TypedRelation colType1) (r2 : TypedRelation colType2)
+    (a1 a2 : String) (t : TypedTuple (Fin.append colType1 colType2)) :
     t ∈ (crossProductRel r1 r2 a1 a2).rows ↔
     (splitTuple t).1 ∈ r1.rows ∧ (splitTuple t).2 ∈ r2.rows := by
 
@@ -201,9 +201,9 @@ This join operation is simply filtering of cross product for given condition
 -/
 
 @[simp, grind .]
-def join (r1 : TypedRelation types1) (r2 : TypedRelation types2) (table1_alias: String := "L") (table2_alias: String := "R")
-    (condition : TypedTuple (Fin.append types1 types2) → Bool) :
-    TypedRelation (Fin.append types1 types2) :=
+def join (r1 : TypedRelation colType1) (r2 : TypedRelation colType2) (table1_alias: String := "L") (table2_alias: String := "R")
+    (condition : TypedTuple (Fin.append colType1 colType2) → Bool) :
+    TypedRelation (Fin.append colType1 colType2) :=
 
   let product := crossProductRel r1 r2 table1_alias table2_alias
   {
@@ -213,16 +213,16 @@ def join (r1 : TypedRelation types1) (r2 : TypedRelation types2) (table1_alias: 
 
 -- Theorem: Join Empty Left
 -- ∅ ⋈ R = ∅
-theorem join_empty_left (r1 : TypedRelation types1) (r2 : TypedRelation types2)
-    (condition : TypedTuple (Fin.append types1 types2) → Bool) (a1 a2 : String)
+theorem join_empty_left (r1 : TypedRelation colType1) (r2 : TypedRelation colType2)
+    (condition : TypedTuple (Fin.append colType1 colType2) → Bool) (a1 a2 : String)
     (h : r1.rows = ∅) :
     (join r1 r2 a1 a2 condition).rows = ∅ := by
   grind
 
 -- Theorem: Join Empty Right
 -- R ⋈ ∅ = ∅
-theorem join_empty_right (r1 : TypedRelation types1) (r2 : TypedRelation types2)
-    (condition : TypedTuple (Fin.append types1 types2) → Bool) (a1 a2 : String)
+theorem join_empty_right (r1 : TypedRelation colType1) (r2 : TypedRelation colType2)
+    (condition : TypedTuple (Fin.append colType1 colType2) → Bool) (a1 a2 : String)
     (h : r2.rows = ∅) :
     (join r1 r2 a1 a2 condition).rows = ∅ := by
   grind
@@ -230,8 +230,8 @@ theorem join_empty_right (r1 : TypedRelation types1) (r2 : TypedRelation types2)
 -- Theorem: Join Size Upper Bound
 -- |R ⋈ S| <= |R| * |S|
 -- "A join can never create more rows than the cross product."
-theorem join_card_bound (r1 : TypedRelation types1) (r2 : TypedRelation types2)
-    (condition : TypedTuple (Fin.append types1 types2) → Bool) (a1 a2 : String) :
+theorem join_card_bound (r1 : TypedRelation colType1) (r2 : TypedRelation colType2)
+    (condition : TypedTuple (Fin.append colType1 colType2) → Bool) (a1 a2 : String) :
     (join r1 r2 a1 a2 condition).rows.card ≤ r1.rows.card * r2.rows.card := by
   simp only [join]
   have h_filter : (Finset.filter (fun t => condition t) (crossProductRel r1 r2 a1 a2).rows).card
@@ -244,9 +244,9 @@ theorem join_card_bound (r1 : TypedRelation types1) (r2 : TypedRelation types2)
 -- σ_p ( R ⋈ _c S ) = R ⋈ _{c && p} S
 -- "Filtering a join result is the same as adding the filter to the join condition."
 -- (This is useful: The database can check 'p' while joining, instead of doing a second pass)
-theorem join_filter_merge (r1 : TypedRelation types1) (r2 : TypedRelation types2)
-    (c : TypedTuple (Fin.append types1 types2) → Bool) -- Join Condition
-    (p : TypedTuple (Fin.append types1 types2) → Bool) -- Filter Condition
+theorem join_filter_merge (r1 : TypedRelation colType1) (r2 : TypedRelation colType2)
+    (c : TypedTuple (Fin.append colType1 colType2) → Bool) -- Join Condition
+    (p : TypedTuple (Fin.append colType1 colType2) → Bool) -- Filter Condition
     (a1 a2 : String) :
 
     (join r1 r2 a1 a2 c).rows.filter (fun t => p t) =
@@ -255,8 +255,8 @@ theorem join_filter_merge (r1 : TypedRelation types1) (r2 : TypedRelation types2
 
 -- Theorem: Join is Subset of Cross Product
 -- (R ⋈ S) ⊆ (R x S)
-theorem join_subset_crossProduct (r1 : TypedRelation types1) (r2 : TypedRelation types2)
-    (condition : TypedTuple (Fin.append types1 types2) → Bool) (a1 a2 : String) :
+theorem join_subset_crossProduct (r1 : TypedRelation colType1) (r2 : TypedRelation colType2)
+    (condition : TypedTuple (Fin.append colType1 colType2) → Bool) (a1 a2 : String) :
     (join r1 r2 a1 a2 condition).rows ⊆ (crossProductRel r1 r2 a1 a2).rows := by
   grind
 

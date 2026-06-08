@@ -27,36 +27,36 @@ so this will help us in future.
 -/
 
 -- Finsets require Decidable Equality to handle deduplication
-variable {types : Fin n → Type} [∀ i, DecidableEq (types i)][ ∀ i, LinearOrder (types i)]
-abbrev  TypedTuple (types : Fin n → Type) := (i : Fin n) → types i
+variable {colType : Fin n → Type} [∀ i, DecidableEq (colType i)][ ∀ i, LinearOrder (colType i)]
+abbrev  TypedTuple (colType : Fin n → Type) := (i : Fin n) → colType i
 
 -- We ensure tuples can be compared for equality
-instance : DecidableEq (TypedTuple types) :=
-  inferInstanceAs (DecidableEq ((i : Fin n) → types i))
+instance : DecidableEq (TypedTuple colType) :=
+  inferInstanceAs (DecidableEq ((i : Fin n) → colType i))
 
 -- Pi.Lex.linearOrder is noncomputable, hence the manual approach to Lexicographic ordering
--- noncomputable instance [inst : ∀ i, LinearOrder (types i)] : LinearOrder (TypedTuple types) :=
---   @Pi.Lex.linearOrder (Fin n) types _ _ inst
+-- noncomputable instance [inst : ∀ i, LinearOrder (colType i)] : LinearOrder (TypedTuple colType) :=
+--   @Pi.Lex.linearOrder (Fin n) colType _ _ inst
 
-variable (r s t : TypedTuple types)
+variable (r s t : TypedTuple colType)
 set_option linter.unusedSectionVars false
 
 theorem eq_iff : r = s ↔ ∀ i, r i = s i := by grind only
 
 def lt : Prop := ∃ i : Fin n, (r i < s i) ∧ (∀ j : Fin n, j < i → r j = s j)
-instance : LT (TypedTuple types) := ⟨lt⟩
+instance : LT (TypedTuple colType) := ⟨lt⟩
 instance : Decidable (lt r s) := by unfold lt; infer_instance
 instance : Decidable (r < s) := inferInstanceAs (Decidable (lt r s))
-instance : DecidableLT (TypedTuple types) := by infer_instance
+instance : DecidableLT (TypedTuple colType) := by infer_instance
 
 -- @[simp, grind =]
 theorem lt_iff : r < s ↔ ∃ i : Fin n, (r i < s i) ∧ (∀ j : Fin n, j < i → r j = s j) := by rfl
 
 def le : Prop := r < s ∨ r = s
-instance : LE (TypedTuple types) := ⟨le⟩
+instance : LE (TypedTuple colType) := ⟨le⟩
 instance : Decidable (le r s) := by unfold le; infer_instance
 instance : Decidable (r ≤ s) := inferInstanceAs (Decidable (le r s))
-instance : DecidableLE (TypedTuple types) := by infer_instance
+instance : DecidableLE (TypedTuple colType) := by infer_instance
 
 
 theorem le_iff : r ≤ s ↔ r < s ∨ r = s := by rfl
@@ -127,7 +127,7 @@ theorem le_total : r ≤ s ∨ s ≤ r := by
     obtain ⟨i, hi, hi'⟩ := exists_first_diff _ _ h
     rcases Ne.lt_or_gt hi <;> grind only [lt_iff]
 
-instance  [inst : ∀ i, LinearOrder (types i)] : LinearOrder (TypedTuple types) where
+instance  [inst : ∀ i, LinearOrder (colType i)] : LinearOrder (TypedTuple colType) where
   le_refl := le_refl
   le_trans := le_trans
   le_antisymm := le_antisymm
@@ -142,23 +142,23 @@ instance  [inst : ∀ i, LinearOrder (types i)] : LinearOrder (TypedTuple types)
 
 /-! ## Definitions -/
 
-@[ext, grind cases] structure TypedRelation (types : Fin n → Type) where
+@[ext, grind cases] structure TypedRelation (colType : Fin n → Type) where
   labels : Fin n → String
-  rows   : Finset (TypedTuple types)
+  rows   : Finset (TypedTuple colType)
 deriving Inhabited
 
 -- Definition of an Empty Relation (The "Zero" element)
-def emptyRel (l : Fin n → String) : TypedRelation types :=
+def emptyRel (l : Fin n → String) : TypedRelation colType :=
   { labels := l, rows := ∅ }
 
 /-! ## Relational Algebra Operations on Finsets -/
 
 -- Projection (uses Finset.image)
 @[simp]
-def projection {m : Nat} (indices : Fin m → Fin n) (rel : TypedRelation types) :
-    TypedRelation (fun j => types (indices j)) :=
+def projection {m : Nat} (indices : Fin m → Fin n) (rel : TypedRelation colType) :
+    TypedRelation (fun j => colType (indices j)) :=
 
-  let _ : ∀ j, DecidableEq (types (indices j)) := fun _ => inferInstance
+  let _ : ∀ j, DecidableEq (colType (indices j)) := fun _ => inferInstance
   {
     labels := fun j => rel.labels (indices j),
     rows   := rel.rows.image (fun t j => t (indices j))
@@ -166,27 +166,27 @@ def projection {m : Nat} (indices : Fin m → Fin n) (rel : TypedRelation types)
 
 @[simp]
 def typedColumn {α : Type} [DecidableEq α]
-    (index : Fin n) (rel : TypedRelation types) (h : types index = α := by simp) : Finset α :=
+    (index : Fin n) (rel : TypedRelation colType) (h : colType index = α := by simp) : Finset α :=
   -- Cast the tuple value to alpha and image it
   rel.rows.image (fun tuple => h ▸ tuple index)
 
 -- Restriction (uses Finset.filter)
 @[simp, grind]
-def restriction (predicate : TypedTuple types → Bool) (rel : TypedRelation types) :
-    TypedRelation types :=
+def restriction (predicate : TypedTuple colType → Bool) (rel : TypedRelation colType) :
+    TypedRelation colType :=
   {
     labels := rel.labels,
     rows   := rel.rows.filter (fun t => predicate t)
   }
 
 -- Selection is same as restriction, but is also commonly used
-def selection (predicate : TypedTuple types → Bool) (rel : TypedRelation types) :
-    TypedRelation types :=
+def selection (predicate : TypedTuple colType → Bool) (rel : TypedRelation colType) :
+    TypedRelation colType :=
   restriction predicate rel
 
 -- Union
 @[simp, grind]
-def union (r1 r2 : TypedRelation types) : TypedRelation types :=
+def union (r1 r2 : TypedRelation colType) : TypedRelation colType :=
   {
     labels := r1.labels,
     rows   := r1.rows ∪ r2.rows -- Finset Union
@@ -194,7 +194,7 @@ def union (r1 r2 : TypedRelation types) : TypedRelation types :=
 
 -- Intersection
 @[simp, grind]
-def intersection (r1 r2 : TypedRelation types) : TypedRelation types :=
+def intersection (r1 r2 : TypedRelation colType) : TypedRelation colType :=
   {
     labels := r1.labels,
     rows   := r1.rows ∩ r2.rows -- Finset Intersection
@@ -202,7 +202,7 @@ def intersection (r1 r2 : TypedRelation types) : TypedRelation types :=
 
 -- Minus / Difference
 @[simp, grind]
-def minus (r1 r2 : TypedRelation types) : TypedRelation types :=
+def minus (r1 r2 : TypedRelation colType) : TypedRelation colType :=
   {
     labels := r1.labels,
     rows   := r1.rows \ r2.rows -- Finset Difference (sdiff)
@@ -210,14 +210,14 @@ def minus (r1 r2 : TypedRelation types) : TypedRelation types :=
 
 -- RENAME operator: Changes labels, keeps data exactly the same.
 @[simp, grind]
-def rename (newLabels : Fin n → String) (rel : TypedRelation types) : TypedRelation types :=
+def rename (newLabels : Fin n → String) (rel : TypedRelation colType) : TypedRelation colType :=
   {
     labels := newLabels,
     rows   := rel.rows
   }
 
 -- Helper: Rename a specific column by index
-def renameColumn (idx : Fin n) (newName : String) (rel : TypedRelation types) : TypedRelation types :=
+def renameColumn (idx : Fin n) (newName : String) (rel : TypedRelation colType) : TypedRelation colType :=
   {
     labels := Function.update rel.labels idx newName,
     rows   := rel.rows
@@ -225,14 +225,14 @@ def renameColumn (idx : Fin n) (newName : String) (rel : TypedRelation types) : 
 
 -- Helper to prefix all labels in a relation, useful for cross product
 @[simp]
-def prefixLabels (prefixStr : String) (rel : TypedRelation types) : TypedRelation types :=
+def prefixLabels (prefixStr : String) (rel : TypedRelation colType) : TypedRelation colType :=
   {
     labels := fun i => prefixStr ++ "." ++ rel.labels i,
     rows   := rel.rows
   }
 /-
 @[simp]
-def prefixLabels' (prefixStr : String) (rel : TypedListRelation types) : TypedListRelation types :=
+def prefixLabels' (prefixStr : String) (rel : TypedListRelation colType) : TypedListRelation colType :=
   {
     labels := fun i => prefixStr ++ "." ++ rel.labels i,
     rows   := rel.rows
@@ -243,7 +243,7 @@ def prefixLabels' (prefixStr : String) (rel : TypedListRelation types) : TypedLi
 
 theorem projection_compose {m p : Nat}
     (indices1 : Fin m → Fin n) (indices2 : Fin p → Fin m)
-    (rel : TypedRelation types) :
+    (rel : TypedRelation colType) :
     projection indices2 (projection indices1 rel) =
     projection (fun j => indices1 (indices2 j)) rel := by
   simp only [projection]
@@ -254,7 +254,7 @@ theorem projection_compose {m p : Nat}
 
 -- Projection removes duplicates, so size is <= original, not equal.
 theorem projection_card_le {m : Nat} (indices : Fin m → Fin n)
-    (rel : TypedRelation types) :
+    (rel : TypedRelation colType) :
     (projection indices rel).rows.card ≤ rel.rows.card := by
   simp only [projection]
   -- Law: |image f S| ≤ |S|
@@ -264,16 +264,16 @@ theorem projection_card_le {m : Nat} (indices : Fin m → Fin n)
 -- |σ(R)| ≤ |R|
 -- "Filtering rows can never increase the number of rows."
 theorem restriction_card_le
-    (predicate : TypedTuple types → Bool) (rel : TypedRelation types) :
+    (predicate : TypedTuple colType → Bool) (rel : TypedRelation colType) :
     (restriction predicate rel).rows.card ≤ rel.rows.card := by
   simp only [restriction]
   -- |filter p S| ≤ |S|
   apply Finset.card_filter_le
 
 /-
-omit [(i : Fin n) → DecidableEq (types i)] [(i : Fin n) → LinearOrder (types i)] in
+omit [(i : Fin n) → DecidableEq (colType i)] [(i : Fin n) → LinearOrder (colType i)] in
 theorem restriction'_length_le
-    (predicate : TypedTuple types → Bool) (rel : TypedListRelation types) :
+    (predicate : TypedTuple colType → Bool) (rel : TypedListRelation colType) :
     (restriction' predicate rel).rows.length ≤ rel.rows.length := by
     simp only [restriction', List.length_filter_le ]
 -/
@@ -282,22 +282,22 @@ theorem restriction'_length_le
 -/
 
 -- format a single tuple to: "[Val1, Val2, ...]"
-def formatTuple [∀ i, ToString (types i)] (t : TypedTuple types) : String :=
+def formatTuple [∀ i, ToString (colType i)] (t : TypedTuple colType) : String :=
   let parts := List.finRange n |>.map (fun i => toString (t i))
   "[" ++ (String.intercalate ", " parts) ++ "]"
 
 -- Helper to format the whole table
 -- Note: We use 'unsafe' to convert the Set of rows into a List for printing
-unsafe def simpleFormat [∀ i, DecidableEq (types i)] [∀ i, ToString (types i)]
-    (rel : TypedRelation types) : String :=
+unsafe def simpleFormat [∀ i, DecidableEq (colType i)] [∀ i, ToString (colType i)]
+    (rel : TypedRelation colType) : String :=
   let labelStr := "Labels: " ++ toString (List.ofFn rel.labels)
 
   -- unsafeCast allows us to view the Set as a List just for printing
-  let rowList : List (TypedTuple types) := unsafeCast rel.rows.val
+  let rowList : List (TypedTuple colType) := unsafeCast rel.rows.val
   let rowStrs := rowList.map (fun r => "Row:    " ++ formatTuple r)
 
   String.intercalate "\n" (labelStr :: rowStrs)
 
-unsafe instance [∀ i, DecidableEq (types i)] [∀ i, ToString (types i)] :
-    Repr (TypedRelation types) where
+unsafe instance [∀ i, DecidableEq (colType i)] [∀ i, ToString (colType i)] :
+    Repr (TypedRelation colType) where
   reprPrec rel _ := simpleFormat rel

@@ -6,7 +6,7 @@ namespace LeanDatabase
 
 structure ColumnDef where
   name : String
-  typeStr: String
+  colTypetr: String
   isPrimaryKey : Bool := false
   isNullable : Bool := true
   isUnique : Bool := false
@@ -23,9 +23,9 @@ deriving Inhabited
 
 /-! ## Enhanced TypedRelation with Schema -/
 
-structure TypedTableRelation (types : Fin n → Type) where
+structure TypedTableRelation (colType : Fin n → Type) where
   schema : TableSchema n
-  relation : TypedRelation types
+  relation : TypedRelation colType
   -- Invariant: schema.columns.length = n
 deriving Inhabited
 
@@ -85,7 +85,7 @@ deriving Repr, BEq
 def SQLColumn.toColumnDef (col : SQLColumn) : ColumnDef :=
   {
     name := col.name,
-    typeStr := s!"{col.sqlType}",
+    colTypetr := s!"{col.sqlType}",
     isPrimaryKey := col.constraints.primaryKey,
     isNullable := !col.constraints.notNull,
     isUnique := col.constraints.unique,
