@@ -28,7 +28,7 @@ so this will help us in future.
 
 -- Finsets require Decidable Equality to handle deduplication
 variable {types : Fin n → Type} [∀ i, DecidableEq (types i)][ ∀ i, LinearOrder (types i)]
-abbrev TypedTuple (types : Fin n → Type) := (i : Fin n) → types i
+abbrev  TypedTuple (types : Fin n → Type) := (i : Fin n) → types i
 
 -- We ensure tuples can be compared for equality
 instance : DecidableEq (TypedTuple types) :=
@@ -153,7 +153,7 @@ instance  [inst : ∀ i, LinearOrder (types i)] : LinearOrder (TypedTuple types)
 
 /-! ## Definitions -/
 
-@[ext, grind] structure TypedRelation (types : Fin n → Type) where
+@[ext, grind cases] structure TypedRelation (types : Fin n → Type) where
   labels : Fin n → String
   rows   : Finset (TypedTuple types)
 deriving Inhabited

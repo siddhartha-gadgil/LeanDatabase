@@ -17,6 +17,7 @@ syntax (name := createTableCmd) "CREATE" "TABLE" ident "(" (ident data_type),* "
 syntax (name :=insertCmd) "INSERT" "INTO" ident "(" (ident),* ")" "VALUES" "(" (term),* ")" : command
 
 syntax (name := selectCmd) "SELECT" sepBy(ident, ",") "FROM" ident "WHERE" term : command
+syntax (name := selectTerm) "SELECT" sepBy(ident, ",") "FROM" ident "WHERE" term : term
 
 open Lean Elab Command Term Meta
 
@@ -33,7 +34,7 @@ def elabCreateTableCmd : CommandElab := fun stx => do
       | `(data_type| INT) => `(ℤ)
       | `(data_type| STRING) => `(String)
       | `(data_type| BOOL) => `(Bool)
-      | `(data_type| VARCHAR($m)) => `(String)
+      | `(data_type| VARCHAR($_)) => `(String)
       | _ => `(String)
 
     let alts_types ← typesList.mapIdxM fun idx t => do

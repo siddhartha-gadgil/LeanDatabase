@@ -28,7 +28,7 @@ def query_Fast (r1 r2 : TypedRelation types) : TypedRelation types :=
 -- We prove that no matter what data is in r1 or r2, the result is identical.
 theorem mapReduce_equivalence (r1 r2 : TypedRelation types) :
     query_Slow isHighValue r1 r2 = query_Fast isHighValue r1 r2 := by
-  grind [query_Slow, query_Fast]
+  grind +locals
 
 /-!
 ### Scenario 2: The "Index Merge" Optimization
@@ -52,7 +52,7 @@ def query_SinglePass (r : TypedRelation types) : TypedRelation types :=
 omit [∀ i, DecidableEq (types i)] in
 theorem pipeline_equivalence (r : TypedRelation types) :
     query_MultiPass isHighValue isActive r = query_SinglePass isHighValue isActive r := by
-  grind [query_MultiPass, query_SinglePass]
+  grind +locals
   -- We used theorem proved previously
 
 /-! ### Scenario 3: -/
@@ -79,6 +79,5 @@ def query_Clean (tableA tableB : TypedRelation types) : TypedRelation types :=
 theorem complex_query_equivalence (tableA tableB : TypedRelation types) :
     query_Messy isActive isBanned tableA tableB =
     query_Clean isActive isBanned tableA tableB := by
-  grind [query_Messy, query_Clean]
-
+  grind +locals
 end QueryOptimization
