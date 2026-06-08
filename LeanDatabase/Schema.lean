@@ -23,7 +23,7 @@ deriving Inhabited
 
 /-! ## Enhanced TypedRelation with Schema -/
 
-structure TypedTableRelation (colType : Fin n → Type) where
+structure TypedTableRelation (colType : Fin n → Type)[(i : Fin n) → DecidableEq (colType i)] where
   schema : TableSchema n
   relation : TypedRelation colType
   -- Invariant: schema.columns.length = n
