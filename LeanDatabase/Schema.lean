@@ -39,7 +39,7 @@ inductive SQLType where
   | BOOL
   | FLOAT
   | TEXT
-deriving Repr, BEq
+deriving Repr, DecidableEq
 
 def SQLType.toLeanType : SQLType → Type
   | SQLType.INT => Int

@@ -5,6 +5,7 @@ open LeanDatabase
 
 variable {n : Nat}
 variable {types : Fin n → Type} [∀ i, DecidableEq (types i)]
+set_option linter.unusedSectionVars false
 
 /-!
 ### Scenario 1: The "MapReduce" Optimization
@@ -31,6 +32,16 @@ theorem mapReduce_equivalence (r1 r2 : TypedRelation types) :
   grind +locals
 
 /-!
+## Automated proof with `grind`
+
+This code can be generated, with `let` statements for intermediate queries, and the final proof can be done with a single call to `grind`:
+-/
+example (r1 r2 : TypedRelation types) :
+    let query_Slow : TypedRelation types := restriction isHighValue (union r1 r2)
+    let query_Fast : TypedRelation types := union (restriction isHighValue r1) (restriction isHighValue r2)
+    query_Slow = query_Fast := by
+  grind
+/-!
 ### Scenario 2: The "Index Merge" Optimization
 (Cascading Selection)
 -/
@@ -49,11 +60,20 @@ def query_SinglePass (r : TypedRelation types) : TypedRelation types :=
   restriction (fun t => isHighValue t && isActive t) r
 
 -- 3. THE PROOF
-omit [∀ i, DecidableEq (types i)] in
 theorem pipeline_equivalence (r : TypedRelation types) :
     query_MultiPass isHighValue isActive r = query_SinglePass isHighValue isActive r := by
   grind +locals
-  -- We used theorem proved previously
+
+/-!
+## Automated proof with `grind`
+
+This code can be generated, with `let` statements for intermediate queries, and the final proof can be done with a single call to `grind`:
+-/
+example (r : TypedRelation types) :
+    let query_MultiPass := restriction isHighValue (restriction isActive r)
+    let query_SinglePass := restriction (fun t => isHighValue t && isActive t) r
+    query_MultiPass = query_SinglePass := by
+  grind
 
 /-! ### Scenario 3: -/
 
@@ -80,4 +100,18 @@ theorem complex_query_equivalence (tableA tableB : TypedRelation types) :
     query_Messy isActive isBanned tableA tableB =
     query_Clean isActive isBanned tableA tableB := by
   grind +locals
+
+/-!
+## Automated proof with `grind`
+
+This code can be generated, with `let` statements for intermediate queries, and the final proof can be done with a single call to `grind`:
+-/
+example (tableA tableB : TypedRelation types) :
+    let query_Messy := minus
+      (union (restriction isActive tableA) (restriction isActive tableB))
+      (restriction isBanned (union tableA tableB))
+    let query_Clean := restriction (fun t => isActive t && !isBanned t) (union tableA tableB)
+    query_Messy = query_Clean := by
+  grind
+
 end QueryOptimization

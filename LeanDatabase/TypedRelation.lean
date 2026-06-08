@@ -39,9 +39,8 @@ instance : DecidableEq (TypedTuple types) :=
 --   @Pi.Lex.linearOrder (Fin n) types _ _ inst
 
 variable (r s t : TypedTuple types)
+set_option linter.unusedSectionVars false
 
-
-omit [(i : Fin n) → DecidableEq (types i)] [(i : Fin n) → LinearOrder (types i)] in
 theorem eq_iff : r = s ↔ ∀ i, r i = s i := by grind only
 
 def lt : Prop := ∃ i : Fin n, (r i < s i) ∧ (∀ j : Fin n, j < i → r j = s j)
@@ -51,7 +50,6 @@ instance : Decidable (r < s) := inferInstanceAs (Decidable (lt r s))
 instance : DecidableLT (TypedTuple types) := by infer_instance
 
 -- @[simp, grind =]
-omit [(i : Fin n) → DecidableEq (types i)] in
 theorem lt_iff : r < s ↔ ∃ i : Fin n, (r i < s i) ∧ (∀ j : Fin n, j < i → r j = s j) := by rfl
 
 def le : Prop := r < s ∨ r = s
@@ -61,16 +59,13 @@ instance : Decidable (r ≤ s) := inferInstanceAs (Decidable (le r s))
 instance : DecidableLE (TypedTuple types) := by infer_instance
 
 
-omit [(i : Fin n) → DecidableEq (types i)] in
 theorem le_iff : r ≤ s ↔ r < s ∨ r = s := by rfl
 
 def min := if r ≤ s then r else s
 def max := if r ≤ s then s else r
 
-omit [(i : Fin n) → DecidableEq (types i)] in
 theorem le_refl : r ≤ r := by grind only [le_iff]
 
-omit [(i : Fin n) → DecidableEq (types i)] in
 theorem lt_trans : r < s → s < t → r < t := by
   simp only [lt_iff]; intro ⟨i₁, h₁, h_eq₁⟩ ⟨i₂, h₂, h_eq₂⟩
   rcases lt_trichotomy i₁ i₂ with h | h | h
@@ -82,12 +77,10 @@ theorem lt_trans : r < s → s < t → r < t := by
     · grind only
   · grind only
 
-omit [(i : Fin n) → DecidableEq (types i)] in
 theorem le_trans : r ≤ s → s ≤ t → r ≤ t := by
   simp only [le_iff]; intro h₁ h₂
   rcases h₁ with h₁ | h₁ <;> rcases h₂ with h₂ | h₂ <;> grind only [lt_trans]
 
-omit [(i : Fin n) → DecidableEq (types i)] in
 theorem not_gt_of_lt : r < s → ¬s < r := by
   simp only [lt_iff, not_exists, not_and, not_forall]
   intro ⟨j, hj, h_eq⟩ i hi --; obtain ⟨j, hj, h_eq⟩ := h
@@ -98,10 +91,8 @@ theorem not_gt_of_lt : r < s → ¬s < r := by
           · specialize h_eq i h; grind only
   use j, this; grind only
 
-omit [(i : Fin n) → DecidableEq (types i)] in
 theorem not_eq_of_lt : r < s → ¬ r = s := by grind only [lt_iff]
 
-omit [(i : Fin n) → DecidableEq (types i)] in
 theorem lt_iff_le_not_ge : r < s ↔ r ≤ s ∧ ¬s ≤ r := by
   constructor
   · intro h; constructor
@@ -111,12 +102,10 @@ theorem lt_iff_le_not_ge : r < s ↔ r ≤ s ∧ ¬s ≤ r := by
   · intro h; simp only [le_iff, not_or] at h
     grind only
 
-omit [(i : Fin n) → DecidableEq (types i)] in
 theorem le_antisymm : r ≤ s → s ≤ r → r = s := by
   simp only [le_iff]; intro h₁ h₂
   rcases h₁ with h₁ | h₁ <;> rcases h₂ with h₂ | h₂ <;> grind only [lt_iff_le_not_ge, le_iff]
 
-omit [(i : Fin n) → LinearOrder (types i)] in
 theorem exists_first_diff (h : ¬ r = s) : ∃ i, ¬ r i = s i ∧ ∀ j < i, r j = s j := by
   let p : Fin n → Bool := fun i ↦ r i ≠ s i
   match h_find : Fin.find? p with
@@ -252,7 +241,6 @@ def prefixLabels' (prefixStr : String) (rel : TypedListRelation types) : TypedLi
 
 /-! ## Theorems -/
 
-omit [(i : Fin n) → LinearOrder (types i)] in
 theorem projection_compose {m p : Nat}
     (indices1 : Fin m → Fin n) (indices2 : Fin p → Fin m)
     (rel : TypedRelation types) :
@@ -265,7 +253,6 @@ theorem projection_compose {m p : Nat}
     grind
 
 -- Projection removes duplicates, so size is <= original, not equal.
-omit [(i : Fin n) → LinearOrder (types i)] in
 theorem projection_card_le {m : Nat} (indices : Fin m → Fin n)
     (rel : TypedRelation types) :
     (projection indices rel).rows.card ≤ rel.rows.card := by
@@ -276,7 +263,6 @@ theorem projection_card_le {m : Nat} (indices : Fin m → Fin n)
 -- Theorem: Restriction Cardinality
 -- |σ(R)| ≤ |R|
 -- "Filtering rows can never increase the number of rows."
-omit [(i : Fin n) → DecidableEq (types i)] [(i : Fin n) → LinearOrder (types i)] in
 theorem restriction_card_le
     (predicate : TypedTuple types → Bool) (rel : TypedRelation types) :
     (restriction predicate rel).rows.card ≤ rel.rows.card := by
