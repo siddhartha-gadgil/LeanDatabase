@@ -1,6 +1,7 @@
 import Lean
 import Mathlib
 import LeanDatabase.Schema
+import LeanDatabase.GrindToolbox
 
 open Lean Meta Elab Term
 
@@ -41,9 +42,9 @@ elab "egfilter%" : term => do
   let e ← egFilter
   return e
 
-#check egfilter%
+-- #check egfilter%
 
-#eval egfilter% 32 true
+-- #eval egfilter% 32 true
 
 example : egfilter% = fun age isActive ↦ (31 ≤  age) && isActive && (20 < age)  := by
   grind
@@ -54,9 +55,9 @@ elab "egfilter%%" : term => do
   let e ← egFilter'
   return e
 
-#check egfilter%%
+-- #check egfilter%%
 
-#eval egfilter%% 32 true
+-- #eval egfilter%% 32 true
 
 def checkEquiv (data: Json) : TermElabM Bool := do
     let .ok schema := data.getObjValAs? (List Json) "schema" | throwError "Missing schema"
@@ -69,14 +70,14 @@ def checkEquiv (data: Json) : TermElabM Bool := do
     let firstExpr ← parseFilter schemaStr firstStr
     let secondExpr ← parseFilter schemaStr secondStr
     let goalType ←  mkEq firstExpr secondExpr
-    logInfo m!"Checking equivalence of:\n  {firstStr}\n  {secondStr}\nParsed as:\n  {← ppExpr firstExpr}\n  {← ppExpr secondExpr}; Goal: {← ppExpr goalType}"
+    -- logInfo m!"Checking equivalence of:\n  {firstStr}\n  {secondStr}\nParsed as:\n  {← ppExpr firstExpr}\n  {← ppExpr secondExpr}; Goal: {← ppExpr goalType}"
     let mvar ← mkFreshExprMVar goalType
     let tac ← `(tacticSeq| grind)
     try
         let (goals, _) ← Elab.runTactic mvar.mvarId! tac
         pure goals.isEmpty
-    catch e =>
-        logInfo m!"Error occurred while running tactic: {e.toMessageData}"
+    catch _ =>
+        -- logInfo m!"Error occurred while running tactic: {e.toMessageData}"
         pure false
 
 def checkEquivCore (data: Json) : CoreM Bool := do
@@ -86,15 +87,10 @@ def checkEquivCore (data: Json) : CoreM Bool := do
 macro "SELECT" " * " "FROM" ident "WHERE" t:term : term =>
     return t
 
-def dataEg := json% {
-  "schema": [
-    {"name": "age", "type": "Int"},
-    {"name": "isActive", "type": "Bool"}
-  ],
-  "first": "SELECT * FROM table WHERE age > 30 && isActive",
-  "second": "SELECT * FROM table WHERE age > 30 && isActive && age > 20"
-}
+def dataEg := json% {"schema": [{"name": "age", "type": "Int"}, {"name": "isActive", "type": "Bool"}],
+  "first": "SELECT * FROM table WHERE age > 30 && isActive","second": "SELECT * FROM table WHERE age > 30 && isActive && age > 20"}
 
-#eval checkEquiv dataEg
+-- #eval checkEquiv dataEg
+
 
 end LeanDatabase
