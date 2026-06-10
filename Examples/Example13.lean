@@ -6,7 +6,7 @@ open LeanDatabase LeanDatabase.TypedAgg
 # Example 13 — toolbox demo: equivalences that close "for free"
 
 Each equivalence below needs a lemma that isn't specific to the example — they live in
-`LeanDatabase.GrindToolbox` (set-algebra rewrites) and `LeanDatabase.TypedAggregation`
+`LeanDatabase.SQLToolbox` (set-algebra rewrites) and `LeanDatabase.Operators.Aggregate`
 (aggregation/coalesce). Importing the toolbox lets every query equivalence here close with a
 bare `grind +locals`, on the `TypedRelation` algebra.
 -/
