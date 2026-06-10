@@ -1,7 +1,7 @@
 import Lean
 import Mathlib
 import LeanDatabase.Schema
-import LeanDatabase.GrindToolbox
+import LeanDatabase.SQLToolbox
 
 open Lean Meta Elab Term
 

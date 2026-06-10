@@ -1,6 +1,6 @@
-import LeanDatabase.TypedAggregation
-import LeanDatabase.RelationalAlgebra
-open LeanDatabase LeanDatabase.TypedAgg LeanDatabase.EquivTactic
+import LeanDatabase.SQLEquiv
+
+open LeanDatabase LeanDatabase.TypedAgg
 
 /-!
 # Example 11 — "latest row per group", the four canonical SQL forms

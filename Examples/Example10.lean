@@ -1,4 +1,4 @@
-import LeanDatabase.RelationalAlgebra
+import LeanDatabase.SQLEquiv
 
 /-!
 # Example 10 — `OR` predicate ≡ `UNION` ≡ disjoint `UNION ALL`

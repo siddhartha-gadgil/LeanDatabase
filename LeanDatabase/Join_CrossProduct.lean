@@ -116,7 +116,7 @@ theorem crossProduct_card (r1 : TypedRelation colType1) (r2 : TypedRelation colT
     (a1 a2 : String) :
     (crossProductRel r1 r2 a1 a2).rows.card = r1.rows.card * r2.rows.card := by
   simp_all only [crossProductRel, List.contains_eq_mem, List.mem_ofFn, List.any_eq_true,
-    decide_eq_true_eq, exists_exists_eq_and, prefixLabels, instDecidableEqAppend]
+    decide_eq_true_eq, exists_exists_eq_and, prefixLabels]
   rw [Finset.card_image_of_injective]
   · simp only [Finset.card_product]
   · simp only [combine_tuples_injective]

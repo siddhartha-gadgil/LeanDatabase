@@ -1,4 +1,5 @@
-import LeanDatabase.GrindToolbox
+import LeanDatabase.SQLEquiv
+
 open LeanDatabase LeanDatabase.TypedAgg
 
 /-!

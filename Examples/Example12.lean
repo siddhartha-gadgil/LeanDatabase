@@ -1,4 +1,5 @@
-import LeanDatabase.TypedAggregation
+import LeanDatabase.SQLEquiv
+
 open LeanDatabase LeanDatabase.TypedAgg
 
 /-!

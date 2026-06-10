@@ -1,4 +1,4 @@
-import LeanDatabase.RelationalAlgebra
+import LeanDatabase.SQLEquiv
 
 /-!
 # Example 2 — Cascading selection (the "Index Merge" rewrite)

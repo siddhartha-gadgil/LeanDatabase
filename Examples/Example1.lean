@@ -1,4 +1,4 @@
-import LeanDatabase.RelationalAlgebra
+import LeanDatabase.SQLEquiv
 
 /-!
 # Example 1 — Predicate pushdown through `UNION` (the "MapReduce" rewrite)

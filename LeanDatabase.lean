@@ -3,6 +3,7 @@
 import LeanDatabase.TypedRelation
 import LeanDatabase.RelationalAlgebra
 import LeanDatabase.TypedAggregation
-import LeanDatabase.GrindToolbox
+import LeanDatabase.SQLToolbox
+import LeanDatabase.SQLEquiv
 import LeanDatabase.Join_CrossProduct
 import LeanDatabase.Schema
