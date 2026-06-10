@@ -226,3 +226,9 @@ theorem relCountDistinct_le {β : Type} [DecidableEq β]
 attribute [grind .] Finset.image_congr Finset.filter_congr Finset.sum_union
 
 end LeanDatabase.TypedAgg
+
+/- Re-export the aggregate operators into the top-level `LeanDatabase` namespace-/
+namespace LeanDatabase
+export LeanDatabase.TypedAgg
+  (grp cnt sumI okeys groupMaxN relCount relSum relMax relMin relCountDistinct relAvg)
+end LeanDatabase

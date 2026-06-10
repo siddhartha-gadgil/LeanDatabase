@@ -1,5 +1,5 @@
 import LeanDatabase.SQLEquiv
-open LeanDatabase LeanDatabase.TypedAgg
+open LeanDatabase
 
 /-!
 # Example 15 — `(R ⋉ S) ∪ (R ▷ S) = R` (semi/anti-join partition)

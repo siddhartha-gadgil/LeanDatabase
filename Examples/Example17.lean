@@ -1,5 +1,5 @@
 import LeanDatabase.SQLEquiv
-open LeanDatabase LeanDatabase.TypedAgg
+open LeanDatabase
 
 /-!
 # Example 17 — `COUNT(WHERE p) + COUNT(WHERE NOT p) = COUNT(*)`

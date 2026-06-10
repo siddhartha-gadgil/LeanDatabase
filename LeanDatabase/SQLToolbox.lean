@@ -28,6 +28,19 @@ itself, which lives in `TypedRelation`) so `sql_equiv` can collapse `∅`-table 
   simp only [← Bool.not_eq_true]
   exact Finset.card_filter_add_card_filter_not _
 
+/-- **`COUNT` partition by complementary predicates.** A robust generalization of
+`card_filter_true_add_false`: it does NOT require the two filters to mention a single shared `p`.
+This matters because `simp` De-Morgan-splits a compound `WHERE`/`!WHERE` (e.g. `a ∧ b` vs
+`¬a ∨ ¬b`), after which no single `p` survives. Tagged `@[grind]` so `grind` matches the two
+`card`s and discharges the `Q ↔ ¬P` side-condition (pure propositional/Boolean reasoning) itself —
+closing the partition regardless of how `simp` rewrote the predicates. -/
+@[grind] theorem card_filter_add_card_filter_compl {α : Type} [DecidableEq α] (s : Finset α)
+    (P Q : α → Prop) [DecidablePred P] [DecidablePred Q] (h : ∀ a, Q a ↔ ¬ P a) :
+    (s.filter P).card + (s.filter Q).card = s.card := by
+  have hQ : s.filter Q = s.filter (fun a => ¬ P a) := Finset.filter_congr (fun a _ => h a)
+  rw [hQ]
+  exact Finset.card_filter_add_card_filter_not _
+
 
 attribute [grind =]
   restriction_idempotence          -- σ_p(σ_p R) = σ_p R

@@ -1,6 +1,6 @@
 import LeanDatabase.SQLEquiv
 
-open LeanDatabase LeanDatabase.TypedAgg
+open LeanDatabase
 
 /-!
 # Example 13 — toolbox demo: equivalences that close "for free"
