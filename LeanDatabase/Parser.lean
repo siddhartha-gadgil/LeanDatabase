@@ -21,20 +21,34 @@ def elabFilter' (schema : List (Name × Name)) (stx : Syntax) : TermElabM Expr :
       let restExpr ← elabFilter' rest stx
       mkLambdaFVars #[localVar] restExpr
 
-inductive SqlTargetType where
+inductive SQLTypeProxy where
   | int
   | bool
   | float
   | string
 
-def typeExpr (t : SqlTargetType) : Expr :=
+@[reducible]
+def SQLTypeProxy.type : SQLTypeProxy → Type
+  | .int => Int
+  | .bool => Bool
+  | .float => Rat
+  | .string => String
+
+instance (t : SQLTypeProxy) : DecidableEq t.type :=
+  match t with
+  | .int => inferInstance
+  | .bool => inferInstance
+  | .float => inferInstance
+  | .string => inferInstance
+
+def typeExpr (t : SQLTypeProxy) : Expr :=
   match t with
   | .int => mkConst ``Int
   | .bool => mkConst ``Bool
   | .float => mkConst ``Rat
   | .string => mkConst ``String
 
-def normalizeSQLType (sqlType : String) : SqlTargetType :=
+def sqlProxy (sqlType : String) : SQLTypeProxy :=
   let s := sqlType.toLower
   if s.startsWith "varchar" then .string
   else if s.startsWith "int" then .int
@@ -44,7 +58,7 @@ def normalizeSQLType (sqlType : String) : SqlTargetType :=
   else if s.startsWith "char" then .string
   else .string -- default to string for unrecognized types
 
-def elabFilter (schema : List (Name × SqlTargetType)) (stx : Syntax) : TermElabM Expr := do
+def elabFilter (schema : List (Name × SQLTypeProxy)) (stx : Syntax) : TermElabM Expr := do
   match schema with
   | [] => elabTermEnsuringType stx (mkConst ``Bool)
   | (name, colType) :: rest => do
@@ -53,20 +67,41 @@ def elabFilter (schema : List (Name × SqlTargetType)) (stx : Syntax) : TermElab
       let restExpr ← elabFilter rest stx
       mkLambdaFVars #[localVar] restExpr
 
-variable (p: Fin n → Type) [∀ i, DecidableEq (p i)]
+@[reducible]
+def colTypeOfList (l: List SQLTypeProxy) : Fin l.length → Type := match l with
+  | [] => by
+    intro ⟨i, hi⟩
+    simp at hi
+  | t :: rest =>
+    fun ⟨i, hi⟩ =>
+      match i with
+      | 0 => t.type
+      | j+1 => colTypeOfList rest ⟨j, by simp at hi; assumption⟩
 
-#synth DecidableEq ((i : Fin n) → p i)
+instance sqlTypeDecEq (l: List SQLTypeProxy) : (i : Fin l.length) → DecidableEq (colTypeOfList l i) := by
+  match l with
+  | [] =>
+    intro ⟨i, hi⟩
+    simp at hi
+  | t :: rest =>
+    intro ⟨i, hi⟩
+    match i with
+    | 0 => exact inferInstance
+    | j+1 =>
+      exact sqlTypeDecEq rest ⟨j, by simp at hi; assumption⟩
 
+-- Testing that decidable equality works for the generated types
+example (l: List SQLTypeProxy) : TypedRelation (colTypeOfList l) :=
+  emptyRel (fun _ => "dummy")
 
-instance liftDecEq (p: Fin n → Type) [∀ i, DecidableEq (p i)] : DecidableEq ((i : Fin n) → p i) :=
-  inferInstance
+def TypedRelationOfList (l: List SQLTypeProxy) : Type :=
+  TypedRelation (colTypeOfList l)
 
-
-#check liftDecEq
+#check TypedRelation
 
 def parseFilter (schemaStr : List (String × String)) (str : String) : TermElabM Expr := do
   let .ok stx := Parser.runParserCategory (← getEnv) `term str | throwError "Failed to parse filter expression: {str}"
-  let schema := schemaStr.map (fun (name, colType) => (name.toName, normalizeSQLType colType))
+  let schema := schemaStr.map (fun (name, colType) => (name.toName, sqlProxy colType))
   elabFilter schema stx
 
 def egFilter := parseFilter [("age", "Int"), ("isActive", "Bool")] "age > 30 && isActive"
