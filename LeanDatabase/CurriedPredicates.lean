@@ -13,6 +13,7 @@ def curriedPred {m : Nat} (cols : Fin m → Type) : Type :=
   | 0   => Bool
   | k+1 => cols (0 : Fin (k+1)) → curriedPred (fun i => cols (Fin.succ i))
 
+@[grind .]
 def applyCurried {m : Nat} {cols : Fin m → Type}
     (p : curriedPred (cols := cols)) (t : (i : Fin m) → cols i) : Bool :=
   match m with
@@ -22,8 +23,17 @@ def applyCurried {m : Nat} {cols : Fin m → Type}
     let t' : (i : Fin k) → cols (Fin.succ i) := fun i => t (Fin.succ i)
     applyCurried p' t'
 
+@[grind .]
 def restrictionCurried (p : curriedPred (cols := colType))
     (rel : TypedRelation colType) :
+    TypedRelation colType :=
+  {
+    labels := rel.labels,
+    rows   := rel.rows.filter (fun t => applyCurried p t)
+  }
+
+def restrictionCurried'
+    (rel : TypedRelation colType) (p : curriedPred (cols := colType)) :
     TypedRelation colType :=
   {
     labels := rel.labels,

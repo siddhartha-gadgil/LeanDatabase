@@ -26,6 +26,8 @@ inductive SQLTypeProxy where
   | bool
   | float
   | string
+deriving Repr, DecidableEq, ToExpr
+
 
 @[reducible]
 def SQLTypeProxy.type : SQLTypeProxy → Type
@@ -94,21 +96,54 @@ instance sqlTypeDecEq (l: List SQLTypeProxy) : (i : Fin l.length) → DecidableE
 example (l: List SQLTypeProxy) : TypedRelation (colTypeOfList l) :=
   emptyRel (fun _ => "dummy")
 
+@[reducible]
 def TypedRelationOfList (l: List SQLTypeProxy) : Type :=
   TypedRelation (colTypeOfList l)
 
-#check TypedRelation
+def sqlTypeListExpr (l: List SQLTypeProxy) : MetaM Expr := do
+  match l with
+  | [] => mkAppOptM ``List.nil #[mkConst ``SQLTypeProxy]
+  | t :: rest =>
+    mkAppM ``List.cons #[toExpr t, ← sqlTypeListExpr rest]
+
+-- #check List.nil
+-- #check mkAppOptM
+-- #check TypedRelationOfList
 
 def parseFilter (schemaStr : List (String × String)) (str : String) : TermElabM Expr := do
   let .ok stx := Parser.runParserCategory (← getEnv) `term str | throwError "Failed to parse filter expression: {str}"
   let schema := schemaStr.map (fun (name, colType) => (name.toName, sqlProxy colType))
   elabFilter schema stx
 
+def elabTypeRelMap (schema : List (Name × SQLTypeProxy)) (stx: Syntax) : TermElabM Expr := do
+  let colTypes := schema.map (fun (_, colType) => colType)
+  let listExpr ← sqlTypeListExpr colTypes
+  let type ← mkAppM ``TypedRelationOfList #[listExpr]
+  let filter ← elabFilter schema stx
+  withLocalDeclD `typedRel type fun typeRel => do
+    let restExpr ← mkAppM ``restrictionCurried' #[typeRel, filter]
+    mkLambdaFVars #[typeRel] restExpr
+
+def parseTypeRelMap  (schemaStr : List (String × String)) (str : String) : TermElabM Expr := do
+  let .ok stx := Parser.runParserCategory (← getEnv) `term str | throwError "Failed to parse filter expression: {str}"
+  let schema := schemaStr.map (fun (name, colType) => (name.toName, sqlProxy colType))
+  elabTypeRelMap schema stx
+
 def egFilter := parseFilter [("age", "Int"), ("isActive", "Bool")] "age > 30 && isActive"
+
+def egTypeRelMap := parseTypeRelMap [("age", "Int"), ("isActive", "Bool")] "true"
+
+#check egTypeRelMap
 
 elab "egfilter%" : term => do
   let e ← egFilter
   return e
+
+elab "egTypeRelMap%" : term => do
+  let e ← egTypeRelMap
+  return e
+
+-- #check egTypeRelMap%
 
 -- #check egfilter%
 
@@ -122,12 +157,6 @@ def egFilter' := parseFilter [("age", "Int"), ("isActive", "Bool")] "age > 30"
 elab "egfilter%%" : term => do
   let e ← egFilter'
   return e
-
-#check Fin.rec
-
-#check List.get
-
-#check Fin.succ
 
 -- #check egfilter%%
 
