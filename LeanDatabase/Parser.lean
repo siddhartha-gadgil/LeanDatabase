@@ -60,14 +60,19 @@ def sqlProxy (sqlType : String) : SQLTypeProxy :=
   else if s.startsWith "char" then .string
   else .string -- default to string for unrecognized types
 
-def elabFilter (schema : List (Name × SQLTypeProxy)) (stx : Syntax) : TermElabM Expr := do
+#check withLetDecl
+#check mkLetFVars
+
+def elabFilter (schemaName: Name) (schema : List (Name × SQLTypeProxy)) (stx : Syntax) : TermElabM Expr := do
   match schema with
   | [] => elabTermEnsuringType stx (mkConst ``Bool)
   | (name, colType) :: rest => do
     let colTypeExpr := typeExpr colType
-    withLocalDeclD name colTypeExpr fun localVar => do
-      let restExpr ← elabFilter rest stx
-      mkLambdaFVars #[localVar] restExpr
+    let fullName := schemaName ++ name
+    withLocalDeclD fullName colTypeExpr fun localVar => do
+      withLetDecl name colTypeExpr localVar fun localVar' => do
+        let restExpr ← elabFilter schemaName rest stx
+        mkLambdaFVars #[localVar] <| ← mkLetFVars #[localVar'] restExpr
 
 @[reducible]
 def colTypeOfList (l: List SQLTypeProxy) : Fin l.length → Type :=
@@ -106,13 +111,13 @@ def sqlTypeListExpr (l: List SQLTypeProxy) : MetaM Expr := do
 def parseFilter (schemaStr : List (String × String)) (str : String) : TermElabM Expr := do
   let .ok stx := Parser.runParserCategory (← getEnv) `term str | throwError "Failed to parse filter expression: {str}"
   let schema := schemaStr.map (fun (name, colType) => (name.toName, sqlProxy colType))
-  elabFilter schema stx
+  elabFilter `schema schema stx
 
 def elabTypeRelMap (schema : List (Name × SQLTypeProxy)) (stx: Syntax) : TermElabM Expr := do
   let colTypes := schema.map (fun (_, colType) => colType)
   let listExpr ← sqlTypeListExpr colTypes
   let type ← mkAppM ``TypedRelationOfList #[listExpr]
-  let filter ← elabFilter schema stx
+  let filter ← elabFilter `schema schema stx
   withLocalDeclD `typedRel type fun typeRel => do
     let restExpr ← mkAppM ``restrictionCurried #[typeRel, filter]
     mkLambdaFVars #[typeRel] restExpr
@@ -170,7 +175,8 @@ example : eg1 = eg2 := by
   grind +locals
 
 example : egTypeRelMap% = egTypeRelMap%% := by
-  grind +locals
+  grind
+
 
 def checkEquiv (data: Json) : TermElabM Bool := do
     let .ok schema := data.getObjValAs? (List Json) "schema" | throwError "Missing schema"
