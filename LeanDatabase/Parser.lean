@@ -75,19 +75,20 @@ def withColumnVars (schemaName: Name) (schema : List (Name × SQLTypeProxy))  (k
         mkLambdaFVars #[localVar] <| ← mkLetFVars #[localVar'] restExpr
 
 
-def withFunColumnVars (schemaName: Name) (schema : List (Name × SQLTypeProxy)) (relType relVar : Expr)  (k : α →  TermElabM Expr) (x : α) : TermElabM Expr := do
+def withFunColumnVars (schemaName: Name) (schema : List (Name × SQLTypeProxy)) (relVar : Expr)  (k : α →  TermElabM Expr) (x : α) : TermElabM Expr := do
   match schema with
   | [] => k x
   | (name, colType) :: rest => do
     let colTypeExpr := typeExpr colType
     let fullName := schemaName ++ name
     let funcName := fullName ++ `func
+    let relType ← inferType relVar
     let funcType ← mkArrow relType colTypeExpr
     withLocalDeclD funcName funcType fun funcVar => do
       let colExpr ← mkAppM' funcVar #[relVar]
       withLetDecl fullName colTypeExpr colExpr fun localVar => do
         withLetDecl name colTypeExpr localVar fun localVar' => do
-          let restExpr ← withFunColumnVars schemaName rest relType relVar k x
+          let restExpr ← withFunColumnVars schemaName rest relVar k x
           mkLambdaFVars #[funcVar] <| ← mkLetFVars #[localVar, localVar'] restExpr
 
 
@@ -112,6 +113,10 @@ example (l: List SQLTypeProxy) : TypedRelation (colTypeOfList l) :=
   emptyRel (fun _ => "dummy")
 
 @[reducible]
+def TypedTupleOfList (l: List SQLTypeProxy) : Type :=
+  TypedTuple (colTypeOfList l)
+
+@[reducible]
 def TypedRelationOfList (l: List SQLTypeProxy) : Type :=
   TypedRelation (colTypeOfList l)
 
@@ -123,7 +128,7 @@ def sqlTypeListExpr (l: List SQLTypeProxy) : MetaM Expr := do
 
 -- #check List.nil
 -- #check mkAppOptM
--- #check TypedRelationOfList
+-- #check TypedTupleOfList
 
 def withSchemasVars (schemas : List (Name × List (Name × SQLTypeProxy))) (k : α →  TermElabM Expr) (x : α) : TermElabM Expr := do
   match schemas with
@@ -142,10 +147,14 @@ def withFunSchemasVars (schemas : List (Name × List (Name × SQLTypeProxy))) (r
   | (schemaName, schema) :: rest => do
     let colTypes := schema.map (fun (_, colType) => colType)
     let listExpr ← sqlTypeListExpr colTypes
-    let type ← mkAppM ``TypedRelationOfList #[listExpr]
+    -- let test : Fin 3 := 2
+    -- let e := toExpr test
+    let type ← mkAppM ``TypedTupleOfList #[listExpr]
     withLocalDeclD schemaName type fun typeRel => do
-      let inner ← withFunColumnVars schemaName schema type relVar (fun x => withFunSchemasVars rest relVar k x) x
+      let inner ← withFunColumnVars schemaName schema relVar (fun x => withFunSchemasVars rest relVar k x) x
       mkLambdaFVars #[typeRel] inner
+
+-- #eval List.finRange 3
 
 def elabFilter (schemas : List (Name × List (Name × SQLTypeProxy))) (stx : Syntax)  : TermElabM Expr := do
     withSchemasVars schemas (fun stx => elabTermEnsuringType stx (mkConst ``Bool)) stx
@@ -160,12 +169,12 @@ def parseFilter (schemaStr : List (String × String)) (str : String) : TermElabM
 def elabTypeRelMap (schemaName : Name) (schema : List (Name × SQLTypeProxy)) (stx: Syntax) : TermElabM Expr := do
   let colTypes := schema.map (fun (_, colType) => colType)
   let listExpr ← sqlTypeListExpr colTypes
-  let type ← mkAppM ``TypedRelationOfList #[listExpr]
+  let type ← mkAppM ``TypedTupleOfList #[listExpr]
   withLocalDeclD `typedRel type fun typeRel => do
     -- let filter ← elabFilter [(schemaName, schema)] stx
     -- let filter ← mkAppM' filter #[typeRel]
     -- let restExpr ← mkAppM ``restrictionCurried #[typeRel, filter]
-    let m ← (withFunColumnVars schemaName schema type typeRel fun stx => do
+    let m ← (withFunColumnVars schemaName schema typeRel fun stx => do
       elabTermEnsuringType stx (mkConst ``Bool)) stx
     -- logInfo m!"Parsed filter expression as: {← ppExpr m}"
     mkLambdaFVars #[typeRel] m
