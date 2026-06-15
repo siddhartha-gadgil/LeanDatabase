@@ -19,7 +19,7 @@ large dependent schema doesn't choke `sql_equiv`.
 import json, re, sys, os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DATA = os.path.join(HERE, "..", "crossskill_equivalent_sql.jsonl")
+DATA = os.path.join(HERE, "crossskill_equivalent_sql.jsonl")
 
 LEAN_KEYWORDS = {
     "end","then","else","do","by","fun","let","in","at","if","calc","match","with",

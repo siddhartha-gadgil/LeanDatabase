@@ -9,7 +9,7 @@ other variant differences as out-of-scope; the docstring carries the detail.
 import json, re, os, glob
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DATA = os.path.join(HERE, "..", "crossskill_equivalent_sql.jsonl")
+DATA = os.path.join(HERE, "crossskill_equivalent_sql.jsonl")
 recs = {json.loads(l)["instance_id"]: json.loads(l) for l in open(DATA)}
 
 def first_para(text, marker):
