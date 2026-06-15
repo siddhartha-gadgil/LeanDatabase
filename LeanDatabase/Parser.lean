@@ -151,13 +151,13 @@ def withSchemasRelVars (schemas : List (Name × List (Name × SQLTypeProxy)))  (
 -- #eval List.finRange 3
 
 -- This is the "WHERE" part of a SQL query, which is a function from a TypedRelation to a TypedRelation. This is to be applied to the database, which may be a single schema or built from multiple schemas.
-def elabTypedTupleMap (schemaName : Name) (schema : List (Name × SQLTypeProxy)) (stx: Syntax) : TermElabM Expr := do
+def elabTypedTupleFilter (schemaName : Name) (schema : List (Name × SQLTypeProxy)) (stx: Syntax) : TermElabM Expr := do
   withSchemasTupleVars [(schemaName, schema)] (fun stx => elabTermEnsuringType stx (mkConst ``Bool)) stx
 
-def parseTypedTupleMap  (schemaStr : List (String × String)) (str : String) : TermElabM Expr := do
+def parseTypedTupleFilter  (schemaStr : List (String × String)) (str : String) : TermElabM Expr := do
   let .ok stx := Parser.runParserCategory (← getEnv) `term str | throwError "Failed to parse filter expression: {str}"
   let schema := schemaStr.map (fun (name, colType) => (name.toName, sqlProxy colType))
-  elabTypedTupleMap `schema schema stx
+  elabTypedTupleFilter `schema schema stx
 
 -- #check selection
 
@@ -165,7 +165,7 @@ def elabTypedRelMap (schemas : List (Name × List (Name × SQLTypeProxy))) (stx:
   withSchemasRelVars schemas fun relVars => do
     let [relVar] := relVars | throwError "Expected exactly one relation variable"
     let [(schemaName, schema)] := schemas | throwError "Expected exactly one schema"
-    let filter ← elabTypedTupleMap schemaName schema stx
+    let filter ← elabTypedTupleFilter schemaName schema stx
     -- logInfo m!"Elaborated filter type: {← ppExpr <| ← inferType filter}"
     mkAppM ``selection #[filter, relVar]
   -- logInfo m!"Elaborated relation map type: {← ppExpr <| ← inferType outer}"
@@ -177,20 +177,20 @@ def parseTypedRelMap  (schemasStr : List (String × List (String × String))) (s
     (schemaName.toName, schema'))
   elabTypedRelMap schemas stx
 
-def egTypedTupleMap := parseTypedTupleMap [("age", "Int"), ("isActive", "Bool")] "age > 30 && isActive"
+def egTypedTupleFilter := parseTypedTupleFilter [("age", "Int"), ("isActive", "Bool")] "age > 30 && isActive"
 
-def egTypedTupleMap' := parseTypedTupleMap [("age", "Int"), ("isActive", "Bool")] "age > 30 && isActive && age > 20"
+def egTypedTupleFilter' := parseTypedTupleFilter [("age", "Int"), ("isActive", "Bool")] "age > 30 && isActive && age > 20"
 
 def egTypedRelMap := parseTypedRelMap [("schema", [("age", "Int"), ("isActive", "Bool")])] "age > 30 && isActive"
 
 def egTypedRelMap' := parseTypedRelMap [("schema", [("age", "Int"), ("isActive", "Bool")])] "age > 30 && isActive && age > 20"
 
-elab "egTypedTupleMap%" : term => do
-  let e ← egTypedTupleMap
+elab "egTypedTupleFilter%" : term => do
+  let e ← egTypedTupleFilter
   return e
 
-elab "egTypedTupleMap%%" : term => do
-  let e ← egTypedTupleMap'
+elab "egTypedTupleFilter%%" : term => do
+  let e ← egTypedTupleFilter'
   return e
 
 elab "egTypedRelMap%" : term => do
@@ -203,16 +203,16 @@ elab "egTypedRelMap%%" : term => do
 
 -- #check egTypedRelMap%
 
--- #check egTypedTupleMap%%
+-- #check egTypedTupleFilter%%
 
-def eg1 := egTypedTupleMap%
-def eg2 := egTypedTupleMap%%
+def eg1 := egTypedTupleFilter%
+def eg2 := egTypedTupleFilter%%
 
 example : eg1 = eg2 := by
   grind +locals
 
 set_option pp.funBinderTypes true in
-example : egTypedTupleMap% = egTypedTupleMap%% := by
+example : egTypedTupleFilter% = egTypedTupleFilter%% := by
   grind
 
 set_option pp.funBinderTypes true in
@@ -227,8 +227,8 @@ def checkEquiv (data: Json) : TermElabM Bool := do
       pure (name, sqlType)
     let .ok firstStr := data.getObjValAs? String "first" | throwError "Missing first expression"
     let .ok secondStr := data.getObjValAs? String "second" | throwError "Missing second expression"
-    let firstExpr ← parseTypedTupleMap schemaStr firstStr
-    let secondExpr ← parseTypedTupleMap schemaStr secondStr
+    let firstExpr ← parseTypedTupleFilter schemaStr firstStr
+    let secondExpr ← parseTypedTupleFilter schemaStr secondStr
     let goalType ←  mkEq firstExpr secondExpr
     -- logInfo m!"Checking equivalence of:\n  {firstStr}\n  {secondStr}\nParsed as:\n  {← ppExpr firstExpr}\n  {← ppExpr secondExpr}; Goal: {← ppExpr goalType}"
     let mvar ← mkFreshExprMVar goalType
