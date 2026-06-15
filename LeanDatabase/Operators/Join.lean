@@ -187,6 +187,63 @@ theorem semijoin_union_antijoin (r1 : TypedRelation colType1) (r2 : TypedRelatio
     Bool.not_eq_true', decide_eq_false_iff_not]
   grind
 
+/-! ### Subquery ↔ join/semi-join bridges
+The dataset's cross-skill rewrites are overwhelmingly "subquery form vs join form". These lemmas
+connect the two: `EXISTS`/`IN` correlated subqueries are semi-joins, and a semi-join is the
+`DISTINCT` left-projection of the corresponding inner join. -/
+
+-- **`WHERE EXISTS`/membership** — the defining membership of a semi-join.
+theorem mem_semijoin (r1 : TypedRelation colType1) (r2 : TypedRelation colType2)
+    (cond : TypedTuple colType1 → TypedTuple colType2 → Bool) (t : TypedTuple colType1) :
+    t ∈ (semijoin r1 r2 cond).rows ↔ t ∈ r1.rows ∧ ∃ s ∈ r2.rows, cond t s := by
+  simp only [semijoin, restriction, Finset.mem_filter, decide_eq_true_eq]
+
+-- **`WHERE a IN (SELECT b FROM S)` is a semi-join on `a = b`.** The uncorrelated `IN`-subquery
+-- (membership in a projected column) equals the semi-join with the equality correlation.
+theorem in_subquery_eq_semijoin {β : Type} [DecidableEq β]
+    (r1 : TypedRelation colType1) (r2 : TypedRelation colType2)
+    (a : TypedTuple colType1 → β) (b : TypedTuple colType2 → β) :
+    restriction (fun t => decide (a t ∈ r2.rows.image b)) r1
+      = semijoin r1 r2 (fun t s => decide (a t = b s)) := by
+  simp only [semijoin]
+  refine congrArg (fun p => restriction p r1) ?_
+  funext t
+  simp only [Finset.mem_image, decide_eq_true_eq]
+  grind
+
+-- **`WHERE a NOT IN (SELECT b FROM S)` is an anti-join on `a = b`** — the `NOT IN`/`NOT EXISTS`
+-- mirror of `in_subquery_eq_semijoin`.
+theorem not_in_subquery_eq_antijoin {β : Type} [DecidableEq β]
+    (r1 : TypedRelation colType1) (r2 : TypedRelation colType2)
+    (a : TypedTuple colType1 → β) (b : TypedTuple colType2 → β) :
+    restriction (fun t => decide (a t ∉ r2.rows.image b)) r1
+      = antijoin r1 r2 (fun t s => decide (a t = b s)) := by
+  simp only [antijoin]
+  refine congrArg (fun p => restriction p r1) ?_
+  funext t
+  simp only [Finset.mem_image, decide_eq_true_eq]
+  grind
+
+-- **A semi-join is the `DISTINCT` left-projection of the inner join.** `R ⋉ S` (i.e. `WHERE
+-- EXISTS (… cond)`) equals the set of left-rows of `R ⋈_cond S` — the bridge between the
+-- subquery form and the `JOIN … (GROUP BY/DISTINCT)` form.
+theorem semijoin_eq_join_image (r1 : TypedRelation colType1) (r2 : TypedRelation colType2)
+    (a1 a2 : String) (cond : TypedTuple colType1 → TypedTuple colType2 → Bool) :
+    (semijoin r1 r2 cond).rows
+      = (join r1 r2 a1 a2 (fun t => cond (splitTuple t).1 (splitTuple t).2)).rows.image
+          (fun t => (splitTuple t).1) := by
+  ext r
+  simp only [semijoin, restriction, Finset.mem_filter, decide_eq_true_eq, Finset.mem_image,
+    join, mem_crossProduct]
+  constructor
+  · rintro ⟨hr, s, hs, hc⟩
+    refine ⟨combineTuple (r, s), ?_, ?_⟩
+    · simp only [splitTuple_combineTuple]; exact ⟨⟨hr, hs⟩, hc⟩
+    · simp only [splitTuple_combineTuple]
+  · rintro ⟨t, ⟨⟨hL, hR⟩, hc⟩, hrt⟩
+    subst hrt
+    exact ⟨hL, (splitTuple t).2, hR, hc⟩
+
 /-
 ## NULL handling and outer joins
 

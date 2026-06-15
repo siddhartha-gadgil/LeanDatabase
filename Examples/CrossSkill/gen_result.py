@@ -38,12 +38,21 @@ LEMMAS = [
     {"name": "restriction_congr + cnt_eq_of_partition_eq + card_image_eq_of_fiber + select_congr",
      "where": "LeanDatabase/{SQLToolbox,Operators/Select}.lean",
      "statement": "general congruences: restriction/select agree when predicates/row-maps agree on the data; same-partition => same group count / same distinct count."},
+    {"name": "SUBQUERY BRIDGES: mem_semijoin + in_subquery_eq_semijoin + semijoin_eq_join_image (+ combineTuple/splitTuple_combineTuple)",
+     "where": "LeanDatabase/Operators/{CrossProduct,Join}.lean",
+     "statement": "EXISTS/IN correlated subquery = semi-join; a semi-join is the DISTINCT left-projection of the inner join. The subquery<->join-form bridge (combineTuple is the named inverse of splitTuple)."},
+    {"name": "crossProduct_assoc + assocAppend + combineTuple_splitTuple",
+     "where": "LeanDatabase/Operators/CrossProduct.lean",
+     "statement": "three-way cross-product associativity up to the append re-bracketing (the data core of join associativity)."},
+    {"name": "relCount_union_add_inter",
+     "where": "LeanDatabase/Operators/Aggregate.lean",
+     "statement": "inclusion-exclusion for COUNT (|R|+|S| = |R∪S|+|R∩S|); UNION ALL = UNION on disjoint inputs (set model has no bag multiplicity)."},
 ]
 PLANNED = [
-    {"name": "join_assoc", "where": "LeanDatabase/Operators/{CrossProduct,Join}.lean",
-     "why": "3-way join reassociation; needs a dependent append-associativity reindex (analogous to swapAppend). Deferred — the hardest of the requested batch."},
-    {"name": "subquery<->join bridges, UNION ALL (bag), genuine top-N (ORDER BY LIMIT k)",
-     "why": "larger future items; the dataset is 85% subqueries and has many ranking queries."},
+    {"name": "full conditional join_assoc", "where": "LeanDatabase/Operators/Join.lean",
+     "why": "lift crossProduct_assoc (done) through join conditions on the intermediate schema — needs a named assocAppend inverse + condition transport."},
+    {"name": "UNION ALL bag multiplicity, genuine top-N (ORDER BY LIMIT k)",
+     "why": "out of the Finset set-model: top-N is identity here (correct for sets), bag multiplicity needs a different model."},
 ]
 
 def first_para(text, marker):

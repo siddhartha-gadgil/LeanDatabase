@@ -176,6 +176,14 @@ theorem relCountDistinct_le {β : Type} [DecidableEq β]
     relCountDistinct f rel ≤ relCount rel := by
   simp only [relCountDistinct, relCount]; exact Finset.card_image_le
 
+/-- **Inclusion–exclusion for `COUNT`**: `|R| + |S| = |R ∪ S| + |R ∩ S|`. Our set model has no bag
+`UNION ALL` multiplicity; this is how `COUNT` relates to `UNION`. For *disjoint* inputs the `∩` term
+is `0`, so `UNION ALL` = `UNION` and `|R ∪ S| = |R| + |S|` (see `relCount_union_disjoint`). -/
+theorem relCount_union_add_inter (r s : TypedRelation colType) :
+    relCount r + relCount s = relCount (union r s) + relCount (intersection r s) := by
+  have := Finset.card_union_add_card_inter r.rows s.rows
+  simp only [relCount, union, intersection]; omega
+
 /-- **`COUNT(*) = COUNT(DISTINCT key)` when `key` is a key** (injective on the rows). The honest
 fact behind `COUNT(DISTINCT pk) = COUNT(*)`. -/
 theorem relCount_eq_relCountDistinct_of_injOn {β : Type} [DecidableEq β]

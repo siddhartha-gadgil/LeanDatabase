@@ -48,26 +48,41 @@
       "name": "restriction_congr + cnt_eq_of_partition_eq + card_image_eq_of_fiber + select_congr",
       "where": "LeanDatabase/{SQLToolbox,Operators/Select}.lean",
       "statement": "general congruences: restriction/select agree when predicates/row-maps agree on the data; same-partition => same group count / same distinct count."
+    },
+    {
+      "name": "SUBQUERY BRIDGES: mem_semijoin + in_subquery_eq_semijoin + semijoin_eq_join_image (+ combineTuple/splitTuple_combineTuple)",
+      "where": "LeanDatabase/Operators/{CrossProduct,Join}.lean",
+      "statement": "EXISTS/IN correlated subquery = semi-join; a semi-join is the DISTINCT left-projection of the inner join. The subquery<->join-form bridge (combineTuple is the named inverse of splitTuple)."
+    },
+    {
+      "name": "crossProduct_assoc + assocAppend + combineTuple_splitTuple",
+      "where": "LeanDatabase/Operators/CrossProduct.lean",
+      "statement": "three-way cross-product associativity up to the append re-bracketing (the data core of join associativity)."
+    },
+    {
+      "name": "relCount_union_add_inter",
+      "where": "LeanDatabase/Operators/Aggregate.lean",
+      "statement": "inclusion-exclusion for COUNT (|R|+|S| = |R∪S|+|R∩S|); UNION ALL = UNION on disjoint inputs (set model has no bag multiplicity)."
     }
   ],
   "planned_lemmas": [
     {
-      "name": "join_assoc",
-      "where": "LeanDatabase/Operators/{CrossProduct,Join}.lean",
-      "why": "3-way join reassociation; needs a dependent append-associativity reindex (analogous to swapAppend). Deferred — the hardest of the requested batch."
+      "name": "full conditional join_assoc",
+      "where": "LeanDatabase/Operators/Join.lean",
+      "why": "lift crossProduct_assoc (done) through join conditions on the intermediate schema — needs a named assocAppend inverse + condition transport."
     },
     {
-      "name": "subquery<->join bridges, UNION ALL (bag), genuine top-N (ORDER BY LIMIT k)",
-      "why": "larger future items; the dataset is 85% subqueries and has many ranking queries."
+      "name": "UNION ALL bag multiplicity, genuine top-N (ORDER BY LIMIT k)",
+      "why": "out of the Finset set-model: top-N is identity here (correct for sets), bag multiplicity needs a different model."
     }
   ],
   "summary": {
-    "encoded": 19,
-    "pass": 14,
-    "pass_under_hypothesis": 3,
-    "out_of_scope": 2,
+    "encoded": 20,
+    "pass": 15,
+    "pass_under_hypothesis": 5,
+    "out_of_scope": 0,
     "fail": 0,
-    "on_disk_now": 6
+    "on_disk_now": 9
   },
   "instances": [
     {
@@ -109,6 +124,16 @@
       "difference": "semantic-probing writes the recovery rate as SUM(recovered) / SUM(confirmed) 100 (divide then multiply); probing writes SUM(recovered) 100.0 / SUM(confirmed) (multiply then divide). All four wrap it in ROUND(_,2); GROUP BY country, HAVING SUM(confirmed)>50000, ORDER BY … LIMIT 3 are shared.",
       "table_encoded": "COVID19_OPEN_DATA (701)",
       "note": "needed `set_option maxRecDepth` (wide schema).",
+      "on_disk": true
+    },
+    {
+      "instance_id": "sf_bq048",
+      "file": "Examples/CrossSkill/Sf_bq048.lean",
+      "num_distinct_variants": 4,
+      "num_equivalent_sqls": 4,
+      "sql_equiv": "pass",
+      "difference": null,
+      "table_encoded": null,
       "on_disk": true
     },
     {
@@ -170,10 +195,10 @@
       "file": "Examples/CrossSkill/Sf_bq310.lean",
       "num_distinct_variants": 4,
       "num_equivalent_sqls": 4,
-      "sql_equiv": "out_of_scope",
-      "difference": "NONE — OUT-OF-SCOPE (data-dependent LIKE patterns). The four variants differ in their WHERE predicates themselves: - LOWER(title) LIKE 'how%' (semantic-probing, baseline-1) vs 'how %' (probing) vs '%how%' (baseline-sg); - tags LIKE '%android-%' (semantic-probing, probing, baseline-sg) vs '%android%'",
+      "sql_equiv": "pass_under_hypothesis",
+      "difference": null,
       "table_encoded": "POSTS_QUESTIONS (20)",
-      "on_disk": false
+      "on_disk": true
     },
     {
       "instance_id": "sf_bq327",
@@ -200,10 +225,10 @@
       "file": "Examples/CrossSkill/Sf_bq398.lean",
       "num_distinct_variants": 3,
       "num_equivalent_sqls": 3,
-      "sql_equiv": "out_of_scope",
-      "difference": "OUT-OF-SCOPE (top-N ordering + NULL). All three variants are SELECT indicator_name … WHERE country_name='Russian Federation' GROUP BY indicator_name … LIMIT 3. The only differences are: ORDER BY MAX(\"value\") DESC vs ORDER BY SUM(\"value\") DESC — these rank the groups differently, and the ranking matt",
+      "sql_equiv": "pass_under_hypothesis",
+      "difference": null,
       "table_encoded": "INTERNATIONAL_DEBT (6)",
-      "on_disk": false
+      "on_disk": true
     },
     {
       "instance_id": "sf_bq402",
