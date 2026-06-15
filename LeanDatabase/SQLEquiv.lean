@@ -3,6 +3,7 @@ import LeanDatabase.Operators.Aggregate
 import LeanDatabase.CurriedPredicates
 import LeanDatabase.SQLToolbox
 import LeanDatabase.Operators
+import LeanDatabase.Constraints
 
 open LeanDatabase LeanDatabase.TypedAgg
 

@@ -85,6 +85,28 @@ theorem join_subset_crossProduct (r1 : TypedRelation colType1) (r2 : TypedRelati
     (join r1 r2 a1 a2 condition).rows ⊆ (crossProductRel r1 r2 a1 a2).rows := by
   grind
 
+-- Theorem: Join Commutativity (up to the schema half-swap)
+-- (R ⋈_c S)  ≅  (S ⋈_{c∘swap} R)
+-- "Swapping the join operands gives the same rows once you swap the two schema halves
+--  (`swapAppend`) and transport the condition through that swap."  The two sides have *different*
+--  dependent schemas (`Fin.append c1 c2` vs `Fin.append c2 c1`), so equality is stated on `.rows`
+--  modulo `swapAppend`.
+theorem join_comm (r1 : TypedRelation colType1) (r2 : TypedRelation colType2)
+    (cond : TypedTuple (Fin.append colType1 colType2) → Bool) (a1 a2 : String) :
+    (join r1 r2 a1 a2 cond).rows.image swapAppend
+      = (join r2 r1 a2 a1 (fun u => cond (swapAppend u))).rows := by
+  ext u
+  simp only [join, Finset.mem_image, Finset.mem_filter]
+  constructor
+  · rintro ⟨t, ⟨htmem, htcond⟩, rfl⟩
+    rw [mem_crossProduct] at htmem
+    rw [mem_crossProduct, splitTuple_swapAppend, swapAppend_swapAppend]
+    exact ⟨⟨htmem.2, htmem.1⟩, htcond⟩
+  · rintro ⟨humem, hucond⟩
+    rw [mem_crossProduct] at humem
+    refine ⟨swapAppend u, ⟨?_, hucond⟩, swapAppend_swapAppend u⟩
+    rw [mem_crossProduct, splitTuple_swapAppend]; exact ⟨humem.2, humem.1⟩
+
 /-
 ## Semi-join and Anti-join
 Unlike the (cross-product based) `join`, these are SCHEMA-PRESERVING: the output keeps the left

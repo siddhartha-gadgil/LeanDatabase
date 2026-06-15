@@ -203,4 +203,65 @@ theorem mem_crossProduct (r1 : TypedRelation colType1) (r2 : TypedRelation colTy
       · simp_all only [Fin.addCases_right]
         grind
 
+/-
+## Cross-product commutativity (up to the schema half-swap)
+
+`crossProductRel r1 r2` lives over `Fin.append colType1 colType2`, while `crossProductRel r2 r1`
+lives over `Fin.append colType2 colType1` — *different* dependent schemas. `swapAppend` is the
+reindexing that exchanges the two halves; under it the two cross products have the same row-set.
+-/
+
+-- Swap the two halves of an appended-schema tuple: `(c1 ++ c2)`-tuple ↦ `(c2 ++ c1)`-tuple.
+@[simp]
+def swapAppend (t : TypedTuple (Fin.append colType1 colType2)) :
+    TypedTuple (Fin.append colType2 colType1) :=
+  fun j =>
+    Fin.addCases
+      (fun (j : Fin m) =>
+        have h : Fin.append colType2 colType1 (Fin.castAdd n j) = colType2 j := by
+          simp [Fin.append, Fin.addCases]
+        h.symm ▸ (splitTuple t).2 j)
+      (fun (j : Fin n) =>
+        have h : Fin.append colType2 colType1 (Fin.natAdd m j) = colType1 j := by
+          simp [Fin.append, Fin.addCases]
+        h.symm ▸ (splitTuple t).1 j)
+      j
+
+-- Splitting a swapped tuple just swaps the two component tuples.
+omit [∀ i, DecidableEq (colType1 i)] [∀ i, DecidableEq (colType2 i)] in
+theorem splitTuple_swapAppend (t : TypedTuple (Fin.append colType1 colType2)) :
+    splitTuple (swapAppend t) = ((splitTuple t).2, (splitTuple t).1) := by
+  apply Prod.ext
+  · funext k
+    simp only [splitTuple, swapAppend, Fin.addCases_left]
+    grind
+  · funext k
+    simp only [splitTuple, swapAppend, Fin.addCases_right]
+    grind
+
+-- `swapAppend` is an involution (swapping back recovers the original tuple).
+omit [∀ i, DecidableEq (colType1 i)] [∀ i, DecidableEq (colType2 i)] in
+theorem swapAppend_swapAppend (t : TypedTuple (Fin.append colType1 colType2)) :
+    swapAppend (swapAppend t) = t := by
+  funext j
+  induction j using Fin.addCases with
+  | left k => simp only [swapAppend, splitTuple, Fin.addCases_left, Fin.addCases_right]; grind
+  | right k => simp only [swapAppend, splitTuple, Fin.addCases_left, Fin.addCases_right]; grind
+
+-- **Cross-product commutativity.** The two argument orders have the same row-set up to `swapAppend`.
+theorem crossProduct_comm (r1 : TypedRelation colType1) (r2 : TypedRelation colType2) (a1 a2 : String) :
+    (crossProductRel r1 r2 a1 a2).rows.image swapAppend = (crossProductRel r2 r1 a2 a1).rows := by
+  ext u
+  simp only [Finset.mem_image]
+  rw [mem_crossProduct]
+  constructor
+  · rintro ⟨t, ht, rfl⟩
+    rw [mem_crossProduct] at ht
+    rw [splitTuple_swapAppend]
+    exact ⟨ht.2, ht.1⟩
+  · rintro ⟨h1, h2⟩
+    refine ⟨swapAppend u, ?_, swapAppend_swapAppend u⟩
+    rw [mem_crossProduct, splitTuple_swapAppend]
+    exact ⟨h2, h1⟩
+
 end LeanDatabase

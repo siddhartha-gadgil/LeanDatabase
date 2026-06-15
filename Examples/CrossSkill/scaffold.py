@@ -27,15 +27,18 @@ LEAN_KEYWORDS = {
     "def","theorem","example","variable","open","namespace","section","set","mut",
 }
 
-def lean_type(sql_type: str) -> str:
-    t = sql_type.upper()
-    if any(k in t for k in ("VARCHAR","TEXT","CHAR","STRING")):      return "String"
-    if "BOOL" in t:                                                  return "Bool"
-    if any(k in t for k in ("DATE","TIMESTAMP","TIME")):            return "String"   # modeled as String
-    if any(k in t for k in ("FLOAT","DOUBLE","REAL","DECIMAL","NUMERIC","NUMBER","INT")):
-        return "Int"
-    if any(k in t for k in ("ARRAY","VARIANT","OBJECT")):           return "String"   # placeholder
-    return "String"
+def sql_proxy(sql_type: str) -> str:
+    """Mirror LeanDatabase.Parser.sqlProxy: DDL type -> SQLTypeProxy constructor."""
+    s = sql_type.lower()
+    starts = lambda *ps: any(s.startswith(p) for p in ps)
+    if starts("varchar","text","char","string"):         return ".string"
+    if starts("bool"):                                    return ".bool"
+    if starts("float","double","real"):                   return ".float"
+    if starts("int","number","numeric","decimal","bigint","smallint","tinyint"): return ".int"
+    if starts("date","timestamp","time"):                 return ".string"   # dates modeled as strings
+    return ".string"   # default (ARRAY, VARIANT, …)
+
+PROXY_LEAN = {".string": "String", ".int": "Int", ".bool": "Bool", ".float": "Rat"}
 
 def ident(name: str) -> str:
     s = re.sub(r"[^0-9a-zA-Z_]", "_", name)
@@ -70,21 +73,21 @@ def referenced_tables(sqls, ddl_tables):
             seen.append(u)
     return seen
 
-def emit_schema(table, cols):
+def emit_schema(table, cols, prefix=""):
+    """Emit the table schema in the parser's canonical form: a `List SQLTypeProxy`
+    (so `colTypeOfList`/`sqlTypeDecEq` give the type + DecidableEq, exactly what
+    LeanDatabase.Parser produces from the DDL) plus one named projection per column."""
     n = len(cols)
-    arms = " ".join(f"| {i} => {lean_type(t)}" for i,(c,t) in enumerate(cols))
-    inst = " ".join(f"| {i} => inferInstance" for i in range(n))
+    proxies = ", ".join(sql_proxy(t) for _,t in cols)
     lines = [
-        f"/-- Full `{table}` schema ({n} columns), straight from the DDL. -/",
-        f"abbrev {table}CT : Fin {n} → Type := fun i =>",
-        f"  match i with {arms}",
-        f"instance : ∀ i, DecidableEq ({table}CT i) := fun i =>",
-        f"  match i with {inst}",
+        f"/-- Full `{table}` schema ({n} columns) in the parser's canonical form. -/",
+        f"abbrev {table} : List SQLTypeProxy := [{proxies}]",
         "",
         f"-- column projections for {table}",
     ]
     for i,(c,t) in enumerate(cols):
-        lines.append(f"abbrev {ident(c)} : TypedTuple {table}CT → {lean_type(t)} := fun t => t {i}")
+        lt = PROXY_LEAN[sql_proxy(t)]
+        lines.append(f"abbrev {prefix}{ident(c)} : TypedTupleOfList {table} → {lt} := fun t => t {i}")
     return "\n".join(lines)
 
 def main():
@@ -114,8 +117,12 @@ def main():
     if os.path.exists(out) and not force:
         sys.exit(f"{out} exists; pass --force to overwrite")
 
+    # If >1 table, prefix projections with the table name to avoid column collisions.
+    multi = len(tables) > 1
+
     P = []
     P.append("import LeanDatabase.SQLEquiv")
+    P.append("import LeanDatabase.Parser")
     P.append("open LeanDatabase")
     P.append("")
     P.append("/-!")
@@ -138,15 +145,16 @@ def main():
     P.append(f"namespace CrossSkill.{mod}")
     P.append("")
     for t in tables:
-        P.append(emit_schema(t, ddl_tables[t]))
+        P.append(emit_schema(t, ddl_tables[t], prefix=(t.lower()+"_" if multi else "")))
         P.append("")
+    rel0 = tables[0] if tables else "SCHEMA"
     P.append("/- TODO: encode the two variants as query terms over the schema(s) above,")
     P.append("   then prove them equal. Replace the placeholder below. -/")
     P.append("")
-    P.append("-- def q_a (R : TypedRelation ...CT) := ...")
-    P.append("-- def q_b (R : TypedRelation ...CT) := ...")
+    P.append(f"-- def q_a (R : TypedRelationOfList {rel0}) := ...")
+    P.append(f"-- def q_b (R : TypedRelationOfList {rel0}) := ...")
     P.append("")
-    P.append("-- theorem equiv (R : TypedRelation ...CT) : q_a R = q_b R := by")
+    P.append(f"-- theorem equiv (R : TypedRelationOfList {rel0}) : q_a R = q_b R := by")
     P.append("--   sql_equiv")
     P.append("")
     P.append(f"end CrossSkill.{mod}")
