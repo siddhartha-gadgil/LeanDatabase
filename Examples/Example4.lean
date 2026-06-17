@@ -1,4 +1,4 @@
-import LeanDatabase.SQLEquiv
+import LeanDatabase.Parser
 
 /-!
 # Example 4 — Combine + global anti-set ≡ single combined predicate

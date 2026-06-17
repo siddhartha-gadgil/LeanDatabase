@@ -1,4 +1,4 @@
-import LeanDatabase.SQLEquiv
+import LeanDatabase.Parser
 
 /-!
 # Example 1 — Predicate pushdown through `UNION` (the "MapReduce" rewrite)

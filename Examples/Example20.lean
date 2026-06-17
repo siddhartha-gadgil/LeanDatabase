@@ -1,4 +1,4 @@
-import LeanDatabase.SQLEquiv
+import LeanDatabase.Parser
 open LeanDatabase
 
 /-!

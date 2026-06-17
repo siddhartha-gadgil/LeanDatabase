@@ -1,4 +1,4 @@
-import LeanDatabase.SQLEquiv
+import LeanDatabase.Parser
 
 /-!
 # Example 2 — Cascading selection (the "Index Merge" rewrite)

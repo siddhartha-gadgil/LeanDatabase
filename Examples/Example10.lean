@@ -1,4 +1,4 @@
-import LeanDatabase.SQLEquiv
+import LeanDatabase.Parser
 
 /-!
 # Example 10 — `OR` predicate ≡ `UNION` ≡ disjoint `UNION ALL`

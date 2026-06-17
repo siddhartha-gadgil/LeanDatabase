@@ -2,6 +2,7 @@ import LeanDatabase.Parser.Types
 import LeanDatabase.Parser.Syntax
 import LeanDatabase.Parser.Context
 import LeanDatabase.Parser.Query
+import LeanDatabase.SQLEquiv
 
 /-!
 # SQL → `TypedRelation` parser
@@ -13,7 +14,7 @@ Aggregates the parser modules and exposes the public API. The pipeline:
 * `Parser.Context` — column-binding elaboration context + per-operator (algebra) elaborators.
 * `Parser.Query`   — `elabSqlQuery` and the `parse*` entry points.
 
-The `checkEquiv` API below parses two `WHERE`-predicate strings and asks `grind` whether they are
+The `checkEquiv` API below parses two `WHERE`-predicate strings and asks `sql_equiv` whether they are
 equal — the entry point used by the `sql_process` executable.
 -/
 
@@ -22,7 +23,7 @@ open Lean Meta Elab Term
 namespace LeanDatabase
 
 /-- Parse the `first`/`second` filter strings from a JSON record (with its `schema`) and report
-whether `grind` proves them equal. -/
+whether `sql_equiv` proves them equal. -/
 def checkEquiv (data: Json) : TermElabM Bool := do
     let .ok schema := data.getObjValAs? (List Json) "schema" | throwError "Missing schema"
     let schemaStr : List (String × String) ←  schema.mapM fun colJson => do
@@ -35,7 +36,7 @@ def checkEquiv (data: Json) : TermElabM Bool := do
     let secondExpr ← parseTypedTupleFilter schemaStr secondStr
     let goalType ←  mkEq firstExpr secondExpr
     let mvar ← mkFreshExprMVar goalType
-    let tac ← `(tacticSeq| grind)
+    let tac ← `(tacticSeq| sql_equiv)
     try
         let (goals, _) ← Elab.runTactic mvar.mvarId! tac
         pure goals.isEmpty
