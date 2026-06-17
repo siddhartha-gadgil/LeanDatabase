@@ -5,7 +5,7 @@ open LeanDatabase
 # Example 7 — Correlated `COUNT(*)` ≡ GROUP BY + LEFT JOIN + COALESCE
 
 Built on the `TypedRelation` relational algebra (rows are `TypedTuple`s; the per-customer
-filter is the defined `restriction`, via `TypedAgg.cnt`). Set semantics / dedup'd data.
+filter is the defined `restriction`, via `TypedAgg.groupCount`). Set semantics / dedup'd data.
 
 ## The two SQL queries being proved equivalent
 
@@ -46,14 +46,14 @@ def out (id : Nat) (name : String) (c : Nat) : TypedTuple outCT :=
 def query_Correlated (customers : TypedRelation custCT) (orders : TypedRelation ordCT) :
     TypedRelation outCT :=
   { labels := fun j => match j with | 0 => customers.labels 0 | 1 => customers.labels 1 | 2 => "order_count",
-    rows := customers.rows.image (fun c => out (c 0) (c 1) (cnt ordKey (c 0) orders)) }
+    rows := customers.rows.image (fun c => out (c 0) (c 1) (groupCount ordKey (c 0) orders)) }
 
 /-- Query 2: GROUP BY once, LEFT JOIN, `COALESCE(_, 0)` the misses. -/
 def query_GroupJoin (customers : TypedRelation custCT) (orders : TypedRelation ordCT) :
     TypedRelation outCT :=
   { labels := fun j => match j with | 0 => customers.labels 0 | 1 => customers.labels 1 | 2 => "order_count",
     rows := customers.rows.image (fun c =>
-      out (c 0) (c 1) (if c 0 ∈ okeys ordKey orders then cnt ordKey (c 0) orders else 0)) }
+      out (c 0) (c 1) (if c 0 ∈ groupKeys ordKey orders then groupCount ordKey (c 0) orders else 0)) }
 
 theorem query_equivalence (customers : TypedRelation custCT) (orders : TypedRelation ordCT) :
     query_Correlated customers orders = query_GroupJoin customers orders := by

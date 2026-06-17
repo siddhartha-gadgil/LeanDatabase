@@ -7,7 +7,7 @@ open LeanDatabase
 The headline rewrite, on the `TypedRelation` algebra: two correlated scalar subqueries
 (`COUNT(*)`, `SUM(total_amount)`) per customer, vs. aggregate once with `GROUP BY` and probe
 with a `LEFT JOIN` + `COALESCE(_, 0)`. Counts/sums are taken over the defined `restriction`
-(`TypedAgg.cnt` / `TypedAgg.sumI`). Set semantics / dedup'd data.
+(`TypedAgg.groupCount` / `TypedAgg.groupSum`). Set semantics / dedup'd data.
 
 ## The two SQL queries being proved equivalent
 
@@ -57,7 +57,7 @@ def query_Correlated (customers : TypedRelation custCT) (orders : TypedRelation 
   { labels := fun j => match j with
       | 0 => customers.labels 0 | 1 => customers.labels 1 | 2 => "order_count" | 3 => "total_spent",
     rows := customers.rows.image (fun c =>
-      out (c 0) (c 1) (cnt ordKey (c 0) orders) (sumI ordKey (c 0) orders ordAmt)) }
+      out (c 0) (c 1) (groupCount ordKey (c 0) orders) (groupSum ordKey (c 0) orders ordAmt)) }
 
 /-- Query 2: GROUP BY once, LEFT JOIN, `COALESCE(_, 0)` the misses. -/
 def query_GroupJoin (customers : TypedRelation custCT) (orders : TypedRelation ordCT) :
@@ -66,8 +66,8 @@ def query_GroupJoin (customers : TypedRelation custCT) (orders : TypedRelation o
       | 0 => customers.labels 0 | 1 => customers.labels 1 | 2 => "order_count" | 3 => "total_spent",
     rows := customers.rows.image (fun c =>
       out (c 0) (c 1)
-        (if c 0 ∈ okeys ordKey orders then cnt ordKey (c 0) orders else 0)
-        (if c 0 ∈ okeys ordKey orders then sumI ordKey (c 0) orders ordAmt else 0)) }
+        (if c 0 ∈ groupKeys ordKey orders then groupCount ordKey (c 0) orders else 0)
+        (if c 0 ∈ groupKeys ordKey orders then groupSum ordKey (c 0) orders ordAmt else 0)) }
 
 theorem query_equivalence (customers : TypedRelation custCT) (orders : TypedRelation ordCT) :
     query_Correlated customers orders = query_GroupJoin customers orders := by

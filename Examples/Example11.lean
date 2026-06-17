@@ -53,25 +53,25 @@ abbrev createdAt : TypedTuple ordCT → Nat := fun t => t 1
 
 /-- Form (2): `JOIN … MAX(created_at) … ON m.latest = o.created_at` — keep group-maximal rows. -/
 @[simp] def query_MaxJoin (orders : TypedRelation ordCT) : TypedRelation ordCT :=
-  restriction (fun o => decide (createdAt o = groupMaxN ordKey (ordKey o) orders createdAt)) orders
+  restriction (fun o => decide (createdAt o = groupMax ordKey (ordKey o) orders createdAt)) orders
 
 /-- Form (3): `WHERE NOT EXISTS (a strictly later row in the same group)`. -/
 @[simp] def query_NotExistsLater (orders : TypedRelation ordCT) : TypedRelation ordCT :=
   restriction
-    (fun o => decide (¬ ∃ s ∈ (grp ordKey (ordKey o) orders).rows, createdAt o < createdAt s)) orders
+    (fun o => decide (¬ ∃ s ∈ (group ordKey (ordKey o) orders).rows, createdAt o < createdAt s)) orders
 
 /-- Form (4): `LEFT JOIN` self on a later row, keep `WHERE later IS NULL` — i.e. the set of
     strictly-later rows in the group is empty. -/
 @[simp] def query_LeftJoinNull (orders : TypedRelation ordCT) : TypedRelation ordCT :=
   restriction
-    (fun o => decide (∀ s ∈ (grp ordKey (ordKey o) orders).rows, ¬ createdAt o < createdAt s)) orders
+    (fun o => decide (∀ s ∈ (group ordKey (ordKey o) orders).rows, ¬ createdAt o < createdAt s)) orders
 
 /-- `ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY created_at DESC)` for row `o`:
     one more than the number of strictly-later rows in `o`'s group. This is the *faithful* rank
     when `created_at` is unique within each group (the regime in which `ROW_NUMBER() = 1` is even
     deterministic); ties would need an extra tie-break column, which we assume away. -/
 @[simp] def rnRank (orders : TypedRelation ordCT) (o : TypedTuple ordCT) : Nat :=
-  1 + ((grp ordKey (ordKey o) orders).rows.filter (fun s => decide (createdAt o < createdAt s))).card
+  1 + ((group ordKey (ordKey o) orders).rows.filter (fun s => decide (createdAt o < createdAt s))).card
 
 /-- Form (1): `… WHERE ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY created_at DESC) = 1`. -/
 @[simp] def query_RowNumber (orders : TypedRelation ordCT) : TypedRelation ordCT :=

@@ -9,9 +9,9 @@ Aggregation (`COUNT`, `SUM`, `MIN`, `MAX`, `AVG`, `GROUP BY`, correlated subquer
 input tables are assumed duplicate-free, under which `COUNT`/`SUM` over distinct rows agree with
 SQL.
 
-Two layers: **grouped** scalars (`grp`/`cnt`/`sumI`/`okeys`/`groupMaxN`, take a key) and
+Two layers: **grouped** scalars (`group`/`groupCount`/`groupSum`/`groupKeys`/`groupMax`, take a key) and
 **ungrouped** whole-relation aggregates (`relCount`/`relSum`/`relMax`/`relMin`/`relCountDistinct`/
-`relAvg`); compose the latter with `grp key k rel` for `GROUP BY`.
+`relAvg`); compose the latter with `group key k rel` for `GROUP BY`.
 -/
 
 namespace LeanDatabase.TypedAgg
@@ -24,46 +24,55 @@ variable {K : Type} [DecidableEq K]
 /-! ## Grouping + grouped aggregates -/
 
 /-- `SELECT * FROM rel WHERE key(t) = k` — a group, as a `restriction` of the relation. -/
-def grp (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType) :
+def group (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType) :
     TypedRelation colType :=
   restriction (fun t => decide (key t = k)) rel
 
 /-- `COUNT(*)` over the group of key `k`. -/
-def cnt (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType) : Nat :=
-  (grp key k rel).rows.card
+def groupCount (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType) : Nat :=
+  (group key k rel).rows.card
 
 /-- `SUM(f)` over the group of key `k`. -/
-def sumI (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
+def groupSum (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
     (f : TypedTuple colType → Int) : Int :=
-  ∑ t ∈ (grp key k rel).rows, f t
+  ∑ t ∈ (group key k rel).rows, f t
 
 /-- `SELECT DISTINCT key FROM rel` — the group keys present. -/
-def okeys (key : TypedTuple colType → K) (rel : TypedRelation colType) : Finset K :=
+def groupKeys (key : TypedTuple colType → K) (rel : TypedRelation colType) : Finset K :=
   rel.rows.image key
 
+/-- `GROUP BY`: one output row per distinct key. `key` extracts the grouping key from a row;
+`mkRow k g` builds the output row for key `k` from its group `g` (`group key k rel`). -/
+def groupBy {p : Nat} {outCT : Fin p → Type} [∀ i, DecidableEq (outCT i)]
+    (key : TypedTuple colType → K) (outLabels : Fin p → String)
+    (mkRow : K → TypedRelation colType → TypedTuple outCT)
+    (rel : TypedRelation colType) : TypedRelation outCT :=
+  { labels := outLabels,
+    rows := (groupKeys key rel).image (fun k => mkRow k (group key k rel)) }
+
 /-- A key occurs iff some row carries it. -/
-@[grind =] theorem mem_okeys (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType) :
-    k ∈ okeys key rel ↔ ∃ t ∈ rel.rows, key t = k := by
-  simp [okeys, Finset.mem_image]
+@[grind =] theorem mem_groupKeys (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType) :
+    k ∈ groupKeys key rel ↔ ∃ t ∈ rel.rows, key t = k := by
+  simp [groupKeys, Finset.mem_image]
 
 /-- The group of an absent key is empty (the `LEFT JOIN` miss). -/
-theorem grp_empty_of_not_mem (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
-    (h : k ∉ okeys key rel) : (grp key k rel).rows = ∅ := by
-  rw [mem_okeys] at h
+theorem group_empty_of_not_mem (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
+    (h : k ∉ groupKeys key rel) : (group key k rel).rows = ∅ := by
+  rw [mem_groupKeys] at h
   simp only [not_exists, not_and] at h
-  simp only [grp, restriction, Finset.filter_eq_empty_iff, decide_eq_true_eq]
+  simp only [group, restriction, Finset.filter_eq_empty_iff, decide_eq_true_eq]
   exact fun t ht hk => h t ht hk
 
 /-- `COUNT` of an absent key's group is `0`. -/
-@[grind =] theorem cnt_eq_zero_of_not_mem (key : TypedTuple colType → K) (k : K)
-    (rel : TypedRelation colType) (h : k ∉ okeys key rel) : cnt key k rel = 0 := by
-  simp [cnt, grp_empty_of_not_mem key k rel h]
+@[grind =] theorem groupCount_eq_zero_of_not_mem (key : TypedTuple colType → K) (k : K)
+    (rel : TypedRelation colType) (h : k ∉ groupKeys key rel) : groupCount key k rel = 0 := by
+  simp [groupCount, group_empty_of_not_mem key k rel h]
 
 /-- `SUM` of an absent key's group is `0`. -/
-@[grind =] theorem sum_eq_zero_of_not_mem (key : TypedTuple colType → K) (k : K)
-    (rel : TypedRelation colType) (f : TypedTuple colType → Int) (h : k ∉ okeys key rel) :
-    sumI key k rel f = 0 := by
-  simp [sumI, grp_empty_of_not_mem key k rel h]
+@[grind =] theorem groupSum_eq_zero_of_not_mem (key : TypedTuple colType → K) (k : K)
+    (rel : TypedRelation colType) (f : TypedTuple colType → Int) (h : k ∉ groupKeys key rel) :
+    groupSum key k rel f = 0 := by
+  simp [groupSum, group_empty_of_not_mem key k rel h]
 
 /-- **`CASE` → `WHERE` pushdown.** `SUM(CASE WHEN p THEN f ELSE 0)` over a relation equals
     `SUM(f)` over its `WHERE p` `restriction`: rows failing `p` contribute `0` either way. -/
@@ -82,62 +91,62 @@ theorem sum_indicator_eq_count_where (p : TypedTuple colType → Bool)
   simp only [restriction, Finset.card_eq_sum_ones, Finset.sum_filter]
 
 /-- **`COUNT` coalesce.** `LEFT JOIN`+`COALESCE(_,0)` count equals the correlated count. -/
-@[simp] theorem coalesce_cnt (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType) :
-    (if k ∈ okeys key rel then cnt key k rel else 0) = cnt key k rel := by
+@[simp] theorem coalesce_groupCount (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType) :
+    (if k ∈ groupKeys key rel then groupCount key k rel else 0) = groupCount key k rel := by
   split
   · rfl
-  · rename_i h; exact (cnt_eq_zero_of_not_mem key k rel h).symm
+  · rename_i h; exact (groupCount_eq_zero_of_not_mem key k rel h).symm
 
 /-- **`SUM` coalesce.** `LEFT JOIN`+`COALESCE(_,0)` sum equals the correlated sum. -/
 @[simp] theorem coalesce_sum (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
     (f : TypedTuple colType → Int) :
-    (if k ∈ okeys key rel then sumI key k rel f else 0) = sumI key k rel f := by
+    (if k ∈ groupKeys key rel then groupSum key k rel f else 0) = groupSum key k rel f := by
   split
   · rfl
-  · rename_i h; exact (sum_eq_zero_of_not_mem key k rel f h).symm
+  · rename_i h; exact (groupSum_eq_zero_of_not_mem key k rel f h).symm
 
 /-- Every row belongs to its own group. -/
-@[grind .] theorem self_mem_grp (key : TypedTuple colType → K) (rel : TypedRelation colType)
-    (t : TypedTuple colType) (h : t ∈ rel.rows) : t ∈ (grp key (key t) rel).rows := by
-  simp [grp, restriction, Finset.mem_filter, h]
+@[grind .] theorem self_mem_group (key : TypedTuple colType → K) (rel : TypedRelation colType)
+    (t : TypedTuple colType) (h : t ∈ rel.rows) : t ∈ (group key (key t) rel).rows := by
+  simp [group, restriction, Finset.mem_filter, h]
 
 /-- `MAX(f)` over the group of key `k` (a `Nat` column), as a `Finset.sup` (empty ↦ 0). -/
-def groupMaxN (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
+def groupMax (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
     (f : TypedTuple colType → Nat) : Nat :=
-  (grp key k rel).rows.sup f
+  (group key k rel).rows.sup f
 
 /-- `f t` is the group `MAX(f)` **iff** `t` is `f`-maximal in its group. -/
-@[grind .] theorem eq_groupMaxN_iff (key : TypedTuple colType → K) (k : K)
+@[grind .] theorem eq_groupMax_iff (key : TypedTuple colType → K) (k : K)
     (rel : TypedRelation colType) (f : TypedTuple colType → Nat) (t : TypedTuple colType)
-    (ht : t ∈ (grp key k rel).rows) :
-    f t = groupMaxN key k rel f ↔ ∀ s ∈ (grp key k rel).rows, f s ≤ f t := by
-  unfold groupMaxN
+    (ht : t ∈ (group key k rel).rows) :
+    f t = groupMax key k rel f ↔ ∀ s ∈ (group key k rel).rows, f s ≤ f t := by
+  unfold groupMax
   constructor
   · intro h s hs; rw [h]; exact Finset.le_sup hs
   · intro h
     exact Nat.le_antisymm (Finset.le_sup ht) (Finset.sup_le h)
 
-/-- `simp`-friendly form of `eq_groupMaxN_iff` keyed on table membership `t ∈ rel.rows`. -/
-@[simp] theorem eq_groupMaxN_table (key : TypedTuple colType → K) (f : TypedTuple colType → Nat)
+/-- `simp`-friendly form of `eq_groupMax_iff` keyed on table membership `t ∈ rel.rows`. -/
+@[simp] theorem eq_groupMax_table (key : TypedTuple colType → K) (f : TypedTuple colType → Nat)
     (rel : TypedRelation colType) (t : TypedTuple colType) (ht : t ∈ rel.rows) :
-    (f t = groupMaxN key (key t) rel f) ↔ ∀ s ∈ (grp key (key t) rel).rows, f s ≤ f t :=
-  eq_groupMaxN_iff key (key t) rel f t (self_mem_grp key rel t ht)
+    (f t = groupMax key (key t) rel f) ↔ ∀ s ∈ (group key (key t) rel).rows, f s ≤ f t :=
+  eq_groupMax_iff key (key t) rel f t (self_mem_group key rel t ht)
 
 /-- A group is non-empty iff its key occurs (`EXISTS`/`IN`/`NOT EXISTS`/`NOT IN` bridge). -/
-@[grind =] theorem grp_nonempty_iff (key : TypedTuple colType → K) (k : K)
-    (rel : TypedRelation colType) : (grp key k rel).rows.Nonempty ↔ k ∈ okeys key rel := by
-  simp only [grp, restriction, okeys, Finset.Nonempty, Finset.mem_filter, Finset.mem_image,
+@[grind =] theorem group_nonempty_iff (key : TypedTuple colType → K) (k : K)
+    (rel : TypedRelation colType) : (group key k rel).rows.Nonempty ↔ k ∈ groupKeys key rel := by
+  simp only [group, restriction, groupKeys, Finset.Nonempty, Finset.mem_filter, Finset.mem_image,
     decide_eq_true_eq]
 
-/-- A group is empty iff its key is absent (the `=∅` normal form of `grp_nonempty_iff`, so the
+/-- A group is empty iff its key is absent (the `=∅` normal form of `group_nonempty_iff`, so the
     anti-join rewrites close regardless of which form `sql_simp` leaves). -/
-@[simp, grind =] theorem grp_empty_iff (key : TypedTuple colType → K) (k : K)
-    (rel : TypedRelation colType) : (grp key k rel).rows = ∅ ↔ k ∉ okeys key rel := by
-  rw [← Finset.not_nonempty_iff_eq_empty, grp_nonempty_iff]
+@[simp, grind =] theorem group_empty_iff (key : TypedTuple colType → K) (k : K)
+    (rel : TypedRelation colType) : (group key k rel).rows = ∅ ↔ k ∉ groupKeys key rel := by
+  rw [← Finset.not_nonempty_iff_eq_empty, group_nonempty_iff]
 
 /-! ## Ungrouped (whole-relation) aggregates
 
-For `GROUP BY` apply these to `grp key k rel`. `MAX`/`MIN` are NULL-aware (`WithBot`/`WithTop`,
+For `GROUP BY` apply these to `group key k rel`. `MAX`/`MIN` are NULL-aware (`WithBot`/`WithTop`,
 `⊥`/`⊤` for the empty relation, matching SQL `MAX`/`MIN` of no rows = `NULL`); `AVG` returns
 `(SUM, COUNT)` so the caller owns the division and the empty-relation `NULL`. -/
 
@@ -219,11 +228,11 @@ theorem relCount_eq_relCountDistinct_of_injOn {β : Type} [DecidableEq β]
   exact Finset.sum_union h
 
 /-- **The GROUP BY total**: summing each group's `COUNT(*)` over all present keys gives the table's
-    total `COUNT(*)`. (`∑_{k} cnt(k) = COUNT(*)`, the fiberwise partition by `key`.) -/
-@[grind =] theorem sum_cnt_okeys_eq_relCount (key : TypedTuple colType → K)
+    total `COUNT(*)`. (`∑_{k} groupCount(k) = COUNT(*)`, the fiberwise partition by `key`.) -/
+@[grind =] theorem sum_groupCount_groupKeys_eq_relCount (key : TypedTuple colType → K)
     (rel : TypedRelation colType) :
-    (∑ k ∈ okeys key rel, cnt key k rel) = relCount rel := by
-  simp only [cnt, grp, restriction, okeys, relCount, decide_eq_true_eq]
+    (∑ k ∈ groupKeys key rel, groupCount key k rel) = relCount rel := by
+  simp only [groupCount, group, restriction, groupKeys, relCount, decide_eq_true_eq]
   rw [Finset.card_eq_sum_card_fiberwise (fun t ht => Finset.mem_image_of_mem key ht)]
 
 /-! ## Aggregates of the empty relation (`GROUP BY` over no rows) -/
@@ -256,5 +265,5 @@ end LeanDatabase.TypedAgg
 /- Re-export the aggregate operators into the top-level `LeanDatabase` namespace-/
 namespace LeanDatabase
 export LeanDatabase.TypedAgg
-  (grp cnt sumI okeys groupMaxN relCount relSum relMax relMin relCountDistinct relAvg)
+  (group groupCount groupSum groupKeys groupMax relCount relSum relMax relMin relCountDistinct relAvg groupBy)
 end LeanDatabase

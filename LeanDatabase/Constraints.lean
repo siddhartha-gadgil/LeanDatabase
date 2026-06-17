@@ -25,11 +25,11 @@ theorem cnt_eq_of_partition_eq {α β : Type} [DecidableEq α] [DecidableEq β]
     (key1 : TypedTuple colType → α) (key2 : TypedTuple colType → β)
     (R : TypedRelation colType) (t : TypedTuple colType)
     (h : ∀ s ∈ R.rows, (key1 s = key1 t) ↔ (key2 s = key2 t)) :
-    TypedAgg.cnt key1 (key1 t) R = TypedAgg.cnt key2 (key2 t) R := by
-  have hrows : (TypedAgg.grp key1 (key1 t) R).rows = (TypedAgg.grp key2 (key2 t) R).rows := by
-    unfold TypedAgg.grp restriction
+    TypedAgg.groupCount key1 (key1 t) R = TypedAgg.groupCount key2 (key2 t) R := by
+  have hrows : (TypedAgg.group key1 (key1 t) R).rows = (TypedAgg.group key2 (key2 t) R).rows := by
+    unfold TypedAgg.group restriction
     grind only [Finset.filter_congr]
-  grind [TypedAgg.cnt]
+  grind [TypedAgg.groupCount]
 
 /-- **`GROUP BY key` ≡ `GROUP BY (det, key)`** counts, given the FD `key → det`. The refined key
 `(det, key)` and the coarse key `key` induce the same partition, so every group's `COUNT(*)` agrees
@@ -39,7 +39,7 @@ theorem cnt_pair_eq_of_FD {α β : Type} [DecidableEq α] [DecidableEq β]
     (key : TypedTuple colType → α) (det : TypedTuple colType → β)
     (R : TypedRelation colType) (hfd : FuncDepEq key det R)
     (t : TypedTuple colType) (ht : t ∈ R.rows) :
-    TypedAgg.cnt key (key t) R = TypedAgg.cnt (fun s => (det s, key s)) (det t, key t) R := by
+    TypedAgg.groupCount key (key t) R = TypedAgg.groupCount (fun s => (det s, key s)) (det t, key t) R := by
   apply cnt_eq_of_partition_eq
   grind only [FuncDepEq]
 
@@ -51,7 +51,7 @@ the **coarser** one, so it can't re-match its own result. With the FD in context
     (key : TypedTuple colType → α) (det : TypedTuple colType → β)
     (R : TypedRelation colType) (hfd : FuncDepEq key det R)
     (t : TypedTuple colType) (ht : t ∈ R.rows) :
-    TypedAgg.cnt (fun s => (det s, key s)) (det t, key t) R = TypedAgg.cnt key (key t) R := by
+    TypedAgg.groupCount (fun s => (det s, key s)) (det t, key t) R = TypedAgg.groupCount key (key t) R := by
   apply cnt_eq_of_partition_eq
   grind only [FuncDepEq]
 

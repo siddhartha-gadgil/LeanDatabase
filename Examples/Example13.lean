@@ -39,7 +39,7 @@ theorem union_absorb (a b : TypedRelation colType) :
 /-- Aggregation demo: a `LEFT JOIN`+`COALESCE(_,0)` count equals the correlated count. -/
 theorem coalesce_count_demo {K : Type} [DecidableEq K]
     (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType) :
-    (if k ∈ okeys key rel then cnt key k rel else 0) = cnt key k rel := by
+    (if k ∈ groupKeys key rel then groupCount key k rel else 0) = groupCount key k rel := by
   sql_equiv
 
 end Example13

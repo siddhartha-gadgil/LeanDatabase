@@ -5,7 +5,7 @@ open LeanDatabase
 # Example 8 — `NOT IN` ≡ `NOT EXISTS` (anti-join)
 
 Keep the customers with no orders. The negative counterpart of Example 5; both are a
-`restriction` of `customers` whose predicates agree by `TypedAgg.grp_nonempty_iff`.
+`restriction` of `customers` whose predicates agree by `TypedAgg.group_nonempty_iff`.
 (NULL-free / dedup'd data, so the real-SQL `NOT IN` NULL pitfall does not arise.)
 
 ## The two SQL queries being proved equivalent
@@ -28,12 +28,12 @@ abbrev ordKey : TypedTuple ordCT → Nat := fun t => t 0
 /-- `... WHERE c.customer_id NOT IN (SELECT customer_id FROM orders)`. -/
 def query_NotIn (customers : TypedRelation custCT) (orders : TypedRelation ordCT) :
     TypedRelation custCT :=
-  restriction (fun c => decide (c 0 ∉ okeys ordKey orders)) customers
+  restriction (fun c => decide (c 0 ∉ groupKeys ordKey orders)) customers
 
 /-- `... WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.customer_id)`. -/
 def query_NotExists (customers : TypedRelation custCT) (orders : TypedRelation ordCT) :
     TypedRelation custCT :=
-  restriction (fun c => decide ¬ (grp ordKey (c 0) orders).rows.Nonempty) customers
+  restriction (fun c => decide ¬ (group ordKey (c 0) orders).rows.Nonempty) customers
 
 theorem query_equivalence (customers : TypedRelation custCT) (orders : TypedRelation ordCT) :
     query_NotIn customers orders = query_NotExists customers orders := by

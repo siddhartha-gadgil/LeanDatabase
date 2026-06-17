@@ -8,7 +8,7 @@ Where Examples 1–19 each isolate one identity, this file stress-tests the tool
 realistic optimizer rewrites** — the kind an autoconverter would emit from a SQL benchmark. Every
 predicate is built from the **named combinators** (`between`/`inList`/`colGe`/`colEq`), every
 table-op from the **named operators** (`union`/`minus`/`semijoin`/`projection`/`distinct` and the
-`okeys`/`cnt` aggregates) — there is no raw `decide` anywhere. All three close with `sql_equiv`.
+`groupKeys`/`groupCount` aggregates) — there is no raw `decide` anywhere. All three close with `sql_equiv`.
 
 A single shared "orders" schema is used throughout:
 
@@ -141,11 +141,11 @@ SELECT COUNT(*) FROM (archive UNION live) WHERE <eligible>;
 ```
 
 **Why they're equal.** Summing the per-group counts over every present group key is just the
-fiberwise partition of the rows by `region`: `∑_{k ∈ okeys} cnt(k) = COUNT(*)`
-(`sum_cnt_okeys_eq_relCount`). It holds for any base relation, here the filtered union. -/
+fiberwise partition of the rows by `region`: `∑_{k ∈ groupKeys} groupCount(k) = COUNT(*)`
+(`sum_groupCount_groupKeys_eq_relCount`). It holds for any base relation, here the filtered union. -/
 theorem equiv3 (archive live : TypedRelation OrdCT) :
-    (∑ k ∈ okeys regP (restriction eligible (union archive live)),
-        cnt regP k (restriction eligible (union archive live)))
+    (∑ k ∈ groupKeys regP (restriction eligible (union archive live)),
+        groupCount regP k (restriction eligible (union archive live)))
       = relCount (restriction eligible (union archive live)) := by
   sql_equiv
 

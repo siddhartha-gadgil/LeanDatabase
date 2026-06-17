@@ -41,11 +41,11 @@ abbrev amount : TypedTuple ordCT → Int := fun t => t 2
 
 /-- query 1's `completed_total` for a group: `SUM(CASE WHEN completed THEN amt ELSE 0)`. -/
 def total_CaseSum (orders : TypedRelation ordCT) (k : Nat) : Int :=
-  ∑ t ∈ (grp ordKey k orders).rows, (if isCompleted t then amount t else 0)
+  ∑ t ∈ (group ordKey k orders).rows, (if isCompleted t then amount t else 0)
 
 /-- query 2's `completed_total`: `SUM(amt)` over the group's `WHERE completed` restriction. -/
 def total_WhereSum (orders : TypedRelation ordCT) (k : Nat) : Int :=
-  ∑ t ∈ (restriction isCompleted (grp ordKey k orders)).rows, amount t
+  ∑ t ∈ (restriction isCompleted (group ordKey k orders)).rows, amount t
 
 /-- The rewrite, per customer group: the two `completed_total`s agree, hence so do the
     `SELECT` value and the `HAVING ... > 1000` test. -/

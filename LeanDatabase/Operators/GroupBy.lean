@@ -3,8 +3,8 @@ import LeanDatabase.Operators.Aggregate
 /-!
 # `GROUP BY` → relation, and `HAVING`
 
-`groupByRel` produces one output row per distinct group key (`okeys`), built by `mkRow k rel`
-(which computes the key columns + aggregates for group `k`, typically using `grp`/`cnt`/`sumI`/…).
+`groupByRel` produces one output row per distinct group key (`groupKeys`), built by `mkRow k rel`
+(which computes the key columns + aggregates for group `k`, typically using `group`/`groupCount`/`groupSum`/…).
 `having` is a `WHERE` on the grouped relation.
 -/
 
@@ -21,7 +21,7 @@ variable {K : Type} [DecidableEq K]
 @[simp, grind] def groupByRel (key : TypedTuple colType → K) (newLabels : Fin p → String)
     (mkRow : K → TypedRelation colType → TypedTuple outCT) (rel : TypedRelation colType) :
     TypedRelation outCT :=
-  { labels := newLabels, rows := (okeys key rel).image (fun k => mkRow k rel) }
+  { labels := newLabels, rows := (groupKeys key rel).image (fun k => mkRow k rel) }
 
 /-- `HAVING p` — filter the grouped relation by an aggregate predicate. -/
 @[simp, grind] def having (p : TypedTuple outCT → Bool) (grouped : TypedRelation outCT) :
@@ -31,7 +31,7 @@ variable {K : Type} [DecidableEq K]
 /-- A `GROUP BY` produces at most one row per distinct group key. -/
 theorem groupByRel_card_le (key : TypedTuple colType → K) (newLabels : Fin p → String)
     (mkRow : K → TypedRelation colType → TypedTuple outCT) (rel : TypedRelation colType) :
-    (groupByRel key newLabels mkRow rel).rows.card ≤ (okeys key rel).card := by
+    (groupByRel key newLabels mkRow rel).rows.card ≤ (groupKeys key rel).card := by
   simp only [groupByRel]
   exact Finset.card_image_le
 

@@ -6,7 +6,7 @@ open LeanDatabase
 
 The outer-join anti-join idiom. On the `TypedRelation` algebra both are a `restriction` of
 `customers`: the `LEFT JOIN` probe is `NULL` exactly when the customer's id is absent from the
-order keys (`c.customer_id ∉ okeys`), which by `TypedAgg.grp_nonempty_iff` is the same as the
+order keys (`c.customer_id ∉ groupKeys`), which by `TypedAgg.group_nonempty_iff` is the same as the
 `NOT EXISTS` group being empty.
 
 ## The two SQL queries being proved equivalent
@@ -33,12 +33,12 @@ abbrev ordKey : TypedTuple ordCT → Nat := fun t => t 0
 /-- `LEFT JOIN orders … WHERE o.customer_id IS NULL`: the join probe found no order key. -/
 def query_LeftJoinNull (customers : TypedRelation custCT) (orders : TypedRelation ordCT) :
     TypedRelation custCT :=
-  restriction (fun c => decide (c 0 ∉ okeys ordKey orders)) customers
+  restriction (fun c => decide (c 0 ∉ groupKeys ordKey orders)) customers
 
 /-- `WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.customer_id)`. -/
 def query_NotExists (customers : TypedRelation custCT) (orders : TypedRelation ordCT) :
     TypedRelation custCT :=
-  restriction (fun c => decide ¬ (grp ordKey (c 0) orders).rows.Nonempty) customers
+  restriction (fun c => decide ¬ (group ordKey (c 0) orders).rows.Nonempty) customers
 
 theorem query_equivalence (customers : TypedRelation custCT) (orders : TypedRelation ordCT) :
     query_LeftJoinNull customers orders = query_NotExists customers orders := by
