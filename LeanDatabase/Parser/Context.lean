@@ -56,6 +56,12 @@ def mkLambdaLetsFVars (vars : List (Expr × Array Expr)) (k: TermElabM Expr) : T
   | (var, letVars) :: rest => do
     mkLambdaFVars #[var] (← mkLetFVars letVars (← mkLambdaLetsFVars rest k))
 
+def schemaWithFullNames (schemaName: Name) (schema : List (Name × SQLTypeProxy)) : List (Name × SQLTypeProxy) :=
+  schema.map (fun (name, colType) =>
+    let fullName :=
+      if schemaName.isPrefixOf name then name else schemaName ++ name
+    (fullName, colType))
+
 def withSchemasTupleVars (schemas : List (Name × List (Name × SQLTypeProxy)))
     (k : List (Expr × Array Expr) → TermElabM α) : TermElabM α := do
   match schemas with
