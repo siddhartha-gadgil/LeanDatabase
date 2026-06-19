@@ -56,6 +56,8 @@ def mkLambdaLetsFVars (vars : List (Expr × Array Expr)) (k: TermElabM Expr) : T
   | (var, letVars) :: rest => do
     mkLambdaFVars #[var] (← mkLetFVars letVars (← mkLambdaLetsFVars rest k))
 
+-- #eval Name.components `tableA.x |>.getLast?
+
 def schemaWithFullNames (schemaName: Name) (schema : List (Name × SQLTypeProxy)) : List (Name × SQLTypeProxy) :=
   schema.map (fun (name, colType) =>
     let fullName :=
