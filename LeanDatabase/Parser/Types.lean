@@ -110,6 +110,22 @@ def TypedTupleOfList (l: List SQLTypeProxy) : Type :=
 def TypedRelationOfList (l: List SQLTypeProxy) : Type :=
   TypedRelation (colTypeOfList l)
 
+@[reducible]
+def TypedTupleOfList.nil : TypedTupleOfList [] := fun ⟨i, hi⟩ => by simp at hi
+
+@[reducible]
+def TypedTupleOfList.cons (t : SQLTypeProxy) (x: t.type) (ts : TypedTupleOfList rest) :
+  TypedTupleOfList (t :: rest) := fun ⟨i, hi⟩ =>
+  match i with
+  | 0 => by simp [colTypeOfList]; exact x
+  | j+1 => ts ⟨j, by grind⟩
+
+@[reducible]
+def TypedTupleOfList.append (ts1 : TypedTupleOfList l1) (ts2 : TypedTupleOfList l2) :
+  TypedTupleOfList (l1 ++ l2) := match l1 with
+  | [] => ts2
+  | t :: rest => TypedTupleOfList.cons t (ts1 ⟨0, by simp⟩) (TypedTupleOfList.append (fun ⟨i, hi⟩ => ts1 ⟨i+1, by grind⟩)  ts2)
+
 /-- Reflect a `List SQLTypeProxy` into the `Expr` of the corresponding Lean-level list. -/
 def sqlTypeListExpr (l: List SQLTypeProxy) : MetaM Expr := do
   match l with

@@ -56,24 +56,24 @@ def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQLTypePro
     let filterExpr ← mkAppM ``restriction #[filter, productExpr]
     let colStxs := cols.getElems
     let cols := colStxs.map sqlColTerm
-    let names := colStxs.map sqlColName
+    let names := colStxs.map sqlColName |>.toList
     let nameStrs := names.map (·.toString)
-    let nameExpr := toExpr nameStrs
     let (m, types) ← elabTypedTupleProjection [(`table, combinedSchema)] cols.toList
-    let e' ← mkAppM ``TypedRelation.map #[m, nameExpr, filterExpr]
+    let nameTypeExpr := toExpr <| nameStrs.zip types
+    let e' ← mkAppM ``TypedRelation.mapByList #[filterExpr, nameTypeExpr, m]
     let vars := tableVars.map (fun (relVar, _, _) => relVar)
-    return (← mkLambdaFVars vars.toArray e', names.toList.zip types)
+    return (← mkLambdaFVars vars.toArray e', names.zip types)
   | `(sql_query| SELECT $cols:sql_col,* FROM $dbs:sql_from $[;]?) => do
     let (productExpr, combinedSchema) ← productPair dbs
     let colStxs := cols.getElems
-    let cols := colStxs.map sqlColTerm
-    let names := colStxs.map sqlColName
+    let cols := colStxs.map sqlColTerm |>.toList
+    let names := colStxs.map sqlColName |>.toList
     let nameStrs := names.map (·.toString)
-    let nameExpr := toExpr nameStrs
-    let (m, types) ← elabTypedTupleProjection [(`table, combinedSchema)] cols.toList
-    let e' ← mkAppM ``TypedRelation.map #[m, nameExpr, productExpr]
+    let (m, types) ← elabTypedTupleProjection [(`table, combinedSchema)] cols
+    let nameTypeExpr := toExpr <| nameStrs.zip types
+    let e' ← mkAppM ``TypedRelation.mapByList #[m, nameTypeExpr, productExpr]
     let vars := tableVars.map (fun (relVar, _, _) => relVar)
-    return (← mkLambdaFVars vars.toArray e', names.toList.zip types)
+    return (← mkLambdaFVars vars.toArray e', names.zip types)
   | _ => throwError "Unexpected syntax for SQL query"
   where productPair (dbs: TSyntax `sql_from) : TermElabM (Expr × List (Name × SQLTypeProxy)) := do
     let selectedTableNames := getIdents dbs
@@ -81,13 +81,14 @@ def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQLTypePro
       let .some (tableExpr, tableName, columns) :=
       tableVars.findSome? (fun (tableExpr, name, columns) => if name == db then some (tableExpr, name, columns) else none) | throwError s!"Unknown table {db}"
       pure (tableExpr, tableName, columns)
+    let combinedSchema := selectedTables.foldl (fun acc (_, _, columns) => acc ++ columns) []
     let selectedTableVars := selectedTables.map (fun (tableExpr, _, _) => tableExpr)
     let headExpr :: tailExprs := selectedTableVars | throwError "Expected at least one table in FROM clause"
     let productExpr ← tailExprs.foldlM (fun acc rel => do
       let combinedRel ← mkAppM ``crossProductRel #[acc, rel]
       reduce combinedRel) headExpr
-    let combinedSchema := selectedTables.foldl (fun acc (_, _, columns) => acc ++ columns) []
     return (productExpr, combinedSchema)
+
 
 def elabSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (stx: Syntax) :
     TermElabM (Expr × List (Name × SQLTypeProxy)) := withTableVars tables fun tableVars => do
@@ -114,6 +115,7 @@ def egTypedRelFilter' := parseTypedRelFilter [("table", [("age", "Int"), ("isAct
 
 def egSqlQuery := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT * FROM table WHERE age > 30 && isActive && height < 180"
 
+def egSqlQuery₁ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT age FROM table WHERE age > 30 && isActive && height < 180"
 
 elab "egTypedTupleFilter%" : term => do
   let e ← egTypedTupleFilter
@@ -135,6 +137,10 @@ elab "egSqlQuery%" : term => do
   let (e, _) ← egSqlQuery
   return e
 
+elab "egSqlQuery₁" : term => do
+  let (e, _) ← egSqlQuery₁
+  return e
+
 set_option pp.funBinderTypes true in
 /--
 info: fun (table : TypedRelationOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float]) ↦
@@ -149,6 +155,53 @@ info: fun (table : TypedRelationOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQL
 -/
 #guard_msgs in
 #check egSqlQuery%
+
+/--
+info: @[reducible] def LeanDatabase.TypedTupleOfList : List SQLTypeProxy → Type :=
+fun l ↦ TypedTuple (colTypeOfList l)
+-/
+#guard_msgs in
+#print TypedTupleOfList
+
+example : TypedTupleOfList [] := by
+  intro ⟨i, hi⟩
+  simp at hi
+
+/--
+error: Application type mismatch: The argument
+  fun table.coords ↦
+    let table.age := table.coords ⟨0, ⋯⟩;
+    TypedTuple.cons table.age TypedTuple.nil
+has type
+  TypedTupleOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float] → TypedTuple (Fin.cons ℤ colTypeNil)
+but is expected to have type
+  TypedTuple (colTypeOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float]) →
+    TypedTuple (colTypeOfList (List.map (fun x ↦ x.2) [("table.age", SQLTypeProxy.int)]))
+in the application
+  (restriction
+        (fun table.coords ↦
+          let table.age := table.coords ⟨0, ⋯⟩;
+          let table.isActive := table.coords ⟨1, ⋯⟩;
+          let table.height := table.coords ⟨2, ⋯⟩;
+          decide (table.age > 30) && table.isActive && decide (table.height < 180))
+        table).mapByList
+    [("table.age", SQLTypeProxy.int)] fun table.coords ↦
+    let table.age := table.coords ⟨0, ⋯⟩;
+    TypedTuple.cons table.age TypedTuple.nil
+-/
+#guard_msgs in
+#check egSqlQuery₁
+
+#print Fin.cons
+
+example : colTypeOfList (List.map (fun x ↦ x.2) [("table.age", SQLTypeProxy.int)]) = Fin.cons ℤ colTypeNil :=
+  by
+    simp
+    funext i₀
+    simp at i₀
+    cases i₀
+    simp [colTypeOfList]
+    sorry
 
 set_option pp.funBinderTypes true in
 example : egTypedTupleFilter% = egTypedTupleFilter%% := by

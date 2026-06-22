@@ -39,8 +39,8 @@ def withLetColumnVars  (schema : List ((Name × SQLTypeProxy) × Expr)) (typedTu
   | ((name, colType), projExpr) :: rest => do
     let colTypeExpr := typeExpr colType
     let funcName := name ++ `proj
-    let relType ← inferType typedTupleVar
-    let funcType ← mkArrow relType colTypeExpr
+    let tupleType ← inferType typedTupleVar
+    let funcType ← mkArrow tupleType colTypeExpr
     withLetDecl funcName funcType projExpr fun funcVar => do
       let colExpr ← mkAppM' funcVar #[typedTupleVar]
       let colExpr ← reduce colExpr
@@ -73,11 +73,11 @@ theorem schemaWithFullNames_length (schemaName: Name) (schema : List (Name × SQ
 def expandNames (labels : List Name) (stx: Syntax) : MetaM Syntax := do
   let pairs ← labels.filterMapM fun label => do
     let shorter? := label.components.getLast?
-    pure <| shorter?.map fun shorter => (shorter, label)
+    pure <| shorter?.map fun shorter => (shorter, label.getPrefix)
   stx.replaceM fun id => do
     let idName := id.getId
-    match pairs.find? (fun (shorter, _) => shorter == idName) with
-    | some (_, full) => pure <| mkIdent full
+    match pairs.find? (fun (shorter, _) => shorter.isPrefixOf idName) with
+    | some (_, pfx) => pure <| mkIdent <| pfx ++ idName
     | none => pure none
 
 def withSchemasTupleVars (schemas : List (Name × List (Name × SQLTypeProxy))) (usedName : Name → Bool)
@@ -164,6 +164,11 @@ def rightProj (t : TypedTuple (colTypeOfProduct colType1 colType2)) : TypedTuple
  exact t'
 
 end helpers
+
+def TypedRelation.mapByList {colType : Fin n → Type} [∀ i, DecidableEq (colType i)] (r: TypedRelation colType) (l: List (String × SQLTypeProxy)) (f: TypedTuple colType → TypedTuple (colTypeOfList (l.map (·.2)))) :
+    TypedRelation (colTypeOfList (l.map (·.2))) :=
+      let h : (l.map (·.2)).length = (l.map (·.1)).length := by grind
+      TypedRelation.map f (h ▸ (l.map (·.1)|>.get)) r
 
 /-! ## Per-operator elaborators -/
 

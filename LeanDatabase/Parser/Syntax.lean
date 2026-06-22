@@ -93,4 +93,14 @@ macro:30 t:term "OR" s:term : term =>
 macro:85 "NOT" t:term : term =>
   `(!$t)
 
+/-!
+## Macros to turn aggregates into variable names.
+-/
+macro "SUM" "(" p:ident ")" : term => return mkIdent (p.getId ++ `sum)
+macro "COUNT" "(" p:ident ")" : term => return mkIdent (p.getId ++ `count)
+macro "AVG" "(" p:ident ")" : term => return mkIdent (p.getId ++ `avg)
+macro "MIN" "(" p:ident ")" : term => return mkIdent (p.getId ++ `min)
+macro "MAX" "(" p:ident ")" : term => return mkIdent (p.getId ++ `max)
+macro "COUNT" "(" "*" ")" : term => return mkIdent `countAll
+
 end LeanDatabase
