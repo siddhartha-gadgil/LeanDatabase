@@ -168,16 +168,7 @@ example : TypedTupleOfList [] := by
   simp at hi
 
 /--
-error: Application type mismatch: The argument
-  fun table.coords ↦
-    let table.age := table.coords ⟨0, ⋯⟩;
-    TypedTuple.cons table.age TypedTuple.nil
-has type
-  TypedTupleOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float] → TypedTuple (Fin.cons ℤ colTypeNil)
-but is expected to have type
-  TypedTuple (colTypeOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float]) →
-    TypedTuple (colTypeOfList (List.map (fun x ↦ x.2) [("table.age", SQLTypeProxy.int)]))
-in the application
+info: fun table ↦
   (restriction
         (fun table.coords ↦
           let table.age := table.coords ⟨0, ⋯⟩;
@@ -187,12 +178,13 @@ in the application
         table).mapByList
     [("table.age", SQLTypeProxy.int)] fun table.coords ↦
     let table.age := table.coords ⟨0, ⋯⟩;
-    TypedTuple.cons table.age TypedTuple.nil
+    TypedTupleOfList.cons SQLTypeProxy.int table.age
+      TypedTupleOfList.nil : TypedRelationOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float] →
+  TypedRelation (colTypeOfList (List.map (fun x ↦ x.2) [("table.age", SQLTypeProxy.int)]))
 -/
 #guard_msgs in
 #check egSqlQuery₁
 
-#print Fin.cons
 
 example : colTypeOfList (List.map (fun x ↦ x.2) [("table.age", SQLTypeProxy.int)]) = Fin.cons ℤ colTypeNil :=
   by

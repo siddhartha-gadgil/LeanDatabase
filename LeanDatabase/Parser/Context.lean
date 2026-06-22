@@ -194,13 +194,17 @@ def elabTypedRelFilterSimple (schemas : List (Name × List (Name × SQLTypeProxy
     | [relVar] => pure relVar
     | _ => throwError "Multiple tables in FROM clause not supported in this context"
 
+def exprTypeListTuple (colExprsTypes : List (SQLTypeProxy × Expr)) : MetaM Expr := do
+  colExprsTypes.foldrM (fun (colType, expr) acc => do
+    mkAppM ``TypedTupleOfList.cons #[toExpr colType, expr, acc]) (mkConst ``TypedTupleOfList.nil)
+
 def elabTypedTupleProjection (schemas : List (Name × List (Name × SQLTypeProxy))) (cols: List Syntax.Term) :
   TermElabM (Expr × List SQLTypeProxy) := do
   withSchemasTupleVars schemas (fun name => cols.any (fun col => col.raw.hasIdent name)) (fun vars => do
     let colExprsTypes ← cols.mapM elabAsSql
-    let colExprs := colExprsTypes.map (fun (_, e) => e)
+    -- let colExprs := colExprsTypes.map (fun (_, e) => e)
     let types := colExprsTypes.map (fun (t, _) => t)
-    let e ← mkLambdaLetsFVars vars (exprTypedTuple colExprs)
+    let e ← mkLambdaLetsFVars vars (exprTypeListTuple colExprsTypes)
     return (e, types)
   )
 
