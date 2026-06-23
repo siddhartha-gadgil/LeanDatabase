@@ -1,5 +1,5 @@
 import Lean
-
+open Lean
 /-!
 # SQL surface syntax
 
@@ -43,35 +43,46 @@ syntax sql_from "JOIN" ident "ON" term : sql_from     -- 3. Explicit Inner Join
 syntax sql_from "CROSS" "JOIN" ident : sql_from       -- 4. Cross Join
 syntax sql_from "," sql_from : sql_from              -- 5. Comma-separated (Cartesian Product)
 
-syntax "SELECT" sql_cols "FROM" sql_from ("WHERE" term)? (";")? ("GROUP" "BY" sql_cols ("HAVING" term)?)? : sql_query
+syntax "SELECT " sql_cols " FROM " sql_from (" WHERE " term)?  (" GROUP " " BY " ident,* (" HAVING " term)?)? (";")? : sql_query
 
-macro_rules -- Gemini generated (then fixed) rules for desugaring JOINs and CROSS JOINs into comma-separated FROM clauses with WHERE conditions; GROUP BY omitted for now.
-  -----------------------------------------------------------------------------
-  -- CASE A: The query ALREADY has an existing WHERE clause
-  -----------------------------------------------------------------------------
-  -- 1. Desugar INNER JOIN -> Replace with comma, append condition via AND
+-- macro_rules -- Gemini generated (then fixed) rules for desugaring JOINs and CROSS JOINs into comma-separated FROM clauses with WHERE conditions; GROUP BY omitted for now.
+--   -----------------------------------------------------------------------------
+--   -- CASE A: The query ALREADY has an existing WHERE clause
+--   -----------------------------------------------------------------------------
+--   -- 1. Desugar INNER JOIN -> Replace with comma, append condition via AND
 
-  | `(sql_query| SELECT $items FROM $f:sql_from JOIN $tNext:ident ON $onCond WHERE $whereCond $[;]?) =>
-      `(sql_query| SELECT $items FROM $f, $tNext:ident WHERE $whereCond AND $onCond;)
+--   | `(sql_query| SELECT $items FROM $f:sql_from JOIN $tNext:ident ON $onCond WHERE $whereCond $[;]?) =>
+--       `(sql_query| SELECT $items FROM $f, $tNext:ident WHERE $whereCond AND $onCond;)
 
-  -- 2. Desugar CROSS JOIN -> Replace with comma, leave WHERE unchanged
+--   -- 2. Desugar CROSS JOIN -> Replace with comma, leave WHERE unchanged
 
+--   | `(sql_query| SELECT $items FROM $f:sql_from CROSS JOIN $tNext:ident WHERE $whereCond $[;]?) =>
+--       `(sql_query| SELECT $items FROM $f, $tNext:ident WHERE $whereCond ;)
+
+--   -----------------------------------------------------------------------------
+--   -- CASE B: The query does NOT have a WHERE clause yet
+--   -----------------------------------------------------------------------------
+--   -- 3. Desugar INNER JOIN -> Initialize the WHERE clause with the ON condition
+
+--   | `(sql_query| SELECT $items FROM $f:sql_from JOIN $tNext:ident ON $onCond:term $[;]?) =>
+--       `(sql_query| SELECT $items FROM $f, $tNext:ident WHERE $onCond ;)
+
+--   -- 4. Desugar CROSS JOIN -> Replace with comma, no WHERE clause needed
+
+--   | `(sql_query| SELECT $items FROM $f:sql_from CROSS JOIN $tNext:ident $[;]?) =>
+--       `(sql_query| SELECT $items FROM $f, $tNext:ident;)
+
+partial def escapeJoin (stx : Syntax) : MetaM <| TSyntax `sql_query := do
+  match stx with
+  | `(sql_query| SELECT $items FROM $f:sql_from JOIN $tNext:ident ON $onCond:term WHERE $whereCond $[;]?) =>
+      escapeJoin <| ← `(sql_query| SELECT $items FROM $f, $tNext:ident WHERE $whereCond && $onCond;)
   | `(sql_query| SELECT $items FROM $f:sql_from CROSS JOIN $tNext:ident WHERE $whereCond $[;]?) =>
-      `(sql_query| SELECT $items FROM $f, $tNext:ident WHERE $whereCond ;)
-
-  -----------------------------------------------------------------------------
-  -- CASE B: The query does NOT have a WHERE clause yet
-  -----------------------------------------------------------------------------
-  -- 3. Desugar INNER JOIN -> Initialize the WHERE clause with the ON condition
-
-  | `(sql_query| SELECT $items FROM $f:sql_from JOIN $tNext:ident ON $onCond $[;]?) =>
-      `(sql_query| SELECT $items FROM $f, $tNext:ident WHERE $onCond ;)
-
-  -- 4. Desugar CROSS JOIN -> Replace with comma, no WHERE clause needed
-
+      escapeJoin <| ← `(sql_query| SELECT $items FROM $f, $tNext:ident WHERE $whereCond ;)
+  | `(sql_query| SELECT $items FROM $f:sql_from JOIN $tNext:ident ON $onCond:term $[;]?) =>
+      escapeJoin <| ← `(sql_query| SELECT $items FROM $f, $tNext:ident WHERE $onCond ;)
   | `(sql_query| SELECT $items FROM $f:sql_from CROSS JOIN $tNext:ident $[;]?) =>
-      `(sql_query| SELECT $items FROM $f, $tNext:ident;)
-
+      escapeJoin <| ← `(sql_query| SELECT $items FROM $f, $tNext:ident;)
+  | _ => return ⟨stx⟩
 
 partial def getIdents (stx : TSyntax `sql_from) : List Name :=
   match stx with
@@ -102,5 +113,13 @@ macro "AVG" "(" p:ident ")" : term => return mkIdent (p.getId ++ `avg)
 macro "MIN" "(" p:ident ")" : term => return mkIdent (p.getId ++ `min)
 macro "MAX" "(" p:ident ")" : term => return mkIdent (p.getId ++ `max)
 macro "COUNT" "(" "*" ")" : term => return mkIdent `countAll
+
+open Meta Elab Term
+def expandStx (str: String) : TermElabM Format := do
+  let .ok stx := Parser.runParserCategory (← getEnv) `sql_query str | throwError "Failed to parse SQL query: {str}"
+  let stx ← escapeJoin stx
+  PrettyPrinter.ppCategory `sql_query stx
+
+#eval expandStx "SELECT * FROM table JOIN table2 ON table.age = table2.age WHERE table.age > 30 && table.isActive && table.height < 180"
 
 end LeanDatabase

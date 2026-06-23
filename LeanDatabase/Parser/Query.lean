@@ -38,7 +38,7 @@ This is in the context of table variables. The expressions returned can be compa
 -/
 def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQLTypeProxy))) (stx: Syntax) :
     TermElabM (Expr × List (Name × SQLTypeProxy)) :=  do
-  let stx ← liftMacroM <| expandMacros stx
+  let stx ← escapeJoin stx
   match stx with
   | `(sql_query| SELECT * FROM $dbs:sql_from $[;]?) => do
     let (productExpr, combinedSchema) ← productPair dbs
@@ -74,6 +74,21 @@ def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQLTypePro
     let e' ← mkAppM ``TypedRelation.mapByList #[m, nameTypeExpr, productExpr]
     let vars := tableVars.map (fun (relVar, _, _) => relVar)
     return (← mkLambdaFVars vars.toArray e', names.zip types)
+  | `(sql_query| SELECT $cols:sql_col,* FROM $dbs:sql_from WHERE $filter GROUP BY $groups:ident,* $[;]?) => do
+    let groupNames := groups.getElems.map (fun stx => stx.getId)
+    let inGroup := fun name => groupNames.any (fun g => g == name)
+    let (productExpr, combinedSchema) ← productPair dbs
+    let filter ← elabTypedTupleGroupFilter [(`table, combinedSchema)] filter inGroup
+    let filterExpr ← mkAppM ``restriction #[filter, productExpr]
+    let colStxs := cols.getElems
+    let cols := colStxs.map sqlColTerm
+    let names := colStxs.map sqlColName |>.toList
+    let nameStrs := names.map (·.toString)
+    let (m, types) ← elabTypedTupleGroupProjection [(`table, combinedSchema)] cols.toList inGroup
+    let nameTypeExpr := toExpr <| nameStrs.zip types
+    let e' ← mkAppM ``TypedRelation.mapByList #[filterExpr, nameTypeExpr, m]
+    let vars := tableVars.map (fun (relVar, _, _) => relVar)
+    return (← mkLambdaFVars vars.toArray e', names.zip types)
   | _ => throwError "Unexpected syntax for SQL query"
   where productPair (dbs: TSyntax `sql_from) : TermElabM (Expr × List (Name × SQLTypeProxy)) := do
     let selectedTableNames := getIdents dbs
@@ -85,14 +100,13 @@ def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQLTypePro
     let selectedTableVars := selectedTables.map (fun (tableExpr, _, _) => tableExpr)
     let headExpr :: tailExprs := selectedTableVars | throwError "Expected at least one table in FROM clause: {← PrettyPrinter.ppCategory `sql_from dbs}"
     let productExpr ← tailExprs.foldlM (fun acc rel => do
-      let combinedRel ← mkAppM ``crossProductRel #[acc, rel]
-      reduce combinedRel) headExpr
+      mkAppM ``TypedRelationOfList.append #[acc, rel]) headExpr
     return (productExpr, combinedSchema)
 
 
 def elabSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (stx: Syntax) :
     TermElabM (Expr × List (Name × SQLTypeProxy)) := withTableVars tables fun tableVars => do
-  let stx ← liftMacroM <| expandMacros stx
+  let stx ← escapeJoin stx
   elabSqlQueryCore tableVars stx
 
 def parseSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (str : String) : TermElabM (Expr × List (Name × SQLTypeProxy)) := do
@@ -119,7 +133,7 @@ def egSqlQuery₁ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), 
 
 def egSqlQuery₂ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT age, height FROM table WHERE age > 30 && isActive && height < 180"
 
-def egSqlQuery₃ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)]), (`table2, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT * FROM table JOIN table2 ON table.age = table2.age WHERE table.age > 30 && table.isActive && table.height < 180"
+def egSqlQuery₃ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)]), (`table2, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT * FROM table, table2  WHERE table.age > 30 && table.isActive && table.height < 180"
 
 def egSqlQuery₄ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT 2 * age AS doubled_age FROM table WHERE age > 30 && isActive && height < 180"
 
@@ -227,6 +241,25 @@ info: fun table ↦
 
 -- example : egSqlQuery₃ := by
 --   sorry
+
+/--
+info: fun table table2 ↦
+  restriction
+    (fun table.coords ↦
+      let table.age := table.coords ⟨0, ⋯⟩;
+      let table.isActive := table.coords ⟨1, ⋯⟩;
+      let table.height := table.coords ⟨2, ⋯⟩;
+      decide (table.age > 30) && table.isActive && decide (table.height < 180))
+    (table.append
+      table2) : TypedRelationOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float] →
+  TypedRelationOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float] →
+    TypedRelation
+      (colTypeOfList
+        [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float, SQLTypeProxy.int, SQLTypeProxy.bool,
+          SQLTypeProxy.float])
+-/
+#guard_msgs in
+#check egSqlQuery₃
 
 /--
 info: fun table ↦
