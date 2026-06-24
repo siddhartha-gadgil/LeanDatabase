@@ -25,15 +25,19 @@ namespace LeanDatabase
 /-- Parse the `first`/`second` filter strings from a JSON record (with its `schema`) and report
 whether `sql_equiv` proves them equal. -/
 def checkEquiv (data: Json) : TermElabM Bool := do
-    let .ok schema := data.getObjValAs? (List Json) "schema" | throwError "Missing schema"
-    let schemaStr : List (Name × SQLTypeProxy) ←  schema.mapM fun colJson => do
-      let .ok name := colJson.getObjValAs? Name "name" | throwError "Missing column name"
-      let .ok sqlType := colJson.getObjValAs? String "type" | throwError "Missing column type"
-      pure (name, sqlProxy sqlType)
+    let .ok schemas := data.getObjValAs? (List Json) "schemas" | throwError "Missing schema"
+    let schemasStr : List (Name × List (Name × SQLTypeProxy)) ←  schemas.mapM (fun schema => do
+      let .ok  name := schema.getObjValAs? Name "name" | throwError "Missing schema name"
+      let .ok cols := schema.getObjValAs? (List Json) "columns" | throwError "Missing schema columns"
+      let colStrs : List (Name × SQLTypeProxy) ← cols.mapM fun colJson => do
+        let .ok name := colJson.getObjValAs? Name "name" | throwError "Missing column name"
+        let .ok sqlType := colJson.getObjValAs? String "type" | throwError "Missing column type"
+        pure (name, sqlProxy sqlType)
+      pure (name, colStrs))
     let .ok firstStr := data.getObjValAs? String "first" | throwError "Missing first expression"
     let .ok secondStr := data.getObjValAs? String "second" | throwError "Missing second expression"
-    let (firstExpr, _) ← parseSqlQuery [(`table, schemaStr)] firstStr
-    let (secondExpr, _) ← parseSqlQuery [(`table, schemaStr)] secondStr
+    let (firstExpr, _) ← parseSqlQuery schemasStr firstStr
+    let (secondExpr, _) ← parseSqlQuery schemasStr secondStr
     -- IO.eprintln s!"Parsed first expression: {← ppExpr firstExpr}"
     -- IO.eprintln s!"Parsed second expression: {← ppExpr secondExpr}"
     let goalType ←  mkEq firstExpr secondExpr
@@ -63,9 +67,9 @@ def checkEquivCore (data: Json) : CoreM Bool := do
     let res :=  checkEquiv data |>.run' {} |>.run' {}
     res
 
-def dataEg := json% {"schema": [{"name": "age", "type": "Int"}, {"name": "isActive", "type": "Bool"}],
+def dataEg := json% {"schemas": [{"name": "table", "columns": [{"name": "age", "type": "Int"}, {"name": "isActive", "type": "Bool"}]}],
   "first": "SELECT * FROM table WHERE age > 30 AND isActive","second": "SELECT * FROM table WHERE age > 30 && isActive && age > 20"}
 
--- #eval checkEquiv dataEg
+#eval checkEquiv dataEg
 
 end LeanDatabase

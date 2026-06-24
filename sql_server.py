@@ -553,10 +553,11 @@ def demo_html() -> str:
 
     function currentPayload() {{
       return {{
-        schema: [...schemaRows.querySelectorAll(".schema-row")].map(row => ({{
+        schemas: 
+          [{{name: "table", columns: [...schemaRows.querySelectorAll(".schema-row")].map(row => ({{
           name: row.querySelector(".col-name").value.trim(),
           type: row.querySelector(".col-type").value.trim()
-        }})).filter(col => col.name && col.type),
+        }})).filter(col => col.name && col.type)}}],
         first: first.value,
         second: second.value
       }};
