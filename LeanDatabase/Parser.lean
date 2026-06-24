@@ -24,27 +24,43 @@ namespace LeanDatabase
 
 /-- Parse the `first`/`second` filter strings from a JSON record (with its `schema`) and report
 whether `sql_equiv` proves them equal. -/
-def checkEquivSimple (data: Json) : TermElabM Bool := do
+def checkEquiv (data: Json) : TermElabM Bool := do
     let .ok schema := data.getObjValAs? (List Json) "schema" | throwError "Missing schema"
-    let schemaStr : List (String × String) ←  schema.mapM fun colJson => do
-      let .ok name := colJson.getObjValAs? String "name" | throwError "Missing column name"
+    let schemaStr : List (Name × SQLTypeProxy) ←  schema.mapM fun colJson => do
+      let .ok name := colJson.getObjValAs? Name "name" | throwError "Missing column name"
       let .ok sqlType := colJson.getObjValAs? String "type" | throwError "Missing column type"
-      pure (name, sqlType)
+      pure (name, sqlProxy sqlType)
     let .ok firstStr := data.getObjValAs? String "first" | throwError "Missing first expression"
     let .ok secondStr := data.getObjValAs? String "second" | throwError "Missing second expression"
-    let firstExpr ← parseTypedTupleFilter schemaStr firstStr
-    let secondExpr ← parseTypedTupleFilter schemaStr secondStr
+    let (firstExpr, _) ← parseSqlQuery [(`table, schemaStr)] firstStr
+    let (secondExpr, _) ← parseSqlQuery [(`table, schemaStr)] secondStr
+    -- IO.eprintln s!"Parsed first expression: {← ppExpr firstExpr}"
+    -- IO.eprintln s!"Parsed second expression: {← ppExpr secondExpr}"
     let goalType ←  mkEq firstExpr secondExpr
     let mvar ← mkFreshExprMVar goalType
     let tac ← `(tacticSeq| sql_equiv)
     try
+      withoutErrToSorry do
         let (goals, _) ← Elab.runTactic mvar.mvarId! tac
+        Term.synthesizeSyntheticMVarsNoPostponing
+        let ass? ← getExprMVarAssignment? mvar.mvarId!
+        match ass? with
+        | some ass =>
+          -- IO.eprintln s!"Proof: {← ppExpr ass}"
+          let ass ← instantiateExprMVars ass
+          Term.synthesizeSyntheticMVarsNoPostponing
+          if ass.hasSorry then
+            -- IO.eprintln "Proof contains sorry."
+            return false
+          -- else
+          --   IO.eprintln "No sorry in proof"
+        | none => IO.eprintln "No proof found."
         pure goals.isEmpty
     catch _ =>
         pure false
 
-def checkEquivSimpleCore (data: Json) : CoreM Bool := do
-    let res :=  checkEquivSimple data |>.run' {} |>.run' {}
+def checkEquivCore (data: Json) : CoreM Bool := do
+    let res :=  checkEquiv data |>.run' {} |>.run' {}
     res
 
 def dataEg := json% {"schema": [{"name": "age", "type": "Int"}, {"name": "isActive", "type": "Bool"}],

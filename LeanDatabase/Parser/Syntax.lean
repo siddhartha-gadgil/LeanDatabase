@@ -92,8 +92,8 @@ partial def getIdents (stx : TSyntax `sql_from) : List Name :=
 
 /-! ## Term-level `WHERE`-predicate combinators -/
 
-macro "SELECT" " * " "FROM" ident "WHERE" t:term : term =>
-    return t
+-- macro "SELECT" " * " "FROM" ident "WHERE" t:term : term =>
+--     return t
 
 macro:30 t:term "AND" s:term : term =>
   `($t && $s)
@@ -120,6 +120,6 @@ def expandStx (str: String) : TermElabM Format := do
   let stx ← escapeJoin stx
   PrettyPrinter.ppCategory `sql_query stx
 
-#eval expandStx "SELECT * FROM table JOIN table2 ON table.age = table2.age WHERE table.age > 30 && table.isActive && table.height < 180"
+-- #eval expandStx "SELECT * FROM table JOIN table2 ON table.age = table2.age WHERE table.age > 30 && table.isActive && table.height < 180"
 
 end LeanDatabase

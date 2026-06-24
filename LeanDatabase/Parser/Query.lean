@@ -120,6 +120,8 @@ def egTypedRelFilter' := parseTypedRelFilter [("table", [("age", "Int"), ("isAct
 
 def egSqlQuery := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT * FROM table WHERE age > 30 && isActive && height < 180"
 
+def egSqlQuery' := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT * FROM table WHERE age > 30 && isActive && height < 180 && age > 20"
+
 def egSqlQuery₁ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT age FROM table WHERE age > 30 && isActive && height < 180"
 
 def egSqlQuery₂ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT age, height FROM table WHERE age > 30 && isActive && height < 180"
@@ -147,6 +149,13 @@ elab "egTypedRelFilter%%" : term => do
 elab "egSqlQuery%" : term => do
   let (e, _) ← egSqlQuery
   return e
+
+elab "egSqlQuery%%" : term => do
+  let (e, _) ← egSqlQuery'
+  return e
+
+example : egSqlQuery% = egSqlQuery%% := by
+  grind
 
 elab "egSqlQuery₁" : term => do
   let (e, _) ← egSqlQuery₁
