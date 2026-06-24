@@ -558,8 +558,7 @@ def demo_html() -> str:
           name: row.querySelector(".col-name").value.trim(),
           type: row.querySelector(".col-type").value.trim()
         }})).filter(col => col.name && col.type)}}],
-        first: first.value,
-        second: second.value
+        queries: [first.value, second.value]
       }};
     }}
 

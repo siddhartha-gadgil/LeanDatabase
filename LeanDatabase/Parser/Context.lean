@@ -70,6 +70,10 @@ theorem schemaWithFullNames_eq (schemaName: Name) (schema : List (Name × SQLTyp
 theorem schemaWithFullNames_length (schemaName: Name) (schema : List (Name × SQLTypeProxy)) :
     (schemaWithFullNames schemaName schema).length = schema.length := by simp [schemaWithFullNames]
 
+syntax "COUNT" "(" "*" ")" : term
+syntax "COUNT" "(" ident ")" : term
+syntax "SUM" "(" ident ")" : term
+
 def expandNames (labels : List Name) (stx: Syntax) : MetaM Syntax := do
   let pairs ← labels.filterMapM fun label => do
     let shorter? := label.components.getLast?
@@ -78,7 +82,11 @@ def expandNames (labels : List Name) (stx: Syntax) : MetaM Syntax := do
     let idName := id.getId
     match pairs.find? (fun (shorter, _) => shorter.isPrefixOf idName) with
     | some (_, pfx) => pure <| mkIdent <| pfx ++ idName
-    | none => pure none
+    | none => match stx with
+      | `(COUNT(*)) => return some <| mkIdent `countAll
+      | `(COUNT($id)) => return some <| mkIdent <| id.getId ++ `count
+      | `(SUM($id)) => return some <| mkIdent <| id.getId ++ `sum
+      | _ => return none
 
 /--
 Expressions for projection functions for each column in a schema, along with the type of the tuple that contains them.
