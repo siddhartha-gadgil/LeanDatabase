@@ -109,18 +109,24 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
     let e' ← mkAppM ``TypedRelation.mapByList #[filteredExpr, nameTypeExpr, m]
     return (← mkLambdaFVars vars.toArray e', names.zip types)
   | _ => throwError "Unexpected syntax for SQL query"
+  -- The FROM relation + its schema: a base table, a comma cartesian product, or a `(subquery) AS
+  -- alias` (elaborated via `elabSqlQueryCore`, then β-reduced to its body; the inner schema is kept).
   where productPair (dbs: TSyntax `sql_from) : TermElabM (Expr × List (Name × SQLTypeProxy)) := do
-    let selectedTableNames := getIdents dbs
-    let selectedTables ←  selectedTableNames.mapM fun db => do
-      let .some (tableExpr, tableName, columns) :=
-      tableVars.findSome? (fun (tableExpr, name, columns) => if name == db then some (tableExpr, name, columns) else none) | throwError s!"Unknown table {db}"
-      pure (tableExpr, tableName, columns)
-    let combinedSchema := selectedTables.foldl (fun acc (_, _, columns) => acc ++ columns) []
-    let selectedTableVars := selectedTables.map (fun (tableExpr, _, _) => tableExpr)
-    let headExpr :: tailExprs := selectedTableVars | throwError "Expected at least one table in FROM clause: {← PrettyPrinter.ppCategory `sql_from dbs}"
-    let productExpr ← tailExprs.foldlM (fun acc rel => do
-      mkAppM ``TypedRelationOfList.append #[acc, rel]) headExpr
-    return (productExpr, combinedSchema)
+    match dbs with
+    | `(sql_from| $db:ident) => do
+      let .some (tableExpr, _, columns) :=
+        tableVars.findSome? (fun (e, name, cols) => if name == db.getId then some (e, name, cols) else none)
+        | throwError s!"Unknown table {db.getId}"
+      return (tableExpr, columns)
+    | `(sql_from| ( $sub:sql_query ) AS $_alias:ident) => do
+      let (lamSub, subSchema) ← elabSqlQueryCore tableVars sub
+      let vars := tableVars.map (fun (relVar, _, _) => relVar)
+      return (lamSub.beta vars.toArray, subSchema)
+    | `(sql_from| $f1:sql_from , $f2:sql_from) => do
+      let (e1, s1) ← productPair f1
+      let (e2, s2) ← productPair f2
+      return (← mkAppM ``TypedRelationOfList.append #[e1, e2], s1 ++ s2)
+    | _ => throwError "Unsupported FROM clause: {← PrettyPrinter.ppCategory `sql_from dbs}"
 
 def elabSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (stx: Syntax) :
     TermElabM (Expr × List (Name × SQLTypeProxy)) := withTableVars tables fun tableVars => do

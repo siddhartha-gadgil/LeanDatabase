@@ -1,4 +1,6 @@
 import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
 
 /-!
 # Example 2 — Cascading selection (the "Index Merge" rewrite)
@@ -21,25 +23,13 @@ SELECT * FROM r WHERE is_high_value AND is_active;
 -/
 
 namespace Example2
-open LeanDatabase
 
-variable {n : Nat}
-variable {colType : Fin n → Type} [∀ i, DecidableEq (colType i)]
-set_option linter.unusedSectionVars false
+CREATE TABLE table (is_active BOOL, is_high_value BOOL)
 
-variable (isHighValue : TypedTuple colType → Bool)
-variable (isActive : TypedTuple colType → Bool)
-
-/-- `SELECT * FROM (SELECT * FROM r WHERE is_active) WHERE is_high_value`. -/
-def query_MultiPass (r : TypedRelation colType) : TypedRelation colType :=
-  restriction isHighValue (restriction isActive r)
-
-/-- `SELECT * FROM r WHERE is_high_value AND is_active`. -/
-def query_SinglePass (r : TypedRelation colType) : TypedRelation colType :=
-  restriction (fun t => isHighValue t && isActive t) r
-
-theorem query_equivalence (r : TypedRelation colType) :
-    query_MultiPass isHighValue isActive r = query_SinglePass isHighValue isActive r := by
+theorem query_equivalence :
+    sql%([table_schema])
+        "SELECT * FROM (SELECT * FROM table WHERE is_active) AS r WHERE is_high_value"
+      = sql%([table_schema]) "SELECT * FROM table WHERE is_high_value AND is_active" := by
   sql_equiv
 
 end Example2
