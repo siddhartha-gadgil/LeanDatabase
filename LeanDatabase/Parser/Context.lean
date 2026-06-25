@@ -43,7 +43,7 @@ def withLetColumnVars  (columns : List ((Name × SQLTypeProxy) × Expr)) (typedT
     let funcType ← mkArrow tupleType colTypeExpr
     withLetDecl funcName funcType projExpr fun funcVar => do
       let colExpr ← mkAppM' funcVar #[typedTupleVar]
-      -- let colExpr ← reduce colExpr
+      let colExpr ← zetaReduce colExpr
       withLetDecl name colTypeExpr colExpr fun localVar => do
         let letVars := #[funcVar, localVar]
         withLetColumnVars rest typedTupleVar usedName (fun restExpr => k (letVars ++ restExpr))
