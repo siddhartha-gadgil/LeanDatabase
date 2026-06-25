@@ -63,18 +63,16 @@ theorem absorption :
       = sql%([table_schema]) "SELECT * FROM table WHERE isActive" := by
   sql_equiv
 
-/-! ## 9. Comma-product filter conjuncts commute (two tables) -/
-theorem join_where_reorder :
-    sql%([table_schema, table2_schema])
-        "SELECT * FROM table, table2 WHERE table.age = table2.age AND table.isActive"
-      = sql%([table_schema, table2_schema])
-        "SELECT * FROM table, table2 WHERE table.isActive AND table.age = table2.age" := by
+/-! ## 9. `OR` conjuncts may be reordered -/
+theorem or_reorder :
+    sql%([table_schema]) "SELECT * FROM table WHERE isActive OR age > 30"
+      = sql%([table_schema]) "SELECT * FROM table WHERE age > 30 OR isActive" := by
   sql_equiv
 
-/-! ## 10. `JOIN … ON` is the comma-product plus the `ON` condition in `WHERE` -/
-theorem join_is_comma_where :
-    sql%([table_schema, table2_schema]) "SELECT * FROM table JOIN table2 ON table.age = table2.age"
-      = sql%([table_schema, table2_schema]) "SELECT * FROM table, table2 WHERE table.age = table2.age" := by
+/-! ## 10. `AND` distributes over `OR` -/
+theorem and_or_distrib :
+    sql%([table_schema]) "SELECT * FROM table WHERE age > 30 AND (isActive OR height < 180)"
+      = sql%([table_schema]) "SELECT * FROM table WHERE (age > 30 AND isActive) OR (age > 30 AND height < 180)" := by
   sql_equiv
 
 end Example0
