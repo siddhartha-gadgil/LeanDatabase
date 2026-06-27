@@ -99,13 +99,22 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
         let filter ← elabTypedTupleFilter [(.anonymous, combinedSchema)] filter
         mkAppM ``restriction #[filter, productExpr]
       | none => pure productExpr
+    let havingFilteredExpr ← match having? with
+      | some having => do
+        let h ← elabTypedTupleGroupFilter
+          [(.anonymous, combinedSchema)]
+          having
+          inGroup
+          filteredExpr
+        mkAppM ``restriction #[h, filteredExpr]
+      | none => pure filteredExpr
     let colStxs := cols.getElems
     let cols := colStxs.map sqlColTerm
     let names := colStxs.map sqlColName |>.toList
     let nameStrs := names.map (·.toString)
-    let (m, types) ← elabTypedTupleGroupProjection [(.anonymous, combinedSchema)] cols.toList inGroup productExpr
+    let (m, types) ← elabTypedTupleGroupProjection [(.anonymous, combinedSchema)] cols.toList inGroup filteredExpr
     let nameTypeExpr := toExpr <| nameStrs.zip types
-    let e' ← mkAppM ``TypedRelation.mapByList #[filteredExpr, nameTypeExpr, m]
+    let e' ← mkAppM ``TypedRelation.mapByList #[havingFilteredExpr, nameTypeExpr, m]
     return (← mkLambdaFVars vars.toArray e', names.zip types)
   | _ => throwError "Unexpected syntax for SQL query"
   where
@@ -137,7 +146,7 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
     | _ => do
       let f ← elabTypedTupleFilter [(.anonymous, schema)] filter
       mkAppM ``restriction #[f, rel]
-  
+
   elabExists (rel : Expr) (outerSchema : List (Name × SQLTypeProxy)) (inner : TSyntax `sql_query)
       (inCol? : Option Term) (isNeg : Bool) : TermElabM Expr := do
     match inner with
@@ -194,7 +203,7 @@ def egSqlQuery₄ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), 
 
 def egSqlQuery₅ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT COUNT(*) AS count FROM table WHERE age > 30 && isActive && height < 180 GROUP BY age"
 
-def egSqlQuery₆ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT SUM(age) AS count FROM table WHERE age > 30 && isActive && height < 180 GROUP BY isActive"
+def egSqlQuery₆ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT SUM(age) AS count FROM table WHERE age > 30 && isActive && height < 180 GROUP BY isActive HAVING SUM(age)>10"
 
 elab "egTypedTupleFilter%" : term => do
   let e ← egTypedTupleFilter
@@ -247,6 +256,9 @@ elab "egSqlQuery₆" : term => do
   let (e, _) ← egSqlQuery₆
   return e
 
+#check egSqlQuery₆
+
+#check egTypedTupleFilter%
 set_option pp.funBinderTypes true in
 /--
 info: fun (table : TypedRelationOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float]) ↦
