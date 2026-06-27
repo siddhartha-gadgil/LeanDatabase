@@ -99,20 +99,17 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
         let filter ← elabTypedTupleFilter [(.anonymous, combinedSchema)] filter
         mkAppM ``restriction #[filter, productExpr]
       | none => pure productExpr
-    let havingFilteredExpr ← match having? with
-      | some having => do
-        let h ← elabTypedTupleGroupFilter
-          [(.anonymous, combinedSchema)]
-          having
-          inGroup
-          filteredExpr
-        mkAppM ``restriction #[h, filteredExpr]
-      | none => pure filteredExpr
     let colStxs := cols.getElems
     let cols := colStxs.map sqlColTerm
     let names := colStxs.map sqlColName |>.toList
     let nameStrs := names.map (·.toString)
     let (m, types) ← elabTypedTupleGroupProjection [(.anonymous, combinedSchema)] cols.toList inGroup filteredExpr
+    let havingFilteredExpr ← match having? with
+      | some having => do
+        let h ← elabTypedTupleGroupFilter
+          [(.anonymous, combinedSchema)] having inGroup filteredExpr
+        mkAppM ``restriction #[h, filteredExpr]
+      | none => pure filteredExpr
     let nameTypeExpr := toExpr <| nameStrs.zip types
     let e' ← mkAppM ``TypedRelation.mapByList #[havingFilteredExpr, nameTypeExpr, m]
     return (← mkLambdaFVars vars.toArray e', names.zip types)
@@ -203,7 +200,9 @@ def egSqlQuery₄ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), 
 
 def egSqlQuery₅ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT COUNT(*) AS count FROM table WHERE age > 30 && isActive && height < 180 GROUP BY age"
 
-def egSqlQuery₆ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT SUM(age) AS count FROM table WHERE age > 30 && isActive && height < 180 GROUP BY isActive HAVING SUM(age)>10"
+def egSqlQuery₆ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT SUM(age) AS count FROM table WHERE age > 30 && isActive && height < 180 GROUP BY isActive"
+
+def egSqlQuery₇ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT SUM(age) AS sum FROM table WHERE age > 30 && isActive && height < 180 GROUP BY isActive HAVING SUM(age) < 100"
 
 elab "egTypedTupleFilter%" : term => do
   let e ← egTypedTupleFilter
@@ -256,7 +255,10 @@ elab "egSqlQuery₆" : term => do
   let (e, _) ← egSqlQuery₆
   return e
 
-#check egSqlQuery₆
+elab "egSqlQuery₇" : term => do
+  let (e, _) ← egSqlQuery₇
+  return e
+
 
 #check egTypedTupleFilter%
 set_option pp.funBinderTypes true in
@@ -379,7 +381,7 @@ info: fun table ↦
       (fun k ↦
           Int.ofNat
             (groupCount (fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.int (typedTuple 0) TypedTupleOfList.nil) k
-              table))
+              (restriction (fun coords ↦ decide (coords 0 > 30) && coords 1 && decide (coords 2 < 180)) table)))
         ((fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.int (typedTuple 0) TypedTupleOfList.nil) coords);
     TypedTupleOfList.cons SQLTypeProxy.int countAll
       TypedTupleOfList.nil : TypedRelationOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float] →
@@ -387,6 +389,7 @@ info: fun table ↦
 -/
 #guard_msgs in
 #check egSqlQuery₅
+
 
 /--
 info: fun table ↦
@@ -401,7 +404,8 @@ info: fun table ↦
     let table.age.sum :=
       (fun k ↦
           groupSum (fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.bool (typedTuple 1) TypedTupleOfList.nil) k
-            table fun typedTuple ↦ typedTuple 0)
+            (restriction (fun coords ↦ decide (coords 0 > 30) && coords 1 && decide (coords 2 < 180)) table)
+            fun typedTuple ↦ typedTuple 0)
         ((fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.bool (typedTuple 1) TypedTupleOfList.nil) coords);
     TypedTupleOfList.cons SQLTypeProxy.int table.age.sum
       TypedTupleOfList.nil : TypedRelationOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float] →
@@ -409,6 +413,39 @@ info: fun table ↦
 -/
 #guard_msgs in
 #check egSqlQuery₆
+
+/--
+info: fun table ↦
+  (restriction
+        (fun coords ↦
+          let table.age.sum :=
+            (fun k ↦
+                groupSum (fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.bool (typedTuple 1) TypedTupleOfList.nil)
+                  k (restriction (fun coords ↦ decide (coords 0 > 30) && coords 1 && decide (coords 2 < 180)) table)
+                  fun typedTuple ↦ typedTuple 0)
+              ((fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.bool (typedTuple 1) TypedTupleOfList.nil) coords);
+          decide (table.age.sum < 100))
+        (restriction
+          (fun coords ↦
+            let table.age := coords 0;
+            let table.isActive := coords 1;
+            let table.height := coords 2;
+            decide (table.age > 30) && table.isActive && decide (table.height < 180))
+          table)).mapByList
+    [("sum", SQLTypeProxy.int)] fun coords ↦
+    let table.age.sum :=
+      (fun k ↦
+          groupSum (fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.bool (typedTuple 1) TypedTupleOfList.nil) k
+            (restriction (fun coords ↦ decide (coords 0 > 30) && coords 1 && decide (coords 2 < 180)) table)
+            fun typedTuple ↦ typedTuple 0)
+        ((fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.bool (typedTuple 1) TypedTupleOfList.nil) coords);
+    TypedTupleOfList.cons SQLTypeProxy.int table.age.sum
+      TypedTupleOfList.nil : TypedRelationOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float] →
+  TypedRelation (colTypeOfList (List.map (fun x ↦ x.2) [("sum", SQLTypeProxy.int)]))
+-/
+#guard_msgs in
+#check egSqlQuery₇
+
 
 set_option pp.funBinderTypes true in
 example : egTypedTupleFilter% = egTypedTupleFilter%% := by
