@@ -261,16 +261,328 @@ class SqlServer(ThreadingHTTPServer):
     sql_process: SqlProcess
 
 
-def demo_html() -> str:
-    initial = {
-        "schema": [
-            {"name": "age", "type": "Int"},
-            {"name": "isActive", "type": "Bool"},
+DEFAULT_DEMO = {
+    "schemas": [
+        {
+            "name": "table",
+            "columns": [
+                {"name": "age", "type": "Int"},
+                {"name": "isActive", "type": "Bool"},
+            ],
+        }
+    ],
+    "queries": [
+        "SELECT * FROM table WHERE age > 30 && isActive",
+        "SELECT * FROM table WHERE age > 30 && isActive && age > 20",
+    ],
+}
+
+
+TABLE_AGE_ACTIVE_HEIGHT = {
+    "name": "table",
+    "columns": [
+        {"name": "age", "type": "Int"},
+        {"name": "isActive", "type": "Bool"},
+        {"name": "height", "type": "Float"},
+    ],
+}
+
+
+EXAMPLE_GROUPS = [
+    {
+        "label": "Example0",
+        "examples": [
+            {
+                "label": "Example0: AND reorder",
+                "schemas": [TABLE_AGE_ACTIVE_HEIGHT],
+                "queries": [
+                    "SELECT * FROM table WHERE age > 30 AND isActive",
+                    "SELECT * FROM table WHERE isActive AND age > 30",
+                ],
+            },
+            {
+                "label": "Example0: AND idempotent",
+                "schemas": [TABLE_AGE_ACTIVE_HEIGHT],
+                "queries": [
+                    "SELECT * FROM table WHERE isActive AND isActive",
+                    "SELECT * FROM table WHERE isActive",
+                ],
+            },
+            {
+                "label": "Example0: comparison reorder",
+                "schemas": [TABLE_AGE_ACTIVE_HEIGHT],
+                "queries": [
+                    "SELECT * FROM table WHERE age > 30 AND height < 180",
+                    "SELECT * FROM table WHERE height < 180 AND age > 30",
+                ],
+            },
+            {
+                "label": "Example0: double negation",
+                "schemas": [TABLE_AGE_ACTIVE_HEIGHT],
+                "queries": [
+                    "SELECT * FROM table WHERE NOT (NOT isActive)",
+                    "SELECT * FROM table WHERE isActive",
+                ],
+            },
+            {
+                "label": "Example0: De Morgan",
+                "schemas": [TABLE_AGE_ACTIVE_HEIGHT],
+                "queries": [
+                    "SELECT * FROM table WHERE NOT (age > 30 OR isActive)",
+                    "SELECT * FROM table WHERE NOT (age > 30) AND NOT isActive",
+                ],
+            },
+            {
+                "label": "Example0: OR idempotent",
+                "schemas": [TABLE_AGE_ACTIVE_HEIGHT],
+                "queries": [
+                    "SELECT * FROM table WHERE isActive OR isActive",
+                    "SELECT * FROM table WHERE isActive",
+                ],
+            },
+            {
+                "label": "Example0: repeated comparison",
+                "schemas": [TABLE_AGE_ACTIVE_HEIGHT],
+                "queries": [
+                    "SELECT * FROM table WHERE age > 30 AND age > 30",
+                    "SELECT * FROM table WHERE age > 30",
+                ],
+            },
+            {
+                "label": "Example0: absorption",
+                "schemas": [TABLE_AGE_ACTIVE_HEIGHT],
+                "queries": [
+                    "SELECT * FROM table WHERE isActive OR (isActive AND age > 30)",
+                    "SELECT * FROM table WHERE isActive",
+                ],
+            },
+            {
+                "label": "Example0: OR reorder",
+                "schemas": [TABLE_AGE_ACTIVE_HEIGHT],
+                "queries": [
+                    "SELECT * FROM table WHERE isActive OR age > 30",
+                    "SELECT * FROM table WHERE age > 30 OR isActive",
+                ],
+            },
+            {
+                "label": "Example0: AND distributes over OR",
+                "schemas": [TABLE_AGE_ACTIVE_HEIGHT],
+                "queries": [
+                    "SELECT * FROM table WHERE age > 30 AND (isActive OR height < 180)",
+                    "SELECT * FROM table WHERE (age > 30 AND isActive) OR (age > 30 AND height < 180)",
+                ],
+            },
         ],
-        "first": "SELECT * FROM table WHERE age > 30 && isActive",
-        "second": "SELECT * FROM table WHERE age > 30 && isActive && age > 20",
-    }
+    },
+    {
+        "label": "Other examples",
+        "examples": [
+            {
+                "label": "Example1: predicate pushdown through UNION",
+                "schemas": [
+                    {
+                        "name": "r1",
+                        "columns": [
+                            {"name": "is_high_value", "type": "Bool"},
+                            {"name": "val", "type": "Int"},
+                        ],
+                    },
+                    {
+                        "name": "r2",
+                        "columns": [
+                            {"name": "is_high_value", "type": "Bool"},
+                            {"name": "val", "type": "Int"},
+                        ],
+                    },
+                ],
+                "queries": [
+                    "SELECT * FROM (SELECT * FROM r1 UNION SELECT * FROM r2) AS u WHERE is_high_value",
+                    "SELECT * FROM r1 WHERE r1.is_high_value UNION SELECT * FROM r2 WHERE r2.is_high_value",
+                ],
+            },
+            {
+                "label": "Example2: cascading selection",
+                "schemas": [
+                    {
+                        "name": "table",
+                        "columns": [
+                            {"name": "is_active", "type": "Bool"},
+                            {"name": "is_high_value", "type": "Bool"},
+                        ],
+                    }
+                ],
+                "queries": [
+                    "SELECT * FROM (SELECT * FROM table WHERE is_active) AS r WHERE is_high_value",
+                    "SELECT * FROM table WHERE is_high_value AND is_active",
+                ],
+            },
+            {
+                "label": "Example4: combined anti-set",
+                "schemas": [
+                    {
+                        "name": "tableA",
+                        "columns": [
+                            {"name": "is_active", "type": "Bool"},
+                            {"name": "is_banned", "type": "Bool"},
+                        ],
+                    },
+                    {
+                        "name": "tableB",
+                        "columns": [
+                            {"name": "is_active", "type": "Bool"},
+                            {"name": "is_banned", "type": "Bool"},
+                        ],
+                    },
+                ],
+                "queries": [
+                    "(SELECT * FROM tableA WHERE tableA.is_active UNION SELECT * FROM tableB WHERE tableB.is_active) EXCEPT SELECT * FROM (SELECT * FROM tableA UNION SELECT * FROM tableB) AS u WHERE is_banned",
+                    "SELECT * FROM (SELECT * FROM tableA UNION SELECT * FROM tableB) AS u WHERE is_active AND NOT is_banned",
+                ],
+            },
+            {
+                "label": "Example5: EXISTS equals IN",
+                "schemas": [
+                    {
+                        "name": "customers",
+                        "columns": [
+                            {"name": "customer_id", "type": "Int"},
+                            {"name": "name", "type": "String"},
+                        ],
+                    },
+                    {
+                        "name": "orders",
+                        "columns": [
+                            {"name": "customer_id", "type": "Int"},
+                            {"name": "total", "type": "Int"},
+                        ],
+                    },
+                ],
+                "queries": [
+                    "SELECT * FROM customers WHERE EXISTS (SELECT * FROM orders WHERE orders.customer_id = customers.customer_id)",
+                    "SELECT * FROM customers WHERE customers.customer_id IN (SELECT orders.customer_id FROM orders)",
+                ],
+            },
+            {
+                "label": "Example8: NOT IN equals NOT EXISTS",
+                "schemas": [
+                    {
+                        "name": "customers",
+                        "columns": [
+                            {"name": "customer_id", "type": "Int"},
+                            {"name": "name", "type": "String"},
+                        ],
+                    },
+                    {
+                        "name": "orders",
+                        "columns": [
+                            {"name": "customer_id", "type": "Int"},
+                            {"name": "total", "type": "Int"},
+                        ],
+                    },
+                ],
+                "queries": [
+                    "SELECT * FROM customers WHERE customers.customer_id NOT IN (SELECT orders.customer_id FROM orders)",
+                    "SELECT * FROM customers WHERE NOT EXISTS (SELECT * FROM orders WHERE orders.customer_id = customers.customer_id)",
+                ],
+            },
+            {
+                "label": "Example10: OR equals UNION",
+                "schemas": [
+                    {
+                        "name": "table",
+                        "columns": [
+                            {"name": "status", "type": "String"},
+                            {"name": "priority", "type": "String"},
+                        ],
+                    }
+                ],
+                "queries": [
+                    'SELECT * FROM table WHERE status = "open" OR priority = "high"',
+                    'SELECT * FROM table WHERE status = "open" UNION SELECT * FROM table WHERE priority = "high"',
+                ],
+            },
+            {
+                "label": "Example10: OR equals disjoint UNION ALL",
+                "schemas": [
+                    {
+                        "name": "table",
+                        "columns": [
+                            {"name": "status", "type": "String"},
+                            {"name": "priority", "type": "String"},
+                        ],
+                    }
+                ],
+                "queries": [
+                    'SELECT * FROM table WHERE status = "open" OR priority = "high"',
+                    'SELECT * FROM table WHERE status = "open" UNION ALL SELECT * FROM table WHERE priority = "high" AND status <> "open"',
+                ],
+            },
+            {
+                "label": "Example13: UNION absorption",
+                "schemas": [
+                    {
+                        "name": "table",
+                        "columns": [
+                            {"name": "age", "type": "Int"},
+                            {"name": "isActive", "type": "Bool"},
+                        ],
+                    },
+                    {
+                        "name": "table2",
+                        "columns": [
+                            {"name": "age", "type": "Int"},
+                            {"name": "isActive", "type": "Bool"},
+                        ],
+                    },
+                ],
+                "queries": [
+                    "SELECT * FROM table UNION (SELECT * FROM table INTERSECT SELECT * FROM table2)",
+                    "SELECT * FROM table",
+                ],
+            },
+            {
+                "label": "Example16: DISTINCT and cascading WHERE",
+                "schemas": [
+                    {
+                        "name": "R",
+                        "columns": [
+                            {"name": "a", "type": "Int"},
+                            {"name": "b", "type": "Int"},
+                            {"name": "p", "type": "Bool"},
+                            {"name": "q", "type": "Bool"},
+                        ],
+                    }
+                ],
+                "queries": [
+                    "SELECT DISTINCT a + b AS g FROM (SELECT * FROM (SELECT * FROM R WHERE q) AS x WHERE p) AS y",
+                    "SELECT a + b AS g FROM R WHERE p AND q",
+                ],
+            },
+            {
+                "label": "Example18: LIKE, ORDER BY, LIMIT",
+                "schemas": [
+                    {
+                        "name": "table",
+                        "columns": [
+                            {"name": "name", "type": "String"},
+                            {"name": "age", "type": "Int"},
+                        ],
+                    }
+                ],
+                "queries": [
+                    'SELECT * FROM table WHERE name LIKE "%" ORDER BY age LIMIT 10',
+                    "SELECT * FROM table",
+                ],
+            },
+        ],
+    },
+]
+
+
+def demo_html() -> str:
+    initial = DEFAULT_DEMO
     initial_json = html.escape(json.dumps(initial, indent=2))
+    examples_json = json.dumps(EXAMPLE_GROUPS)
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -375,6 +687,19 @@ def demo_html() -> str:
       height: 38px;
       padding: 0 9px;
     }}
+    .schema-card {{
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+    }}
+    .schema-title {{
+      display: grid;
+      grid-template-columns: minmax(120px, 1fr) 36px;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 10px;
+    }}
     .schema-head, .schema-row {{
       display: grid;
       grid-template-columns: minmax(92px, 1fr) 110px 36px;
@@ -388,6 +713,12 @@ def demo_html() -> str:
       margin: 2px 0 6px;
     }}
     .schema-row {{ margin-bottom: 8px; }}
+    .example-grid {{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }}
     button {{
       min-height: 38px;
       border: 1px solid var(--line);
@@ -451,34 +782,36 @@ def demo_html() -> str:
     }}
     @media (max-width: 880px) {{
       main {{ grid-template-columns: 1fr; }}
+      .example-grid {{ grid-template-columns: 1fr; }}
     }}
   </style>
 </head>
 <body>
   <header>
     <h1>LeanDatabase SQL Equivalence</h1>
-    <p>Build a schema and two SQL-like filters, then send the generated JSON to the Lean <code>grind</code>-backed checker.</p>
+    <p>Build named schemas and SQL query pairs, then send the generated JSON to the Lean <code>sql_equiv</code>-backed checker.</p>
   </header>
   <main>
     <section class="panel">
       <h2>Query Pair</h2>
-      <div>
-        <div class="schema-head"><span>Column</span><span>Type</span><span></span></div>
-        <div id="schemaRows"></div>
-        <button type="button" id="addColumn">+ Column</button>
+      <div class="example-grid">
+        <div>
+          <label for="example0Menu">Example0</label>
+          <select id="example0Menu"></select>
+        </div>
+        <div>
+          <label for="otherExampleMenu">Other examples</label>
+          <select id="otherExampleMenu"></select>
+        </div>
       </div>
+      <div id="schemas"></div>
+      <button type="button" id="addSchema">+ Table</button>
 
       <label for="first">First query</label>
       <textarea id="first" spellcheck="false"></textarea>
 
       <label for="second">Second query</label>
       <textarea id="second" spellcheck="false"></textarea>
-
-      <div class="examples">
-        <button type="button" data-example="same">Same filter</button>
-        <button type="button" data-example="stronger">Implied extra bound</button>
-        <button type="button" data-example="different">Different filter</button>
-      </div>
 
       <div class="actions">
         <button class="primary" type="button" id="check">Check equivalence</button>
@@ -501,29 +834,42 @@ def demo_html() -> str:
 
   <script>
     const initial = {json.dumps(initial)};
-    const examples = {{
-      same: {{
-        first: "SELECT * FROM table WHERE age > 30 && isActive",
-        second: "SELECT * FROM table WHERE age > 30 && isActive"
-      }},
-      stronger: {{
-        first: "SELECT * FROM table WHERE age > 30 && isActive",
-        second: "SELECT * FROM table WHERE age > 30 && isActive && age > 20"
-      }},
-      different: {{
-        first: "SELECT * FROM table WHERE age > 30 && isActive",
-        second: "SELECT * FROM table WHERE age > 30 && !isActive"
-      }}
-    }};
+    const exampleGroups = {examples_json};
 
-    const schemaRows = document.querySelector("#schemaRows");
+    const schemasEl = document.querySelector("#schemas");
     const first = document.querySelector("#first");
     const second = document.querySelector("#second");
     const requestJson = document.querySelector("#requestJson");
     const responseJson = document.querySelector("#responseJson");
     const statusLine = document.querySelector("#status");
 
-    function addRow(name = "", type = "Int") {{
+    function addSchema(schema = {{ name: "", columns: [] }}) {{
+      const card = document.createElement("div");
+      card.className = "schema-card";
+      card.innerHTML = `
+        <div class="schema-title">
+          <input aria-label="Table name" class="schema-name" value="${{escapeAttr(schema.name || "")}}" placeholder="table">
+          <button type="button" class="danger remove-schema" title="Remove table">x</button>
+        </div>
+        <div class="schema-head"><span>Column</span><span>Type</span><span></span></div>
+        <div class="schema-rows"></div>
+        <button type="button" class="add-column">+ Column</button>
+      `;
+      const rows = card.querySelector(".schema-rows");
+      card.querySelector(".schema-name").addEventListener("input", updateRequest);
+      card.querySelector(".remove-schema").addEventListener("click", () => {{
+        card.remove();
+        updateRequest();
+      }});
+      card.querySelector(".add-column").addEventListener("click", () => {{
+        addRow(rows);
+        updateRequest();
+      }});
+      (schema.columns || []).forEach(col => addRow(rows, col.name, col.type));
+      schemasEl.appendChild(card);
+    }}
+
+    function addRow(rows, name = "", type = "Int") {{
       const row = document.createElement("div");
       row.className = "schema-row";
       row.innerHTML = `
@@ -544,7 +890,7 @@ def demo_html() -> str:
         updateRequest();
       }});
       row.querySelectorAll("input, select").forEach(el => el.addEventListener("input", updateRequest));
-      schemaRows.appendChild(row);
+      rows.appendChild(row);
     }}
 
     function escapeAttr(value) {{
@@ -553,11 +899,13 @@ def demo_html() -> str:
 
     function currentPayload() {{
       return {{
-        schemas: 
-          [{{name: "table", columns: [...schemaRows.querySelectorAll(".schema-row")].map(row => ({{
-          name: row.querySelector(".col-name").value.trim(),
-          type: row.querySelector(".col-type").value.trim()
-        }})).filter(col => col.name && col.type)}}],
+        schemas: [...schemasEl.querySelectorAll(".schema-card")].map(card => ({{
+          name: card.querySelector(".schema-name").value.trim(),
+          columns: [...card.querySelectorAll(".schema-row")].map(row => ({{
+            name: row.querySelector(".col-name").value.trim(),
+            type: row.querySelector(".col-type").value.trim()
+          }})).filter(col => col.name && col.type)
+        }})).filter(schema => schema.name && schema.columns.length),
         queries: [first.value, second.value]
       }};
     }}
@@ -566,14 +914,18 @@ def demo_html() -> str:
       requestJson.textContent = JSON.stringify(currentPayload(), null, 2);
     }}
 
-    function reset() {{
-      schemaRows.replaceChildren();
-      initial.schema.forEach(col => addRow(col.name, col.type));
-      first.value = initial.first;
-      second.value = initial.second;
+    function loadPayload(payload) {{
+      schemasEl.replaceChildren();
+      (payload.schemas || []).forEach(addSchema);
+      first.value = (payload.queries && payload.queries[0]) || "";
+      second.value = (payload.queries && payload.queries[1]) || "";
       responseJson.textContent = "No request sent yet.";
       statusLine.textContent = "";
       updateRequest();
+    }}
+
+    function reset() {{
+      loadPayload(initial);
     }}
 
     async function check() {{
@@ -608,25 +960,30 @@ def demo_html() -> str:
       }}
     }}
 
-    document.querySelector("#addColumn").addEventListener("click", () => {{
-      addRow("", "Int");
+    document.querySelector("#addSchema").addEventListener("click", () => {{
+      addSchema({{ name: "table" + (schemasEl.children.length + 1), columns: [] }});
       updateRequest();
     }});
     document.querySelector("#check").addEventListener("click", check);
     document.querySelector("#reset").addEventListener("click", reset);
-    document.querySelectorAll("[data-example]").forEach(button => {{
-      button.addEventListener("click", () => {{
-        const example = examples[button.dataset.example];
-        first.value = example.first;
-        second.value = example.second;
-        responseJson.textContent = "No request sent yet.";
-        statusLine.textContent = "";
-        updateRequest();
-      }});
-    }});
     first.addEventListener("input", updateRequest);
     second.addEventListener("input", updateRequest);
 
+    function fillMenu(selector, groupIndex) {{
+      const menu = document.querySelector(selector);
+      menu.append(new Option("Choose example...", ""));
+      exampleGroups[groupIndex].examples.forEach((example, index) => {{
+        menu.append(new Option(example.label, String(index)));
+      }});
+      menu.addEventListener("change", () => {{
+        if (!menu.value) return;
+        loadPayload(exampleGroups[groupIndex].examples[Number(menu.value)]);
+        document.querySelector(groupIndex === 0 ? "#otherExampleMenu" : "#example0Menu").value = "";
+      }});
+    }}
+
+    fillMenu("#example0Menu", 0);
+    fillMenu("#otherExampleMenu", 1);
     reset();
   </script>
 </body>
