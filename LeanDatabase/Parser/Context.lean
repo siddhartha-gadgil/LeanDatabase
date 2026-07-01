@@ -72,10 +72,16 @@ theorem schemaWithFullNames_length (schemaName: Name) (schema : List (Name × SQ
 
 syntax "COUNT" "(" "*" ")" : term
 syntax "COUNT" "(" term ")" : term
+syntax "COUNT" "(" "DISTINCT" term ")" : term
 syntax "SUM" "(" term ")" : term
+syntax "SUM" "(" "DISTINCT" term ")" : term
 syntax "AVG" "(" term ")" : term
+syntax "AVG" "(" "DISTINCT" term ")" : term
 syntax "MIN" "(" term ")" : term
 syntax "MAX" "(" term ")" : term
+syntax "BOOL_AND" "(" term ")" : term
+syntax "EVERY" "(" term ")" : term
+syntax "BOOL_OR" "(" term ")" : term
 
 def expandNames (labels : List Name) (stx: Syntax) : MetaM Syntax := do
   let pairs ← labels.filterMapM fun label => do
@@ -178,20 +184,47 @@ def withSchemasTupleVars (schemas : List (Name × List (Name × SQLTypeProxy))) 
           k ((typedTuple, letVars) :: rest)
 
 /-- The aggregate operators we lift out of `SELECT`/`HAVING` over an arbitrary expression.
-`SUM`/`MIN`/`MAX`/`AVG` share the shape `group<X> key k rel (f : TypedTuple → Int) : Int`;
-`COUNT` is the row count (`groupCount`, no summand). Adding an aggregate = one constructor here
-plus one `AggKind.op` line plus one match arm in `liftAggExprs`. -/
+Adding an aggregate = one constructor here, one line each in `AggKind.op` / `.summand` / `.wrapNat`
+/ `.resultType`, and one match arm in `liftAggExprs`. -/
 inductive AggKind where
   | sum | min | max | avg | count
+  | sumDistinct | countDistinct | avgDistinct
+  | boolAnd | boolOr
   deriving DecidableEq
 
-/-- The `group*` operator constant backing each summand aggregate. -/
+/-- The summand shape: `void` (no argument, `COUNT(*)`), an `Int`/`Bool` expression, or a type-probed
+expression (`COUNT(DISTINCT …)`, which counts distinct values of any column type). -/
+inductive AggSummand | void | int | bool | probe
+
+/-- The `group*` operator constant backing each aggregate. -/
 def AggKind.op : AggKind → Name
   | .sum => ``groupSum
   | .min => ``groupMinInt
   | .max => ``groupMaxInt
   | .avg => ``groupAvg
   | .count => ``groupCount
+  | .sumDistinct => ``groupSumDistinct
+  | .countDistinct => ``groupCountDistinct
+  | .avgDistinct => ``groupAvgDistinct
+  | .boolAnd => ``groupBoolAnd
+  | .boolOr => ``groupBoolOr
+
+/-- The summand each aggregate feeds its operator. -/
+def AggKind.summand : AggKind → AggSummand
+  | .count => .void
+  | .countDistinct => .probe
+  | .boolAnd | .boolOr => .bool
+  | _ => .int
+
+/-- Whether the operator returns `Nat` (so its result is wrapped with `Int.ofNat`). -/
+def AggKind.wrapNat : AggKind → Bool
+  | .count | .countDistinct => true
+  | _ => false
+
+/-- The SQL column type of the aggregate's result. -/
+def AggKind.resultType : AggKind → SQLTypeProxy
+  | .boolAnd | .boolOr => .bool
+  | _ => .int
 
 /-- Builds one grouped aggregate per lifted `(freshName, kind, expr)`: each `expr` is elaborated
 against a fresh tuple of `schema` into a `TypedTuple → Int` summand and fed to the operator named by
@@ -203,21 +236,26 @@ def groupAggExprsE (schema : List (Name × SQLTypeProxy)) (columnInGroup : Name 
   let (keyMapE, _, codomainE) ← subcolumsProjectionsE schema columnInGroup
   let keyValue ← mkAppM' keyMapE #[typedTupleVar]
   aggs.mapM fun (name, kind, exprStx) => do
-    -- summand `fun (t : TypedTuple schema) => (exprStx : Int)` (unused for COUNT)
-    let projE? ← match kind with
-      | .count => pure none
-      | _ => do
-          let projE ← withSchemasTupleVars [(.anonymous, schema)] (fun _ => true) fun vars =>
-            mkLambdaLetsFVars vars (elabTermEnsuringType exprStx (mkConst ``Int))
+    -- summand `fun (t : TypedTuple schema) => (exprStx : <summand type>)`, absent for COUNT(*)
+    let projE? ← match kind.summand with
+      | .void => pure none
+      | s => do
+          let projE ← withSchemasTupleVars [(.anonymous, schema)] (fun _ => true) fun vars => do
+            let body ← match s with
+              | .int => elabTermEnsuringType exprStx (mkConst ``Int)
+              | .bool => elabTermEnsuringType exprStx (mkConst ``Bool)
+              | _ => Prod.snd <$> elabAsSql exprStx        -- `.probe`: discover the column type
+            mkLambdaLetsFVars vars (pure body)
           pure (some projE)
     let aggE ← withLocalDeclD `k codomainE fun keyVar => do
-      let call ← match projE? with
-        | none => do mkAppM ``Int.ofNat #[← mkAppM ``groupCount #[keyMapE, keyVar, relE]]
+      let base ← match projE? with
+        | none => mkAppM kind.op #[keyMapE, keyVar, relE]
         | some projE => mkAppM kind.op #[keyMapE, keyVar, relE, projE]
+      let call ← if kind.wrapNat then mkAppM ``Int.ofNat #[base] else pure base
       mkLambdaFVars #[keyVar] call
     let aggValue ← mkAppM' aggE #[keyValue]
     let aggValue ← mkLambdaFVars #[typedTupleVar] aggValue
-    pure ((name, SQLTypeProxy.int), aggValue)
+    pure ((name, kind.resultType), aggValue)
 
 def withSchemasGroupedTupleVars (schemas : List (Name × List (Name × SQLTypeProxy))) (usedName : Name → Bool)
     (inGroup : Name → Bool) (relE : Expr) (aggs : List (Name × AggKind × Syntax.Term))

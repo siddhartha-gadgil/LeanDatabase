@@ -48,6 +48,12 @@ partial def liftAggExprs (stx : Syntax) :
       modify (·.push (name, kind, e))
       return some (mkIdent name)
     match node with
+    | `(COUNT(DISTINCT $e:term)) => record .countDistinct e
+    | `(SUM(DISTINCT $e:term))   => record .sumDistinct e
+    | `(AVG(DISTINCT $e:term))   => record .avgDistinct e
+    | `(BOOL_AND($e:term)) => record .boolAnd e
+    | `(EVERY($e:term))    => record .boolAnd e
+    | `(BOOL_OR($e:term))  => record .boolOr e
     | `(SUM($e:term))   => record .sum e
     | `(MIN($e:term))   => record .min e
     | `(MAX($e:term))   => record .max e

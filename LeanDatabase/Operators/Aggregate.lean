@@ -90,6 +90,17 @@ theorem sum_indicator_eq_count_where (p : TypedTuple colType → Bool)
     (∑ t ∈ rel.rows, (if p t then (1 : Nat) else 0)) = (restriction p rel).rows.card := by
   simp only [restriction, Finset.card_eq_sum_ones, Finset.sum_filter]
 
+/-- **Grouped `CASE` → `WHERE` pushdown.** The group-`k` `SUM(CASE WHEN p THEN f ELSE 0)` over a
+    relation equals the group-`k` `SUM(f)` over its `WHERE p` `restriction` — the `GROUP BY`
+    counterpart of `sum_case_eq_sum_where`, since restrictions on the same relation commute. -/
+@[simp]
+theorem groupSum_case_eq_groupSum_where (key : TypedTuple colType → K) (k : K)
+    (p : TypedTuple colType → Bool) (f : TypedTuple colType → Int) (rel : TypedRelation colType) :
+    groupSum key k rel (fun t => if p t then f t else 0)
+      = groupSum key k (restriction p rel) f := by
+  simp only [groupSum, sum_case_eq_sum_where]
+  grind [group, groupSum, restriction, Finset.filter_filter]
+
 /-- **`COUNT` coalesce.** `LEFT JOIN`+`COALESCE(_,0)` count equals the correlated count. -/
 @[simp] theorem coalesce_groupCount (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType) :
     (if k ∈ groupKeys key rel then groupCount key k rel else 0) = groupCount key k rel := by
@@ -196,6 +207,31 @@ def groupAvg (key : TypedTuple colType → K)
     (k : K)
     (rel : TypedRelation colType)
     (f : TypedTuple colType → Int) : Int := (groupSum key k rel f)/ (Int.ofNat (groupCount key k rel))
+
+/-- `SUM(DISTINCT f)` over the group of key `k` — sum of the *distinct* `f`-values. -/
+def groupSumDistinct (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
+    (f : TypedTuple colType → Int) : Int :=
+  ∑ x ∈ (group key k rel).rows.image f, x
+
+/-- `COUNT(DISTINCT f)` over the group of key `k` (any `DecidableEq` column type). -/
+def groupCountDistinct {β : Type} [DecidableEq β] (key : TypedTuple colType → K) (k : K)
+    (rel : TypedRelation colType) (f : TypedTuple colType → β) : Nat :=
+  ((group key k rel).rows.image f).card
+
+/-- `AVG(DISTINCT f)` = `SUM(DISTINCT f) / COUNT(DISTINCT f)`. -/
+def groupAvgDistinct (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
+    (f : TypedTuple colType → Int) : Int :=
+  groupSumDistinct key k rel f / Int.ofNat (groupCountDistinct key k rel f)
+
+/-- `EVERY` / `BOOL_AND(p)` — true iff every row in the group satisfies `p`. -/
+def groupBoolAnd (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
+    (p : TypedTuple colType → Bool) : Bool :=
+  decide (∀ t ∈ (group key k rel).rows, p t)
+
+/-- `BOOL_OR(p)` — true iff some row in the group satisfies `p`. -/
+def groupBoolOr (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
+    (p : TypedTuple colType → Bool) : Bool :=
+  decide (∃ t ∈ (group key k rel).rows, p t)
 
 /-- A group is non-empty iff its key occurs (`EXISTS`/`IN`/`NOT EXISTS`/`NOT IN` bridge). -/
 @[grind =] theorem group_nonempty_iff (key : TypedTuple colType → K) (k : K)
@@ -330,5 +366,5 @@ end LeanDatabase.TypedAgg
 /- Re-export the aggregate operators into the top-level `LeanDatabase` namespace-/
 namespace LeanDatabase
 export LeanDatabase.TypedAgg
-  (group groupCount groupSum groupKeys groupMax groupMaxInt groupMinInt groupAvg relCount relSum relMax relMin relCountDistinct relAvg groupBy)
+  (group groupCount groupSum groupKeys groupMax groupMaxInt groupMinInt groupAvg groupSumDistinct groupCountDistinct groupAvgDistinct groupBoolAnd groupBoolOr relCount relSum relMax relMin relCountDistinct relAvg groupBy)
 end LeanDatabase
