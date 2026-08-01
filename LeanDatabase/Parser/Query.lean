@@ -58,6 +58,13 @@ partial def liftAggExprs (stx : Syntax) :
     | `(MIN($e:term))   => record .min e
     | `(MAX($e:term))   => record .max e
     | `(AVG($e:term))   => record .avg e
+    | `(COUNT(CASE $[WHEN $cs THEN $_vs]* END)) => do
+        -- `COUNT(CASE WHEN p THEN _ END)` counts the rows where some `p` holds — the missing `ELSE`
+        -- yields NULL, which `COUNT` skips. That is exactly `SUM(CASE WHEN p THEN 1 … ELSE 0 END)`,
+        -- the indicator sum that `groupSum_case_eq_groupSum_where` folds into `COUNT(*) WHERE p`.
+        let ones ← cs.mapM fun _ => `(term| (1 : Int))
+        let e ← `(CASE $[WHEN $cs THEN $ones]* ELSE (0 : Int) END)
+        record .sum e
     | `(COUNT(*))       => record .count ⟨Syntax.mkNumLit "0"⟩
     | `(COUNT($e:term)) => record .count e
     | _ => return none
@@ -97,6 +104,18 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       | none => pure productExpr
     let (rel, outSchema) ← match sel with
       | `(sql_cols| *) => pure (filteredExpr, combinedSchema)
+      | `(sql_cols| $t:ident . *) => do
+        -- Qualified star `t.*`: project onto exactly the columns of table `t` (full names have
+        -- prefix `t`). Reuses the same projection path as an explicit column list.
+        let pfx := t.getId
+        let picked := combinedSchema.filter (fun (name, _) => pfx.isPrefixOf name)
+        if picked.isEmpty then throwError s!"Unknown table {pfx} in `{pfx}.*`"
+        let names := picked.map (·.1)
+        let cols : List Syntax.Term := names.map (fun n => mkIdent n)
+        let nameStrs := names.map (·.toString)
+        let (m, types) ← elabTypedTupleProjection [(.anonymous, combinedSchema)] cols
+        let e' ← mkAppM ``TypedRelation.mapByList #[filteredExpr, toExpr nameStrs, m]
+        pure (e', names.zip types)
       | `(sql_cols| $cols:sql_col,*) => do
         let colStxs := cols.getElems
         let cols := colStxs.map sqlColTerm

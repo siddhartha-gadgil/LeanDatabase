@@ -19,6 +19,7 @@ declare_syntax_cat sql_query
 declare_syntax_cat sql_from
 declare_syntax_cat sql_cols
 syntax "*" : sql_cols
+syntax ident "." "*" : sql_cols     -- qualified star `t.*` — every column of table `t`
 declare_syntax_cat sql_col
 syntax ident : sql_col
 syntax term "AS" ident : sql_col
@@ -177,6 +178,14 @@ macro_rules
       for (c, v) in (cs.zip vs).reverse do
         acc ← `(if ($c : Bool) then $v else $acc)
       return acc
+
+-- `CASE WHEN … THEN … END` *without* `ELSE`. Its full semantics is `ELSE NULL`, which needs the
+-- Phase-4 NULL layer we don't have yet — so there is deliberately **no** general term macro, and it
+-- errors in an ordinary scalar position rather than silently defaulting the missing branch to `0`
+-- (which would be wrong for `SUM`/`AVG`/`MIN`). It is meaningful only in the aggregate-argument
+-- position `COUNT(CASE WHEN p THEN _ END)`, where `COUNT` skips the NULLs; `liftAggExprs`
+-- intercepts exactly that shape and rewrites it to the indicator sum.
+syntax:90 "CASE" ( "WHEN" term "THEN" term ) + "END" : term
 
 
 /-!

@@ -120,8 +120,16 @@ Contrast with `orderBy`: identity **is** sound under set semantics (order unobse
       `distinct`-conditioned corollaries so existing proofs survive as special cases. -->
 <!-- - [ ] **0.7 Ordered top layer (M).** DROPPED — requires the `List` layer we chose not to build.
       `ORDER BY` stays identity (sound); `LIMIT` stays opaque (0.1). -->
-- [ ] **0.8 Regression guard (S).** Script that runs the corpus and prints `queries OK / records OK`.
-      Wire into CI so coverage is a tracked number, not a claim.
+- [x] **0.8 Regression guard (S). ✅ DONE.** `Examples/CrossSkill/coverage.py` prints two tracked
+      numbers on every run (and in CI, wired after `lake build` in `lean_action_ci.yml`):
+      **POTENTIAL** — a transparent regex feature-classifier over all 1266 queries that assigns each
+      the earliest roadmap phase unlocking it, reproducing the unlock curve as a measured number; and
+      **VERIFIED** — the machine-checked proof tally from `result.json`. The classifier independently
+      lands within ~1% of this file's hand-estimated curve (P3 43.8% vs 44.0%, P4 61.5% vs 61.8%,
+      P5 72.9% vs 73.1%; window 26.9%, CTE 76%, CAST 33.3% all match), cross-validating both. Note:
+      POTENTIAL measures *semantic-feature* reachability (assuming surface normalization), so it
+      aligns with the P1+ lines, not the surface-syntax-gated "P0 today = 33". `--json` for CI
+      consumption. This is the standing guard 7.3 (`plausible`) will complement.
 
 ---
 
@@ -133,13 +141,19 @@ Contrast with `orderBy`: identity **is** sound under set semantics (order unobse
       elaborates to the existing identity `orderBy`. Direction is provably erased
       (`ORDER BY a DESC = ORDER BY a ASC = unordered`, verified). Unblocks the **60.1%** of queries
       that were dying at parse time on a direction token.
-- [ ] **1.2 Qualified star `t.*` (S).** 1.3% of queries. Expand against the schema.
-- [ ] **1.3 `CASE … END` without `ELSE` (S, partial).** 10.6% of queries. Full semantics is
-      `ELSE NULL` → belongs to Phase 4. **But** the dominant idiom is
-      `COUNT(CASE WHEN p THEN 1 END)` (2.1% of queries), where `COUNT` skips `NULL`. Handle *only*
-      the aggregate-argument position now via `sum_indicator_eq_count_where`
-      (`Operators/Aggregate.lean:77`), and **error** on the general position rather than defaulting
-      to `0` — defaulting to `0` is silently wrong for `SUM`/`AVG`/`MIN`.
+- [x] **1.2 Qualified star `t.*` (S). ✅ DONE.** Added `syntax ident "." "*" : sql_cols` in
+      `Parser/Syntax.lean`; the SELECT arm in `Parser/Query.lean` filters `combinedSchema` to the
+      columns whose full name has prefix `t` and reuses the explicit-column projection path. Verified:
+      `t.* = a, b` (single table) and, across `t, u`, `t.* = t.a, t.b` (picks only `t`'s columns).
+- [x] **1.3 `CASE … END` without `ELSE` (S, partial). ✅ DONE (aggregate-argument slice).** Added
+      `syntax:90 "CASE" ("WHEN" term "THEN" term)+ "END"` in `Parser/Syntax.lean` with **no** general
+      term macro — so a bare CASE-without-ELSE in an ordinary scalar position is *rejected*, never
+      silently `ELSE 0`. `liftAggExprs` (`Parser/Query.lean`) intercepts the dominant idiom
+      `COUNT(CASE WHEN p THEN _ END)` and rewrites it to the indicator sum
+      `SUM(CASE WHEN p THEN 1 … ELSE 0 END)`, folded by `groupSum_case_eq_groupSum_where`. Verified:
+      `COUNT(CASE WHEN p THEN 1 END) = SUM(CASE WHEN p THEN 1 ELSE 0 END)`, THEN-value irrelevant to
+      the count, and scalar-position CASE-no-ELSE errors. Full `ELSE NULL` semantics still deferred
+      to Phase 4.7.
 
 ---
 
