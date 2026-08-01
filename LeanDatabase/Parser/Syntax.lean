@@ -159,6 +159,27 @@ macro:50 x:term:51 " BETWEEN " a:term:51 " AND " b:term:51 : term =>
 macro:50 x:term:51 " LIKE " p:term:51 : term =>
   `($(Lean.mkIdent (`LeanDatabase ++ `strLike)) $p $x)
 
+/-! ## `NULL` — the sound 2-valued gates (ROADMAP Phase 4, restricted slice)
+
+We model nullable columns as `Option _` but expose NULL only through constructs that reduce to a
+`Bool` or a non-null value, so no 3-valued logic is needed and no unsoundness can arise. There is
+**deliberately no bare `NULL` term**: `col = NULL` cannot be written (so the classic `WHERE NOT(x =
+NULL)` Kleene trap is impossible), and a raw nullable column in a comparison fails to typecheck
+(`Option τ` vs `τ`) rather than silently mis-evaluating. Full 3-valued predicates are future work. -/
+-- `x IS NULL` / `x IS NOT NULL` — 2-valued even on NULL input (`Option.isNone`/`isSome`).
+syntax:50 term:51 " IS " " NULL " : term
+syntax:50 term:51 " IS " " NOT " " NULL " : term
+-- `COALESCE(x, d)` / `IFNULL(x, d)` — first non-null; `NULLIF(a, b)` — NULL when equal, else `a`.
+syntax:max "COALESCE" "(" term "," term ")" : term
+syntax:max "IFNULL" "(" term "," term ")" : term
+syntax:max "NULLIF" "(" term "," term ")" : term
+macro_rules
+  | `($x IS NULL)      => `(Option.isNone $x)
+  | `($x IS NOT NULL)  => `(Option.isSome $x)
+  | `(COALESCE($x, $d)) => `(Option.getD $x $d)
+  | `(IFNULL($x, $d))   => `(Option.getD $x $d)
+  | `(NULLIF($a, $b))   => `(if $a == $b then none else some $a)
+
 -- SQL `EXISTS (subquery)` / `NOT EXISTS (subquery)` — correlated; intercepted as a `WHERE` form by
 -- `Parser.Query` (→ `semijoin` / `antijoin`), so this syntax is only ever matched, never elaborated.
 syntax:90 "EXISTS" "(" sql_query ")" : term

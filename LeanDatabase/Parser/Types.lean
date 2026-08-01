@@ -27,6 +27,7 @@ inductive SQLTypeProxy where
   | float
   | string
   | timestamp
+  | nullable : SQLTypeProxy → SQLTypeProxy   -- a NULL-able column: `.type` becomes `Option _`
 deriving Repr, DecidableEq, ToExpr
 
 
@@ -38,25 +39,37 @@ def SQLTypeProxy.type : SQLTypeProxy → Type
   | .float => Rat
   | .string => String
   | .timestamp => String
+  | .nullable t => Option t.type
 
-def SQLTypeProxy.list : List SQLTypeProxy := [.int, .bool, .float, .string, .timestamp]
+/-- Types the `AS`-clause probe tries. Includes each base type wrapped in `nullable` (one level —
+NULL columns are `Option base`), so a `NULLIF`/nullable projection discovers its type. -/
+def SQLTypeProxy.list : List SQLTypeProxy :=
+  let base := [SQLTypeProxy.int, .bool, .float, .string, .timestamp]
+  base ++ base.map .nullable
 
-instance (t : SQLTypeProxy) : DecidableEq t.type :=
-  match t with
+/-- Order a nullable column with `NULL` as the bottom element (NULLS FIRST). `Option α = WithBot α`
+definitionally, so we borrow `WithBot`'s `LinearOrder`. This exists only so a nullable column's
+`TypedRelation` satisfies the per-column `LinearOrder` the DDL macro emits; NULL ordering is not
+otherwise observable under set semantics. Mathlib has no `LinearOrder (Option α)`, so no diamond. -/
+instance instLinearOrderOption {α : Type} [LinearOrder α] : LinearOrder (Option α) :=
+  WithBot.linearOrder
+
+instance instDecidableEqProxyType : (t : SQLTypeProxy) → DecidableEq t.type
   | .int => inferInstance
   | .bool => inferInstance
   | .float => inferInstance
   | .string => inferInstance
   | .timestamp => inferInstance
+  | .nullable t => have := instDecidableEqProxyType t; inferInstance
 
 /-- The `Expr` of the Lean type a proxy denotes (the term-level mirror of `SQLTypeProxy.type`). -/
-def typeExpr (t : SQLTypeProxy) : Expr :=
-  match t with
+def typeExpr : SQLTypeProxy → Expr
   | .int => mkConst ``Int
   | .bool => mkConst ``Bool
   | .float => mkConst ``Rat
   | .string => mkConst ``String
   | .timestamp => mkConst ``String
+  | .nullable t => mkApp (mkConst ``Option [0]) (typeExpr t)
 
 /-- Map a DDL type string (`VARCHAR(…)`, `BIGINT`, `TIMESTAMP`, …) to a proxy. Matched by prefix,
 defaulting to `string` for anything unrecognized. -/

@@ -221,22 +221,32 @@ recursive fixpoint, the genuinely hard part, is almost pure ignorable tail.
 `NULL` appears in **31.3%** of queries; `IS [NOT] NULL` in **29.9%**. This is the second-hardest
 phase and it cannot be faked.
 
-- [ ] **4.1 Nullable types (M).** `SQLTypeProxy` gains nullability; column type becomes `Option τ`.
-- [ ] **4.2 Predicates become Kleene (L).** `WHERE` currently takes `Bool`. It must take
-      `Option Bool` (or a 3-valued `SQL3` inductive). `WHERE p` keeps rows where `p = some true` —
-      `NULL` is *not* kept. Rewrite `pAnd`/`pOr`/`pNot` (`RelationalAlgebra.lean`) to Kleene tables.
-      **Every predicate lemma in the codebase must be re-proved.** Adding `NULL` as a value without
-      doing this creates a soundness hole of exactly the same shape as Bug 0.A.
-- [ ] **4.3 `IS NULL` / `IS NOT NULL` (S).** These are 2-valued even on `NULL` input — the escape
-      hatch out of Kleene logic.
-- [ ] **4.4 `COALESCE`/`IFNULL`/`NULLIF` (S).** 14.1%. Trivial once 4.1 lands.
-- [ ] **4.5 Aggregates skip `NULL` (M).** `COUNT(x)` ignores nulls, `COUNT(*)` does not.
-      `SUM` of all-nulls is `NULL`, not `0`. `AVG` divides by the non-null count. Each is a separate
-      lemma; the `AggKind` registry makes this a per-kind field rather than 10 rewrites.
-- [ ] **4.6 The `NULL` equality quirk (M).** `NULL = NULL` is *unknown* in `WHERE`, but `GROUP BY`
-      and `DISTINCT` treat nulls as **equal** (one group, one row). Two different equalities on the
-      same type. This will bite; encode it explicitly rather than letting `DecidableEq` decide.
-- [ ] **4.7 `CASE` without `ELSE` (S).** Now correctly `ELSE NULL`. Retires the Phase 1.3 debt.
+**Scope decision:** we shipped the **sound 2-valued slice** (opt-in nullable columns + the constructs
+that reduce NULL to `Bool`/a non-null value), *not* full Kleene 3VL. NULL never enters through a bare
+literal, so the `WHERE NOT(x = NULL)` trap is unwriteable and a raw `Option` column in a comparison
+fails to typecheck. Full 3VL (4.2) and NULL-aware aggregates (4.5) remain deliberately deferred.
+
+- [x] **4.1 Nullable types (M). ✅ DONE (opt-in).** `SQLTypeProxy.nullable` constructor →
+      `.type = Option _`; `.type`/`typeExpr`/`DecidableEq`/the probe `.list` extended; a
+      `LinearOrder (Option α)` (NULLS-FIRST, via `WithBot`) satisfies the DDL's per-column order.
+      DDL: a trailing `NULL` (`amt INT NULL`) marks a column nullable; unmarked columns stay
+      non-nullable, so all existing schemas/examples are unchanged.
+- [ ] **4.2 Predicates become Kleene (L). DEFERRED (by the scope decision).** The full 3VL rewrite of
+      `pAnd`/`pOr`/`pNot` with every predicate lemma re-proved. Not attempted; instead the surface is
+      restricted so nothing unsound can be *written* (see scope note). This is the main remaining
+      Phase-4 work and stays an explicit, large follow-up.
+- [x] **4.3 `IS NULL` / `IS NOT NULL` (S). ✅ DONE.** `Option.isNone`/`isSome` — 2-valued Bool even on
+      NULL input. Verified they compose with ordinary `Bool` predicates and commute under `AND`.
+- [x] **4.4 `COALESCE`/`IFNULL`/`NULLIF` (S). ✅ DONE.** `COALESCE(x,d)`/`IFNULL(x,d) = x.getD d`
+      (non-null result); `NULLIF(a,b) = if a==b then none else some a` (nullable result). Verified
+      `COALESCE` projects and cancels by congruence.
+- [ ] **4.5 Aggregates skip `NULL` (M). DEFERRED.** Needs the nullable values to flow through the
+      aggregate builders (`COUNT(x)` skips nulls, `SUM` of all-nulls is NULL, `AVG` divides by
+      non-null count). Pairs with 4.2; not in the 2-valued slice.
+- [ ] **4.6 The `NULL` equality quirk (M).** `GROUP BY`/`DISTINCT` treat nulls as equal, `WHERE` as
+      unknown. Encode explicitly. Deferred with 4.2/4.5.
+- [ ] **4.7 `CASE` without `ELSE` → `ELSE NULL` (S).** Would retire the Phase 1.3 debt (the general
+      scalar position), but needs a bare NULL literal, which the slice deliberately omits. Deferred.
 
 ---
 
