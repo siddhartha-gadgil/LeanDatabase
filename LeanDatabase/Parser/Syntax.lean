@@ -207,6 +207,24 @@ syntax:max "LOWER" "(" term ")" : term
 syntax:max "TRIM" "(" term ")" : term
 syntax:max "LENGTH" "(" term ")" : term
 
+-- `CAST(x AS <type>)`. The `::` cast form is intentionally unsupported — overriding `::` would
+-- clobber `List.cons` globally. Elaborated (type-directed) in `Parser/Context.lean`, NOT as a macro:
+-- the coercion depends on the *source* type (int→float is a real coercion, ROADMAP 2.4).
+declare_syntax_cat sql_cast_type
+syntax "INT" : sql_cast_type
+syntax "INTEGER" : sql_cast_type
+syntax "BIGINT" : sql_cast_type
+syntax "NUMBER" : sql_cast_type
+syntax "FLOAT" : sql_cast_type
+syntax "DOUBLE" : sql_cast_type
+syntax "REAL" : sql_cast_type
+syntax "NUMERIC" : sql_cast_type
+syntax "DECIMAL" : sql_cast_type
+syntax "STRING" : sql_cast_type
+syntax "TEXT" : sql_cast_type
+syntax "VARCHAR" : sql_cast_type
+syntax:max "CAST" "(" term "AS" sql_cast_type ")" : term
+
 -- Emit the opaque constants as raw (non-hygienic) idents that resolve at the *use* site — this file
 -- doesn't import `Operators/Scalar.lean`, so a literal quoted name would be hygiene-marked and fail
 -- to resolve (same reason the `LIKE` macro above uses `mkIdent`).

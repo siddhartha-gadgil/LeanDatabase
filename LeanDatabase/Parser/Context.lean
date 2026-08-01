@@ -1,6 +1,7 @@
 import LeanDatabase.Parser.Types
 import LeanDatabase.Parser.Syntax
 import LeanDatabase.SQLToolbox
+import LeanDatabase.Operators.Scalar
 
 /-!
 # Elaboration context + per-operator (algebra) elaborators
@@ -29,6 +30,38 @@ def elabAsSql (stx: Syntax) : TermElabM (SQLTypeProxy × Expr) := do
   match res? with
   | some res => pure res
   | none => throwError s!"Failed to parse type in AS clause: {← PrettyPrinter.ppCategory `term stx}"
+
+/-- `CAST(x AS <type>)` — type-directed (see `Operators/Scalar.lean`). Unlike the opaque scalars,
+CAST inspects the *source* type: `Int → FLOAT` is the genuine `Int → Rat` coercion (so a division
+downstream is real, not integer — ROADMAP 2.4), while lossy directions stay opaque. -/
+elab_rules : term
+  | `(CAST($x AS $ty:sql_cast_type)) => do
+    let xe ← elabTerm x none
+    Term.synthesizeSyntheticMVarsNoPostponing
+    let xt ← whnf (← instantiateMVars (← inferType xe))
+    let isInt := xt.isConstOf ``Int
+    let isRat := xt.isConstOf ``Rat
+    let isStr := xt.isConstOf ``String
+    let toFloat : TermElabM Expr := do
+      if isRat then pure xe
+      else if isInt then mkAppM ``LeanDatabase.Scalar.castIntToFloat #[xe]
+      else throwError s!"CAST(_ AS FLOAT): unsupported source type {← ppExpr xt}"
+    let toInt : TermElabM Expr := do
+      if isInt then pure xe
+      else if isRat then mkAppM ``LeanDatabase.Scalar.truncToInt #[xe]
+      else throwError s!"CAST(_ AS INT): unsupported source type {← ppExpr xt}"
+    let toStr : TermElabM Expr := do
+      if isStr then pure xe
+      else if isInt then mkAppM ``LeanDatabase.Scalar.intToStr #[xe]
+      else if isRat then mkAppM ``LeanDatabase.Scalar.floatToStr #[xe]
+      else throwError s!"CAST(_ AS STRING): unsupported source type {← ppExpr xt}"
+    match ty with
+    | `(sql_cast_type| INT) | `(sql_cast_type| INTEGER) | `(sql_cast_type| BIGINT)
+    | `(sql_cast_type| NUMBER) => toInt
+    | `(sql_cast_type| FLOAT) | `(sql_cast_type| DOUBLE) | `(sql_cast_type| REAL)
+    | `(sql_cast_type| NUMERIC) | `(sql_cast_type| DECIMAL) => toFloat
+    | `(sql_cast_type| STRING) | `(sql_cast_type| TEXT) | `(sql_cast_type| VARCHAR) => toStr
+    | _ => throwUnsupportedSyntax
 
 /-! ## Column-binding context -/
 

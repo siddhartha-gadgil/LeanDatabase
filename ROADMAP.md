@@ -175,12 +175,18 @@ Contrast with `orderBy`: identity **is** sound under set semantics (order unobse
       `SELECT ROUND(v,2) = SELECT v`) while identical calls cancel by congruence — verified
       `ROUND(v,2)` cancels over a commuted `WHERE`, `YEAR(d)=2023` elaborates as an `Int` predicate,
       and `ROUND(SUM(v),3)` composes with the aggregate-lifting path in `GROUP BY`.
-- [ ] **2.3 Targeted axioms only where variants differ (M).** `ABS(a-b) = ABS(b-a)`; `ROUND`
-      idempotence. **Do not** axiomatize `ROUND(x,12) = ROUND(x,2)` or `SUBSTR ≡ RIGHT` — those are
-      data-dependent and belong to Phase 8.
-- [ ] **2.4 `CAST` is not free (M).** `CAST(int AS float)` changes division semantics. Integer vs
-      real division is a genuine expected-FAIL in the existing plan (`sf_bq030`). Model `CAST` as a
-      real coercion, not an opaque function, or it will launder integer-division bugs.
+- [ ] **2.3 Targeted axioms only where variants differ (M). DEFERRED (by discipline).** `ABS(a-b) =
+      ABS(b-a)`, `ROUND` idempotence, etc. would each be an *axiom over an opaque constant* — i.e.
+      trust surface. Per this phase's own rule ("only where variants differ"), not adding them
+      speculatively: they go in the moment a concrete corpus pair is shown to need one, not before.
+- [x] **2.4 `CAST` is not free (M). ✅ DONE.** `CAST(x AS <type>)` is a *type-directed elaborator*
+      (`Parser/Context.lean`), not an opaque macro: it inspects the source type. `Int → FLOAT` is the
+      genuine `Int → Rat` coercion `Scalar.castIntToFloat` (so downstream division is real, not
+      integer — the `sf_bq030` hazard); `Int → INT` is the identity; lossy directions (`FLOAT → INT`,
+      casts to string) stay opaque (no laundering risk). Verified: `CAST(a AS FLOAT)` cancels with
+      itself, `CAST(a AS INT) = a` on an int, and `SELECT CAST(a AS FLOAT) = SELECT a` is **rejected
+      as a type mismatch** (Rat ≠ Int) — the integer/real split is structurally enforced, not merely
+      unprovable. The `::` cast form is intentionally unsupported (it would clobber `List.cons`).
 
 ---
 

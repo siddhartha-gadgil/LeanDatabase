@@ -40,4 +40,21 @@ opaque lowerOf (x : String) : String := x
 opaque trimOf (x : String) : String := x
 opaque lengthOf (x : String) : Int := 0
 
+/-! ## `CAST` — a *real* coercion, never opaque (ROADMAP 2.4)
+
+`CAST(int AS FLOAT)` must genuinely widen `Int → Rat`, because that is what turns *integer* division
+into *real* division (`sf_bq030`). Modelling it opaquely would silently equate `a/b` (int division)
+with `CAST(a AS FLOAT)/CAST(b AS FLOAT)` (real division) — a soundness hole. So the widening cast is
+the honest `Int → Rat` coercion below. The *lossy* directions (`FLOAT → INT` truncation, casts to
+string) carry no such hazard and are left opaque; they only ever need to cancel with themselves. -/
+
+/-- `CAST(x AS FLOAT)` from an integer: the genuine `Int → Rat` coercion (NOT opaque). -/
+def castIntToFloat (x : Int) : Rat := (x : Rat)
+
+/-- `CAST(x AS INT)` from a float: lossy truncation — opaque (no laundering hazard). -/
+opaque truncToInt (x : Rat) : Int := 0
+/-- Casts to string — opaque, per source type. -/
+opaque intToStr (x : Int) : String := ""
+opaque floatToStr (x : Rat) : String := ""
+
 end LeanDatabase.Scalar
