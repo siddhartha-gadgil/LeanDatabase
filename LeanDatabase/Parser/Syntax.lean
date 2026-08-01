@@ -71,6 +71,13 @@ syntax:40 sql_query:40 sql_setop sql_query:41 : sql_query
 -- Parenthesised query, for grouping set-ops: `a UNION (a INTERSECT b)`.
 syntax:max "(" sql_query ")" : sql_query
 
+-- Common table expressions: `WITH x AS (q), y AS (q) SELECT …` (non-recursive). Each CTE is a local
+-- relation binding, inlined at every reference (`Parser/Query.lean`). `WITH RECURSIVE` is out of
+-- scope (ROADMAP 3.5) — it is not accepted by this grammar.
+declare_syntax_cat sql_cte
+syntax ident "AS" "(" sql_query ")" : sql_cte
+syntax:max "WITH" sql_cte,+ sql_query : sql_query
+
 -- macro_rules -- Gemini generated (then fixed) rules for desugaring JOINs and CROSS JOINs into comma-separated FROM clauses with WHERE conditions; GROUP BY omitted for now.
 --   -----------------------------------------------------------------------------
 --   -- CASE A: The query ALREADY has an existing WHERE clause

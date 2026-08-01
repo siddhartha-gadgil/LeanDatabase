@@ -195,17 +195,24 @@ Contrast with `orderBy`: identity **is** sound under set semantics (order unobse
 `WITH` appears in **76.6%** of queries. Only **3 queries (0.2%) use `WITH RECURSIVE`** — so the
 recursive fixpoint, the genuinely hard part, is almost pure ignorable tail.
 
-- [ ] **3.1 Grammar (S).** `WITH x AS (q), y AS (q) SELECT …`, comma-separated, non-recursive.
-- [ ] **3.2 Elaborate as `let` (M).** A CTE is a local relation binding, not a new operator. Reuse
-      the existing `withLetDecl` machinery in `Parser/Context.lean`. Bind once, reference `n` times.
-- [ ] **3.3 Make `grind` see through it (M).** Either inline CTEs at elaboration (simple, may blow up
-      term size when referenced many times) or keep the `let` and add a `zeta`-reduction step to
-      `sql_simp`. Start with inlining; measure term size before optimizing.
-- [ ] **3.4 Scalar subquery in `SELECT` (L).** **71.2%** of queries. `(SELECT SUM(x) FROM t)` in a
-      select-list is an ungrouped aggregate → `relSum`/`relCount`. This was deferred earlier as
-      "a bit too complex"; at 71% it is no longer optional. Correlated scalar subqueries are harder
-      than uncorrelated — split the task and do uncorrelated first.
-- [ ] **3.5 `WITH RECURSIVE` (XL).** 3 queries. **Explicitly deprioritize**; log as out of scope.
+- [x] **3.1 Grammar (S). ✅ DONE.** `sql_cte` category + `WITH x AS (q), … SELECT …` in
+      `Parser/Syntax.lean`, comma-separated, non-recursive (`WITH RECURSIVE` is not accepted).
+- [x] **3.2 Elaborate as a binding (M). ✅ DONE (via inlining, not `let`).** `elabSqlQueryCore` gains
+      a threaded `ctes` list; each CTE body is elaborated to a relation over the base vars (`.beta`)
+      and looked up by `productPair`, shadowing base tables. Later CTEs may reference earlier ones.
+      Chose **inlining** over `withLetDecl` (3.3) — simpler and the shared base fvars are captured by
+      the one outer lambda. Column names are kept as the body produced them so `expandNames`
+      (base-label-only) resolves outer references.
+- [x] **3.3 Make `grind` see through it (M). ✅ DONE.** Added `@[simp, grind =]
+      TypedRelation.mapByList_mapByList` — projection fusion via `Finset.image_image`, so a projecting
+      CTE (`SELECT a FROM (SELECT a,b …)`) collapses to one `mapByList`. Verified passthrough,
+      `WHERE`-carrying, projected-through, and chained (`y` references `x`) CTEs all prove; full build
+      green (the global lemma broke nothing).
+- [ ] **3.4 Scalar subquery in `SELECT` (L). NOT STARTED — the remaining Phase-3 work.** **71.2%** of
+      queries. `(SELECT SUM(x) FROM t)` in a select-list is an ungrouped aggregate → `relSum`/`relCount`.
+      Uncorrelated first, then correlated (harder). This is a large task on its own; the CTE core
+      above is the headline +27pt unlock, this is additive.
+- [ ] **3.5 `WITH RECURSIVE` (XL).** 3 queries. **Out of scope** — the grammar rejects it.
 
 ---
 

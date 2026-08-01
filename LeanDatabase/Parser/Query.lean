@@ -77,15 +77,33 @@ grouping. Returns a function of the table variables, comparable for equality wit
 Set-op arms recurse on each side (both return `fun tables => relation`), then β-apply the table vars
 to recover each relation body, combine with `union` / `intersection`, etc. and re-bind once.
 -/
-partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQLTypeProxy))) (stx: Syntax) :
+partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQLTypeProxy)))
+    (ctes : List (Name × Expr × List (Name × SQLTypeProxy))) (stx: Syntax) :
     TermElabM (Expr × List (Name × SQLTypeProxy)) :=  do
   let stx ← escapeJoin stx
   let vars := tableVars.map (fun (relVar, _, _) => relVar)
   match stx with
-  | `(sql_query| ( $q:sql_query )) => elabSqlQueryCore tableVars q
+  | `(sql_query| ( $q:sql_query )) => elabSqlQueryCore tableVars ctes q
+  | `(sql_query| WITH $cs:sql_cte,* $body:sql_query) => do
+    -- Non-recursive CTEs: elaborate each body to a relation over the current base vars, re-qualify
+    -- its columns under the CTE name, and make it available for lookup (inlined at each reference).
+    -- Later CTEs may reference earlier ones, so the accumulator grows left-to-right.
+    let mut ctes := ctes
+    for c in cs.getElems do
+      match c with
+      | `(sql_cte| $name:ident AS ( $q:sql_query )) => do
+        let (lamQ, schemaQ) ← elabSqlQueryCore tableVars ctes q
+        let cteExpr := lamQ.beta vars.toArray
+        -- Keep the CTE body's original column names: `expandNames` only rewrites bare refs against
+        -- base-table labels, so retaining those names lets `SELECT … FROM cte WHERE col …` resolve
+        -- `col` the same way it would against the base table. (Positional relation ⇒ names are just
+        -- metadata; the relation Expr is unchanged.)
+        ctes := ctes ++ [(name.getId, cteExpr, schemaQ)]
+      | _ => throwError "malformed CTE (expected `name AS (query)`)"
+    elabSqlQueryCore tableVars ctes body
   | `(sql_query| $l:sql_query $op:sql_setop $r:sql_query) => do
-    let (lamL, schemaL) ← elabSqlQueryCore tableVars l
-    let (lamR, schemaR) ← elabSqlQueryCore tableVars r
+    let (lamL, schemaL) ← elabSqlQueryCore tableVars ctes l
+    let (lamR, schemaR) ← elabSqlQueryCore tableVars ctes r
     unless schemaL.map (·.2) == schemaR.map (·.2) do
       throwError "set operation requires both queries to have the same column types"
     let opName ← match op with
@@ -170,12 +188,16 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
   productPair (dbs: TSyntax `sql_from) : TermElabM (Expr × List (Name × SQLTypeProxy)) := do
     match dbs with
     | `(sql_from| $db:ident) => do
-      let .some (tableExpr, _, columns) :=
-        tableVars.findSome? (fun (e, name, cols) => if name == db.getId then some (e, name, cols) else none)
-        | throwError s!"Unknown table {db.getId}"
-      return (tableExpr, columns)
+      -- CTEs shadow base tables: a `FROM x` referencing a `WITH x AS (…)` inlines the CTE relation.
+      match ctes.findSome? (fun (name, e, cols) => if name == db.getId then some (e, cols) else none) with
+      | some (cteExpr, cteCols) => return (cteExpr, cteCols)
+      | none =>
+        let .some (tableExpr, _, columns) :=
+          tableVars.findSome? (fun (e, name, cols) => if name == db.getId then some (e, name, cols) else none)
+          | throwError s!"Unknown table {db.getId}"
+        return (tableExpr, columns)
     | `(sql_from| ( $sub:sql_query ) AS $_alias:ident) => do
-      let (lamSub, subSchema) ← elabSqlQueryCore tableVars sub
+      let (lamSub, subSchema) ← elabSqlQueryCore tableVars ctes sub
       let vars := tableVars.map (fun (relVar, _, _) => relVar)
       return (lamSub.beta vars.toArray, subSchema)
     | `(sql_from| $f1:sql_from , $f2:sql_from) => do
@@ -217,7 +239,7 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
 def elabSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (stx: Syntax) :
     TermElabM (Expr × List (Name × SQLTypeProxy)) := withTableVars tables fun tableVars => do
   let stx ← escapeJoin stx
-  elabSqlQueryCore tableVars stx
+  elabSqlQueryCore tableVars [] stx
 
 def parseSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (str : String) : TermElabM (Expr × List (Name × SQLTypeProxy)) := do
   let tables := tables.map (fun (tableName, columns) => (tableName, schemaWithFullNames tableName columns))

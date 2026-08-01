@@ -384,6 +384,16 @@ def TypedRelation.mapByList {colType : Fin n → Type} [∀ i, DecidableEq (colT
     (f : TypedTuple colType → TypedTupleOfList types) : TypedRelationOfList types :=
   { labels := fun i => names.getD i.val "", rows := r.rows.image f }
 
+/-- **Projection fusion.** Two stacked `mapByList`s (e.g. `SELECT … FROM (CTE that projects)`)
+collapse to a single projection composing the row maps — `Finset.image_image` on the rows. This is
+what lets `sql_equiv` see through a projecting CTE (ROADMAP 3.3). -/
+@[simp, grind =] theorem TypedRelation.mapByList_mapByList {n : Nat} {colType : Fin n → Type}
+    [∀ i, DecidableEq (colType i)] {types1 types2 : List SQLTypeProxy} (r : TypedRelation colType)
+    (n1 n2 : List String) (f1 : TypedTuple colType → TypedTupleOfList types1)
+    (f2 : TypedTupleOfList types1 → TypedTupleOfList types2) :
+    (r.mapByList n1 f1).mapByList n2 f2 = r.mapByList n2 (fun t => f2 (f1 t)) := by
+  simp only [TypedRelation.mapByList, Finset.image_image]; rfl
+
 /-! ## Per-operator elaborators -/
 
 -- This is the "WHERE" part of a SQL query, which is a function from a TypedRelation to a TypedRelation. This is to be applied to the database, which may be a single schema or built from multiple schemas.
