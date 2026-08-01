@@ -188,6 +188,43 @@ macro_rules
 syntax:90 "CASE" ( "WHEN" term "THEN" term ) + "END" : term
 
 
+/-! ## Scalar functions
+
+Uninterpreted-by-default: each SQL scalar becomes an `opaque` constant from `Operators/Scalar.lean`
+(emitted as a fully-qualified ident so this file stays dependency-free, as with `LIKE`). Identical
+calls cancel by congruence. Adding a scalar = one `opaque` there + one syntax/macro line here.
+`CAST` is intentionally *not* here — it needs a real coercion (ROADMAP 2.4). -/
+syntax:max "ROUND" "(" term ")" : term
+syntax:max "ROUND" "(" term "," term ")" : term
+syntax:max "ABS" "(" term ")" : term
+syntax:max "CEIL" "(" term ")" : term
+syntax:max "FLOOR" "(" term ")" : term
+syntax:max "YEAR" "(" term ")" : term
+syntax:max "MONTH" "(" term ")" : term
+syntax:max "DAY" "(" term ")" : term
+syntax:max "UPPER" "(" term ")" : term
+syntax:max "LOWER" "(" term ")" : term
+syntax:max "TRIM" "(" term ")" : term
+syntax:max "LENGTH" "(" term ")" : term
+
+-- Emit the opaque constants as raw (non-hygienic) idents that resolve at the *use* site — this file
+-- doesn't import `Operators/Scalar.lean`, so a literal quoted name would be hygiene-marked and fail
+-- to resolve (same reason the `LIKE` macro above uses `mkIdent`).
+open Lean in
+macro_rules
+  | `(ROUND($x))     => `($(mkIdent `LeanDatabase.Scalar.round) $x 0)
+  | `(ROUND($x, $n)) => `($(mkIdent `LeanDatabase.Scalar.round) $x $n)
+  | `(ABS($x))       => `($(mkIdent `LeanDatabase.Scalar.abs) $x)
+  | `(CEIL($x))      => `($(mkIdent `LeanDatabase.Scalar.ceil) $x)
+  | `(FLOOR($x))     => `($(mkIdent `LeanDatabase.Scalar.floor) $x)
+  | `(YEAR($x))      => `($(mkIdent `LeanDatabase.Scalar.yearOf) $x)
+  | `(MONTH($x))     => `($(mkIdent `LeanDatabase.Scalar.monthOf) $x)
+  | `(DAY($x))       => `($(mkIdent `LeanDatabase.Scalar.dayOf) $x)
+  | `(UPPER($x))     => `($(mkIdent `LeanDatabase.Scalar.upperOf) $x)
+  | `(LOWER($x))     => `($(mkIdent `LeanDatabase.Scalar.lowerOf) $x)
+  | `(TRIM($x))      => `($(mkIdent `LeanDatabase.Scalar.trimOf) $x)
+  | `(LENGTH($x))    => `($(mkIdent `LeanDatabase.Scalar.lengthOf) $x)
+
 /-!
 ## Aggregates (`SUM`/`COUNT`/`AVG`/`MIN`/`MAX`)
 

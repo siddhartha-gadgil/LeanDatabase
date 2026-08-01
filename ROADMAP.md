@@ -162,11 +162,19 @@ Contrast with `orderBy`: identity **is** sound under set semantics (order unobse
 `ROUND` 22.2%, `CAST`/`::` 33.3%, date fns 17.1%, string fns 13.4%. These almost always appear
 *identically on both sides* of an equivalence, so they cancel and need no axioms.
 
-- [ ] **2.1 `ScalarKind` registry (M).** Copy the `AggKind` pattern from `Parser/Context.lean` —
-      it is the right design and it earned its keep (10 aggregates, one builder). One enum + one
-      `elabScalarE` dispatcher. Do **not** add these one macro at a time.
-- [ ] **2.2 Uninterpreted-by-default (S).** Each scalar fn elaborates to an opaque Lean function.
-      Cancellation is then `rfl`/congruence — no semantics needed.
+- [x] **2.1 Scalar registry (M). ✅ DONE (as a shared file + convention, not an enum dispatcher).**
+      A uniform `AggKind`-style dispatcher turned out **not** to typecheck for scalars: result types
+      differ per function (`YEAR : String → Int`, `ROUND : α → α`, `UPPER : String → String`), so no
+      single signature fits. Instead `Operators/Scalar.lean` holds one `opaque` constant per function
+      with a documented "add a scalar = one opaque + one macro line" convention, and `Parser/Syntax.lean`
+      has the matching syntax/macro table (idents emitted via `mkIdent`, like `LIKE`, since Syntax
+      doesn't import Scalar). Shipped: `ROUND` (1&2-arg), `ABS`/`CEIL`/`FLOOR`, `YEAR`/`MONTH`/`DAY`,
+      `UPPER`/`LOWER`/`TRIM`/`LENGTH`.
+- [x] **2.2 Uninterpreted-by-default (S). ✅ DONE.** Each scalar is an `opaque` constant, so
+      `ROUND(x,n) = x` is **unprovable** (soundness: verified `sql_equiv` *fails* to prove
+      `SELECT ROUND(v,2) = SELECT v`) while identical calls cancel by congruence — verified
+      `ROUND(v,2)` cancels over a commuted `WHERE`, `YEAR(d)=2023` elaborates as an `Int` predicate,
+      and `ROUND(SUM(v),3)` composes with the aggregate-lifting path in `GROUP BY`.
 - [ ] **2.3 Targeted axioms only where variants differ (M).** `ABS(a-b) = ABS(b-a)`; `ROUND`
       idempotence. **Do not** axiomatize `ROUND(x,12) = ROUND(x,2)` or `SUBSTR ≡ RIGHT` — those are
       data-dependent and belong to Phase 8.
