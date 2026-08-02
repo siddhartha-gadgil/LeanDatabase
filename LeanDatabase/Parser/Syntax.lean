@@ -56,6 +56,15 @@ syntax "(" sql_query ")" "AS" ident : sql_from       -- 2. Subquery with mandato
 syntax sql_from "JOIN" ident "ON" term : sql_from     -- 3. Explicit Inner Join
 syntax sql_from "CROSS" "JOIN" ident : sql_from       -- 4. Cross Join
 syntax sql_from "," sql_from : sql_from              -- 5. Comma-separated (Cartesian Product)
+-- 6. Outer joins — elaborated directly to `leftOuterJoin`/`rightOuterJoin`/`fullOuterJoin`
+-- (`Parser/Query.lean`); the right (resp. left / both) columns become nullable `Option` in the
+-- output schema. `OUTER` is optional (SQL synonym), so each has a with/without form.
+syntax sql_from "LEFT" "JOIN" ident "ON" term : sql_from
+syntax sql_from "LEFT" "OUTER" "JOIN" ident "ON" term : sql_from
+syntax sql_from "RIGHT" "JOIN" ident "ON" term : sql_from
+syntax sql_from "RIGHT" "OUTER" "JOIN" ident "ON" term : sql_from
+syntax sql_from "FULL" "JOIN" ident "ON" term : sql_from
+syntax sql_from "FULL" "OUTER" "JOIN" ident "ON" term : sql_from
 
 syntax "SELECT " (" DISTINCT ")? sql_cols " FROM " sql_from (" WHERE " term)?  (" GROUP " " BY " ident,* (" HAVING " term)?)? (" ORDER " " BY " sql_order_item,*)? (" LIMIT " num)? (";")? : sql_query
 

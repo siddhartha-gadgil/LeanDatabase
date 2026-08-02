@@ -99,6 +99,19 @@ form every parsed query targets. -/
 def colTypeOfList (l: List SQLTypeProxy) : Fin l.length → Type :=
   fun i => (l.get i).type
 
+/-- Every column type is `Inhabited` — needed by the outer-join operators (`leftOuterJoin` uses a
+default to build the `NULL`-padded rows). `Option _` is inhabited by `none`. -/
+instance instInhabitedProxyType : (t : SQLTypeProxy) → Inhabited t.type
+  | .int => inferInstance
+  | .bool => inferInstance
+  | .float => inferInstance
+  | .string => inferInstance
+  | .timestamp => inferInstance
+  | .nullable _ => inferInstance
+
+instance sqlTypeInhabited (l : List SQLTypeProxy) : (i : Fin l.length) → Inhabited (colTypeOfList l i) :=
+  fun i => instInhabitedProxyType (l.get i)
+
 instance sqlTypeDecEq (l: List SQLTypeProxy) : (i : Fin l.length) → DecidableEq (colTypeOfList l i) := by
   match l with
   | [] =>

@@ -206,7 +206,29 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       let (e1, s1) ← productPair f1
       let (e2, s2) ← productPair f2
       return (← mkAppM ``TypedRelationOfList.append #[e1, e2], s1 ++ s2)
+    | `(sql_from| $f1:sql_from LEFT JOIN $t:ident ON $cond:term)
+    | `(sql_from| $f1:sql_from LEFT OUTER JOIN $t:ident ON $cond:term) =>
+      outerJoin f1 t cond ``leftOuterJoin false true
+    | `(sql_from| $f1:sql_from RIGHT JOIN $t:ident ON $cond:term)
+    | `(sql_from| $f1:sql_from RIGHT OUTER JOIN $t:ident ON $cond:term) =>
+      outerJoin f1 t cond ``rightOuterJoin true false
+    | `(sql_from| $f1:sql_from FULL JOIN $t:ident ON $cond:term)
+    | `(sql_from| $f1:sql_from FULL OUTER JOIN $t:ident ON $cond:term) =>
+      outerJoin f1 t cond ``fullOuterJoin true true
     | _ => throwError "Unsupported FROM clause: {← PrettyPrinter.ppCategory `sql_from dbs}"
+  -- `A LEFT/RIGHT/FULL OUTER JOIN t ON cond` → the corresponding operator. The `ON` condition is a
+  -- two-tuple predicate (left tuple, right tuple), exactly like the semi/anti-join correlations.
+  -- The output schema wraps the null-padded side's columns in `.nullable` (their values become
+  -- `Option`), matching the operator's `Fin.append … (fun i => Option _)` result type.
+  outerJoin (f1 : TSyntax `sql_from) (t : TSyntax `ident) (cond : Term)
+      (opName : Name) (nullLeft nullRight : Bool) : TermElabM (Expr × List (Name × SQLTypeProxy)) := do
+    let (e1, s1) ← productPair f1
+    let (e2, s2) ← productPair (← `(sql_from| $t:ident))
+    let condExpr ← elabTypedTupleFilter [(.anonymous, s1), (t.getId, s2)] cond
+    let joinExpr ← mkAppM opName #[e1, e2, condExpr]
+    let nul : List (Name × SQLTypeProxy) → List (Name × SQLTypeProxy) :=
+      List.map (fun (n, ty) => (n, .nullable ty))
+    return (joinExpr, (if nullLeft then nul s1 else s1) ++ (if nullRight then nul s2 else s2))
   -- Apply a `WHERE` clause to `rel`. `[NOT] EXISTS (subquery)` and `x [NOT] IN (subquery)` become a
   -- `semijoin`/`antijoin`; anything else is an ordinary `restriction` by a tuple predicate.
   elabWhere (rel : Expr) (schema : List (Name × SQLTypeProxy)) (filter : Term) : TermElabM Expr := do

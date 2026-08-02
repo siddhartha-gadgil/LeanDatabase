@@ -258,13 +258,22 @@ fails to typecheck. Full 3VL (4.2) and NULL-aware aggregates (4.5) remain delibe
 
 `LEFT JOIN` 14.9%; `RIGHT`/`FULL` only 1.4%.
 
-- [x] **5.1 `LEFT`/`RIGHT`/`FULL OUTER JOIN` operators (L). ✅ DONE (operator + algebra); grammar
-      pending.** `leftOuterJoin`/`rightOuterJoin`/`fullOuterJoin` (`Operators/Join.lean`) null-pad the
-      unmatched side over the nullable layer (`liftNullable`/`nullRow`, right columns become
-      `Option`), built on the same `Fin.append` machinery as the inner join — RIGHT = LEFT swapped,
-      FULL = the union. Verified with the real operator in **Example 26**. Remaining sub-piece: **SQL
-      grammar** so `LEFT JOIN … ON …` can be written in `sql%` (needs nullable-schema propagation
-      through `productPair` and the two-tuple `ON` condition) — the operator is ready for it.
+- [x] **5.1 `LEFT`/`RIGHT`/`FULL OUTER JOIN` — operator + grammar (L). ✅ DONE for whole-relation;
+      projection/`WHERE`-over-join pending a schema reconciliation.** Operators
+      `leftOuterJoin`/`rightOuterJoin`/`fullOuterJoin` (`Operators/Join.lean`) null-pad the unmatched
+      side (`liftNullable`/`nullRow`, that side's columns become `Option`), built on the same
+      `Fin.append` machinery as the inner join. **Grammar**: `sql_from` gains
+      `LEFT|RIGHT|FULL [OUTER] JOIN t ON cond` (6 productions, `Parser/Syntax.lean`); `productPair`
+      elaborates each to the operator with a two-tuple `ON` predicate (reusing `elabTypedTupleFilter`,
+      like the semi/anti-join correlations) and a nullable output schema (`Inhabited` instances added
+      in `Parser/Types.lean` for the null pad). Verified in **Example 27**: LEFT/RIGHT/FULL parse,
+      `OUTER` synonym, qualified/unqualified `ON`, and an `ON`-commute rewrite proved by `sql_equiv`.
+      **Remaining:** column-projection and `WHERE` *over* an outer-join result. The operator returns a
+      `Fin.append (colTypeOfList l1) (fun i => Option (colTypeOfList l2 i))` schema, but the parser's
+      projection/`WHERE` layer works over the canonical `colTypeOfList (l1 ++ l2.map .nullable)`. These
+      families are only *propositionally* equal (heterogeneous domains via `List.length_map`), so a
+      list-native reconciliation is needed — the analogue of `TypedRelationOfList.append`, which is
+      how the inner join avoids the same friction. This is the next codegen step.
 - [x] **5.2 The anti-join pushdown (M). ✅ DONE (the `IS NULL` case).**
       `leftOuterJoin_filter_isNull_eq_antijoin_pad`: `A LEFT JOIN B ON cond` keeping only rows where a right
       column `IS NULL` = the null-padded **anti-join** of the unmatched `A` rows — the
