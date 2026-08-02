@@ -94,10 +94,10 @@ Contrast with `orderBy`: identity **is** sound under set semantics (order unobse
       `| refine limit_congr ?_` as the first alternative in `sql_equiv`. `Example18` fixed (both
       sides carry `LIMIT 10`; now a true theorem). `limit k t = t` is no longer provable. `orderBy`
       left as sound identity.
-- [ ] **0.2 Name the claim honestly (S).** The elaborator proves *set-equivalence*. Reflect it:
-      `SetSemantics.query_equivalence`, or a doc-comment convention on each example, so `sql%(…) =
-      sql%(…)` is never misread as bag/ordered SQL equality. This is also where 0.A is discharged —
-      the `UNION ALL` note lives here.
+- [x] **0.2 Name the claim honestly (S). ✅ DONE.** A module doc-block on `sql_equiv` in
+      `SQLEquiv.lean` spells out that it proves **set-equivalence** ("same result set for every input
+      table"), not bag/ordered SQL: `ORDER BY` erased, `UNION ALL` = set `union` (with the 0.A note
+      discharged here), `LIMIT` opaque. The README "What it does" section mirrors it for readers.
 - [ ] **0.3 Distinct-rows discipline (M).** The blanket "base tables have distinct rows" assumption
       makes set = bag *at the leaves* (so `SUM`/`COUNT` over a base table are honest). Make it
       real, not just prose: an optional `PRIMARY KEY` on `CREATE TABLE` emitting
@@ -245,8 +245,12 @@ fails to typecheck. Full 3VL (4.2) and NULL-aware aggregates (4.5) remain delibe
       non-null count). Pairs with 4.2; not in the 2-valued slice.
 - [ ] **4.6 The `NULL` equality quirk (M).** `GROUP BY`/`DISTINCT` treat nulls as equal, `WHERE` as
       unknown. Encode explicitly. Deferred with 4.2/4.5.
-- [ ] **4.7 `CASE` without `ELSE` → `ELSE NULL` (S).** Would retire the Phase 1.3 debt (the general
-      scalar position), but needs a bare NULL literal, which the slice deliberately omits. Deferred.
+- [x] **4.7 `CASE … ELSE NULL END` (S). ✅ DONE (sound slice).** Dedicated syntax with `NULL` bound
+      *inside* the `CASE` (never a standalone term, so `col = NULL` stays unwriteable): the scalar
+      form yields an `Option` column (`some v` / `none`), and `COUNT(CASE … ELSE NULL END)` is
+      intercepted like the no-`ELSE` form → indicator sum (COUNT skips the NULLs). Verified
+      `COUNT(… ELSE NULL) = COUNT(… no-ELSE)` and a nullable scalar projection through `IS NULL`. The
+      general 3VL semantics of an unrestricted `CASE`/NULL still awaits 4.2.
 
 ---
 

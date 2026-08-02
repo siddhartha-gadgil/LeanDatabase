@@ -10,6 +10,22 @@ open LeanDatabase LeanDatabase.TypedAgg
 /-!
 This file is meant to be imported by the examples, to give them access to the `sql_equiv` tactic.
 This file would contain all dependencies imported, to give all theorems and definitions for `simp` and `grind` to work in `sql_equiv`.
+
+## What `sql_equiv` proves — read this before trusting a green checkmark (ROADMAP 0.2)
+
+`sql_equiv` proves **set-equivalence**: the two queries denote the *same result set*, over a
+`TypedRelation` whose `rows` is a `Finset` and whose base tables are assumed to have distinct rows.
+A proved `sql%(…) = sql%(…)` is therefore **not** a claim about bag (multiset) or ordered SQL:
+
+* `ORDER BY` is the identity (row order is unobservable on a `Finset`) — so an `ORDER BY`
+  difference is *erased*, never proved as an ordered-result equality.
+* `UNION ALL` maps to set `union`; `SELECT a FROM t UNION ALL SELECT a FROM t = SELECT a FROM t`
+  is **correct as sets** (the result *set* of a bag-union is its set-union) but would be false under
+  bag semantics. This is by design, not a bug.
+* `LIMIT k` is `opaque` — provably equal only to itself, never to the unlimited query — because
+  "which k rows" needs an order a `Finset` does not have.
+
+So the equality symbol here means "same set of rows for every possible input table", nothing more.
 -/
 
 namespace LeanDatabase.SQLEquiv

@@ -23,4 +23,13 @@ theorem query_equivalence :
       = sql%([table_schema]) "SELECT * FROM table LIMIT 10" := by
   sql_equiv
 
+/-- The `LIKE`/`LIMIT` features, now with the **new** scalar `ROUND` (Phase 2) in the SELECT list.
+`ROUND(age,0)` is opaque so it cancels by congruence; the `LIKE '%'` keeps every row and the shared
+`LIMIT 10` is preserved by congruence — old and new together. (The `ORDER BY` is dropped here because
+it may only reference projected output columns, and this query projects `ROUND(age,0)`, not `age`.) -/
+theorem query_equivalence_scalar :
+    sql%([table_schema]) "SELECT ROUND(age, 0) AS a FROM table WHERE name LIKE \"%\" LIMIT 10"
+      = sql%([table_schema]) "SELECT ROUND(age, 0) AS a FROM table LIMIT 10" := by
+  sql_equiv
+
 end Example18

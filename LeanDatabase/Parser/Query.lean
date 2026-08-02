@@ -58,10 +58,12 @@ partial def liftAggExprs (stx : Syntax) :
     | `(MIN($e:term))   => record .min e
     | `(MAX($e:term))   => record .max e
     | `(AVG($e:term))   => record .avg e
-    | `(COUNT(CASE $[WHEN $cs THEN $_vs]* END)) => do
-        -- `COUNT(CASE WHEN p THEN _ END)` counts the rows where some `p` holds — the missing `ELSE`
-        -- yields NULL, which `COUNT` skips. That is exactly `SUM(CASE WHEN p THEN 1 … ELSE 0 END)`,
-        -- the indicator sum that `groupSum_case_eq_groupSum_where` folds into `COUNT(*) WHERE p`.
+    | `(COUNT(CASE $[WHEN $cs THEN $_vs]* END))
+    | `(COUNT(CASE $[WHEN $cs THEN $_vs]* ELSE NULL END)) => do
+        -- `COUNT(CASE WHEN p THEN _ [ELSE NULL] END)` counts the rows where some `p` holds — a
+        -- non-matching row is NULL, which `COUNT` skips. That is exactly
+        -- `SUM(CASE WHEN p THEN 1 … ELSE 0 END)`, the indicator sum that
+        -- `groupSum_case_eq_groupSum_where` folds into `COUNT(*) WHERE p`.
         let ones ← cs.mapM fun _ => `(term| (1 : Int))
         let e ← `(CASE $[WHEN $cs THEN $ones]* ELSE (0 : Int) END)
         record .sum e

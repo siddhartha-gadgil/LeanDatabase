@@ -207,6 +207,17 @@ macro_rules
         acc ← `(if ($c : Bool) then $v else $acc)
       return acc
 
+-- `CASE WHEN … THEN … END` with an explicit `ELSE NULL` — the result is `Option`-typed
+-- (`some v` on a match, `none` otherwise). `NULL` appears *only* bound here, never as a standalone
+-- term, so `col = NULL` still cannot be written (the 3VL trap stays unwriteable). ROADMAP 4.7.
+syntax:90 "CASE" ( "WHEN" term "THEN" term ) + "ELSE" "NULL" "END" : term
+macro_rules
+  | `(CASE $[WHEN $cs THEN $vs]* ELSE NULL END) => do
+      let mut acc : Term ← `(none)
+      for (c, v) in (cs.zip vs).reverse do
+        acc ← `(if ($c : Bool) then some $v else $acc)
+      return acc
+
 -- `CASE WHEN … THEN … END` *without* `ELSE`. Its full semantics is `ELSE NULL`, which needs the
 -- Phase-4 NULL layer we don't have yet — so there is deliberately **no** general term macro, and it
 -- errors in an ordinary scalar position rather than silently defaulting the missing branch to `0`

@@ -20,15 +20,27 @@ SELECT * FROM (
 -- query_SinglePass: test both conditions in one pass
 SELECT * FROM r WHERE is_high_value AND is_active;
 ```
+
+The **new** `WITH` (CTE) form (Phase 3) expresses the same first pass as a named binding rather than
+an inline derived table — and proves equal to the same single-pass query. Old (derived table) and
+new (CTE) sit side by side below.
 -/
 
 namespace Example2
 
 CREATE TABLE table (is_active BOOL, is_high_value BOOL)
 
+/-- Original form: the first pass as an inline derived table `(…) AS r`. -/
 theorem query_equivalence :
     sql%([table_schema])
         "SELECT * FROM (SELECT * FROM table WHERE is_active) AS r WHERE is_high_value"
+      = sql%([table_schema]) "SELECT * FROM table WHERE is_high_value AND is_active" := by
+  sql_equiv
+
+/-- Same rewrite, first pass written as a CTE (`WITH r AS (…)`). -/
+theorem query_equivalence_cte :
+    sql%([table_schema])
+        "WITH r AS (SELECT * FROM table WHERE is_active) SELECT * FROM r WHERE is_high_value"
       = sql%([table_schema]) "SELECT * FROM table WHERE is_high_value AND is_active" := by
   sql_equiv
 
