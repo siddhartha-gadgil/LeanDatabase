@@ -37,6 +37,7 @@ theorem no_nulls_after_lift (R : TypedRelation rCT) :
 /-- **LEFT OUTER JOIN** with an empty right table: all left rows survive, `NULL`-padded. -/
 theorem leftJoin_empty_right (R : TypedRelation rCT) (l2 : Fin 1 → String) :
     (leftOuterJoin R (emptyRel l2) cond).rows = (crossProductRel R (nullRow sCT l2)).rows := by
+  simp only [leftOuterJoin]  -- `leftOuterJoin` is no longer `@[simp]`; unfold it explicitly here
   sql_equiv
 
 end Example19

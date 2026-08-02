@@ -266,7 +266,7 @@ fails to typecheck. Full 3VL (4.2) and NULL-aware aggregates (4.5) remain delibe
       grammar** so `LEFT JOIN … ON …` can be written in `sql%` (needs nullable-schema propagation
       through `productPair` and the two-tuple `ON` condition) — the operator is ready for it.
 - [x] **5.2 The anti-join pushdown (M). ✅ DONE (the `IS NULL` case).**
-      `leftOuterJoin_isNull_eq_antijoin_pad`: `A LEFT JOIN B ON cond` keeping only rows where a right
+      `leftOuterJoin_filter_isNull_eq_antijoin_pad`: `A LEFT JOIN B ON cond` keeping only rows where a right
       column `IS NULL` = the null-padded **anti-join** of the unmatched `A` rows — the
       `LEFT JOIN … WHERE b.key IS NULL` ≡ `NOT EXISTS` rewrite, proved and demonstrated (Example 26).
       The complementary `WHERE right IS NOT NULL ≡ INNER JOIN` direction is the remaining half.

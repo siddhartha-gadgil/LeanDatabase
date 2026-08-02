@@ -43,10 +43,21 @@ Idea is to use JUST this tactic to prove equivalences between SQL queries.
 Possible future work: extend this tactic to also be able to disprove using `plausible` (counterexample search).
 -/
 
+-- Outer-join reduction: `A LEFT JOIN B WHERE right IS NULL` ≡ the null-padded anti-join. The broad
+-- `sql_simp` rewrites `Option.isNone` away from the pushdown lemma's LHS, so it can't fire there;
+-- this branch unfolds *only* `restriction`/`isNull` and lets the tagged lemma reduce the join. It is
+-- guarded by `done` so it backtracks (restoring the goal) whenever it does not fully close — hence
+-- harmless to every non-outer-join proof.
+macro "sql_outer_join" : tactic => `(tactic|
+  (apply TypedRelation.ext (by rfl)
+   simp only [restriction, isNull, leftOuterJoin_filter_isNull_eq_antijoin_pad]
+   done))
+
 macro "sql_equiv" : tactic => `(tactic|
   (
    repeat (first
      | refine limit_congr ?_
+     | sql_outer_join
      | (apply TypedRelation.ext <;> try rfl)
      | refine Finset.filter_congr (fun _ _ => ?_)
      | refine Finset.image_congr (fun _ _ => ?_)

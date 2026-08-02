@@ -8,7 +8,7 @@ Where Example 9 modelled the anti-join idiom with a hand-written `restriction`, 
 actual **`leftOuterJoin`** operator (Phase 5) — the one whose output null-pads the right columns
 (`Option`) — and shows that keeping only the rows where a right column `IS NULL` recovers exactly the
 null-padded **anti-join** (the unmatched left rows). This is the `LEFT JOIN … WHERE b.key IS NULL`
-≡ `NOT EXISTS` rewrite, discharged by the `@[simp]` lemma `leftOuterJoin_isNull_eq_antijoin_pad`.
+≡ `NOT EXISTS` rewrite, discharged by the `@[simp]` lemma `leftOuterJoin_filter_isNull_eq_antijoin_pad`.
 
 ```sql
 SELECT * FROM customers c
@@ -35,6 +35,6 @@ theorem left_join_null_eq_antijoin
     (customers : TypedRelation custCT) (orders : TypedRelation ordCT) :
     restriction (isNull (fun t => (splitTuple t).2 0)) (leftOuterJoin customers orders matchCond)
       = crossProductRel (antijoin customers orders matchCond) (nullRow ordCT orders.labels) := by
-  rw [leftOuterJoin_isNull_eq_antijoin_pad]
+  sql_equiv
 
 end Example26

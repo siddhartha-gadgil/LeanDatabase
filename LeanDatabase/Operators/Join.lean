@@ -288,7 +288,7 @@ variable [∀ i, Inhabited (colType1 i)] [∀ i, Inhabited (colType2 i)]
 
 /-- `R ⟕ S` (`LEFT OUTER JOIN`): inner-join matches, plus every unmatched `R` row padded with
 `NULL`s on the `S` columns. Output schema `R ++ Option S`. -/
-@[simp] def leftOuterJoin (r1 : TypedRelation colType1) (r2 : TypedRelation colType2)
+def leftOuterJoin (r1 : TypedRelation colType1) (r2 : TypedRelation colType2)
     (cond : TypedTuple colType1 → TypedTuple colType2 → Bool) :
     TypedRelation (Fin.append colType1 (fun i => Option (colType2 i))) :=
   union
@@ -298,7 +298,7 @@ variable [∀ i, Inhabited (colType1 i)] [∀ i, Inhabited (colType2 i)]
 
 /-- `R ⟖ S` (`RIGHT OUTER JOIN`): the mirror image — unmatched `S` rows padded with `NULL`s on the
 `R` columns. Output schema `Option R ++ S`. -/
-@[simp] def rightOuterJoin (r1 : TypedRelation colType1) (r2 : TypedRelation colType2)
+def rightOuterJoin (r1 : TypedRelation colType1) (r2 : TypedRelation colType2)
     (cond : TypedTuple colType1 → TypedTuple colType2 → Bool) :
     TypedRelation (Fin.append (fun i => Option (colType1 i)) colType2) :=
   union
@@ -308,7 +308,7 @@ variable [∀ i, Inhabited (colType1 i)] [∀ i, Inhabited (colType2 i)]
 
 /-- `R ⟗ S` (`FULL OUTER JOIN`): matches with both sides present, plus the unmatched rows of each
 side padded with `NULL`s on the other. Output schema `Option R ++ Option S`. -/
-@[simp] def fullOuterJoin (r1 : TypedRelation colType1) (r2 : TypedRelation colType2)
+def fullOuterJoin (r1 : TypedRelation colType1) (r2 : TypedRelation colType2)
     (cond : TypedTuple colType1 → TypedTuple colType2 → Bool):
     TypedRelation (Fin.append (fun i => Option (colType1 i)) (fun i => Option (colType2 i))) :=
   union
@@ -349,13 +349,15 @@ variable [∀ i, Inhabited (colType1 i)] [∀ i, Inhabited (colType2 i)]
 right column `i` `IS NULL` is exactly the null-padded **anti-join**: the matched rows all carry
 `some` in the right columns (so `IS NULL` drops them), leaving only the unmatched `A` rows padded
 with `NULL`s. This is the `LEFT JOIN … WHERE b.key IS NULL` ≡ `NOT EXISTS` rewrite (ROADMAP 5.2).
-Applied by `rw` (not `@[simp]`: the `@[simp]` on `leftOuterJoin`/`isNull` would otherwise unfold the
-LHS before this lemma could match). -/
-theorem leftOuterJoin_isNull_eq_antijoin_pad
+
+Stated at the **`Finset.filter` (rows) level** — that is exactly the shape `sql_equiv` reduces the
+relation-level goal to after `TypedRelation.ext` unfolds `restriction`/`isNull`. `leftOuterJoin` is
+left un-`simp` so `(leftOuterJoin …).rows` survives for this `@[simp]` lemma to fire on. -/
+@[simp] theorem leftOuterJoin_filter_isNull_eq_antijoin_pad
     (r1 : TypedRelation colType1) (r2 : TypedRelation colType2)
     (cond : TypedTuple colType1 → TypedTuple colType2 → Bool) (i : Fin m) :
-    restriction (isNull (fun t => (splitTuple t).2 i)) (leftOuterJoin r1 r2 cond)
-      = crossProductRel (antijoin r1 r2 cond) (nullRow colType2 r2.labels) := by
+    Finset.filter (fun t => ((splitTuple t).2 i).isNone) (leftOuterJoin r1 r2 cond).rows
+      = (crossProductRel (antijoin r1 r2 cond) (nullRow colType2 r2.labels)).rows := by
   have hmatched : ∀ t ∈ (crossProductRel r1 (liftNullable r2)).rows,
       ((splitTuple t).2 i).isNone = false := by
     intro t ht
@@ -371,9 +373,7 @@ theorem leftOuterJoin_isNull_eq_antijoin_pad
     have h2 := ht.2
     simp only [nullRow, Finset.mem_singleton] at h2
     rw [h2]; rfl
-  simp only [leftOuterJoin]
-  apply TypedRelation.ext (by rfl)
-  simp only [restriction, union, join, isNull]
+  simp only [leftOuterJoin, union, join]
   apply Finset.ext
   intro t
   simp only [Finset.mem_filter, Finset.mem_union]
