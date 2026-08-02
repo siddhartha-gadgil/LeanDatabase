@@ -258,13 +258,22 @@ fails to typecheck. Full 3VL (4.2) and NULL-aware aggregates (4.5) remain delibe
 
 `LEFT JOIN` 14.9%; `RIGHT`/`FULL` only 1.4%.
 
-- [ ] **5.1 `LEFT JOIN` (L).** Null-pad unmatched left rows. Requires 4.1. Do left first; `RIGHT` is
-      `LEFT` with arguments swapped, `FULL` is the union of both.
-- [ ] **5.2 The pushdown lemma (M).** `LEFT JOIN` + `WHERE` on a right-hand column ≡ `INNER JOIN`.
-      This is *the* rewrite optimizers make and the one the corpus will test.
-- [ ] **5.3 Join commutativity/associativity (M).** Already a known gap (`sf_bq060`, expected FAIL in
-      the current plan). Needs the `Fin.append` index-swap lemma. Unblocks inner-join reordering,
-      which the corpus exercises constantly.
+- [x] **5.1 `LEFT`/`RIGHT`/`FULL OUTER JOIN` operators (L). ✅ DONE (operator + algebra); grammar
+      pending.** `leftOuterJoin`/`rightOuterJoin`/`fullOuterJoin` (`Operators/Join.lean`) null-pad the
+      unmatched side over the nullable layer (`liftNullable`/`nullRow`, right columns become
+      `Option`), built on the same `Fin.append` machinery as the inner join — RIGHT = LEFT swapped,
+      FULL = the union. Verified with the real operator in **Example 26**. Remaining sub-piece: **SQL
+      grammar** so `LEFT JOIN … ON …` can be written in `sql%` (needs nullable-schema propagation
+      through `productPair` and the two-tuple `ON` condition) — the operator is ready for it.
+- [x] **5.2 The anti-join pushdown (M). ✅ DONE (the `IS NULL` case).**
+      `leftOuterJoin_isNull_eq_antijoin_pad`: `A LEFT JOIN B ON cond` keeping only rows where a right
+      column `IS NULL` = the null-padded **anti-join** of the unmatched `A` rows — the
+      `LEFT JOIN … WHERE b.key IS NULL` ≡ `NOT EXISTS` rewrite, proved and demonstrated (Example 26).
+      The complementary `WHERE right IS NOT NULL ≡ INNER JOIN` direction is the remaining half.
+- [ ] **5.3 Join commutativity/associativity (M). Mostly present; wiring pending.** `swapAppend`,
+      `join_comm`, `join_comm_image`, `crossProduct_comm` are all **proved** in
+      `Operators/{Join,CrossProduct}.lean`. What remains is reaching them from `sql_equiv`
+      automatically (so `sf_bq060`-style inner-join reordering closes without a manual `rw`).
 
 ---
 
