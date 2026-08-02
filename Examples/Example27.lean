@@ -11,9 +11,10 @@ side's columns become nullable (`Option`) in the output schema. `OUTER` is an ac
 the `ON` condition is a two-tuple predicate over the left and right rows (so unqualified column names
 resolve against the right schema just as they do in `WHERE EXISTS` correlations).
 
-Note on scope: whole-relation (`SELECT *`) outer joins parse and elaborate; column-projection and
-`WHERE` *over* an outer-join result need a `Fin.append`→`colTypeOfList` schema reconciliation (the
-inner join gets this for free via `TypedRelationOfList.append`) — that is the next codegen step.
+The operator result (a `Fin.append`-shaped schema) is reconciled back to the canonical
+`colTypeOfList` list form by `ofOuterLeft`/`ofOuterRight`/`ofOuterFull` (`Parser/Query.lean`), so
+`WHERE` and column-projection *over* an outer-join result elaborate too — the null-padded side's
+columns are nullable (`Option`), reachable via `IS NULL`/`COALESCE`.
 -/
 
 namespace Example27
@@ -44,6 +45,23 @@ theorem full_outer_synonym :
 theorem on_condition_commutes :
     sql%([customers_schema, orders_schema]) "SELECT * FROM customers LEFT JOIN orders ON id = cust_id"
       = sql%([customers_schema, orders_schema]) "SELECT * FROM customers LEFT JOIN orders ON cust_id = id" := by
+  sql_equiv
+
+/-- `WHERE` *over* a LEFT JOIN result: the (now nullable) right column is reachable via `IS NULL`,
+and the `WHERE` conjuncts commute — so projection/`WHERE` over an outer join really elaborate. -/
+theorem where_over_left_join_commutes :
+    sql%([customers_schema, orders_schema])
+        "SELECT * FROM customers LEFT JOIN orders ON id = cust_id WHERE amount IS NULL AND id > 3"
+      = sql%([customers_schema, orders_schema])
+        "SELECT * FROM customers LEFT JOIN orders ON id = cust_id WHERE id > 3 AND amount IS NULL" := by
+  sql_equiv
+
+/-- `COALESCE` over a nullable right column, projected out of a LEFT JOIN. -/
+theorem coalesce_over_left_join :
+    sql%([customers_schema, orders_schema])
+        "SELECT COALESCE(amount, 0) AS amt FROM customers LEFT JOIN orders ON id = cust_id WHERE id > 1 AND id < 9"
+      = sql%([customers_schema, orders_schema])
+        "SELECT COALESCE(amount, 0) AS amt FROM customers LEFT JOIN orders ON id = cust_id WHERE id < 9 AND id > 1" := by
   sql_equiv
 
 end Example27

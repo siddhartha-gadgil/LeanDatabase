@@ -16,6 +16,46 @@ open Lean Meta Elab Term
 
 namespace LeanDatabase
 
+/-! ## Outer-join schema reconciliation
+
+The `leftOuterJoin`/`rightOuterJoin`/`fullOuterJoin` operators return a `Fin.append`-shaped schema
+whose null-padded side is `fun i => Option (colTypeOfList l i)`, but the rest of the parser (`WHERE`,
+projection) works over the canonical `TypedRelationOfList` / `colTypeOfList (l.map .nullable)` form.
+These reindexers convert the operator result back to the canonical list form by rebuilding each row
+with `TypedTupleOfList.append` + `splitTuple` (the inner join gets this for free via
+`TypedRelationOfList.append`). `ofOption` turns the `Option`-family right/left part into the
+`.nullable`-list form; recursion on the list avoids `Fin.cast` gymnastics. -/
+
+def ofOption : {l : List SQLTypeProxy} →
+    ((i : Fin l.length) → Option (colTypeOfList l i)) → TypedTupleOfList (l.map .nullable)
+  | [], _ => TypedTupleOfList.nil
+  | t :: rest, u =>
+      TypedTupleOfList.cons (.nullable t) (u ⟨0, by simp⟩)
+        (ofOption (l := rest) (fun ⟨i, hi⟩ => u ⟨i+1, by simp only [List.length_cons]; omega⟩))
+
+variable {lA lB : List SQLTypeProxy}
+
+/-- `LEFT JOIN` result → `lA ++ lB.map .nullable`. -/
+def ofOuterLeft
+    (r : TypedRelation (Fin.append (colTypeOfList lA) (fun i => Option (colTypeOfList lB i)))) :
+    TypedRelationOfList (lA ++ lB.map .nullable) :=
+  { labels := fun j => r.labels (Fin.cast (by simp) j),
+    rows := r.rows.image (fun t => TypedTupleOfList.append (splitTuple t).1 (ofOption (splitTuple t).2)) }
+
+/-- `RIGHT JOIN` result → `lA.map .nullable ++ lB`. -/
+def ofOuterRight
+    (r : TypedRelation (Fin.append (fun i => Option (colTypeOfList lA i)) (colTypeOfList lB))) :
+    TypedRelationOfList (lA.map .nullable ++ lB) :=
+  { labels := fun j => r.labels (Fin.cast (by simp) j),
+    rows := r.rows.image (fun t => TypedTupleOfList.append (ofOption (splitTuple t).1) (splitTuple t).2) }
+
+/-- `FULL JOIN` result → `lA.map .nullable ++ lB.map .nullable`. -/
+def ofOuterFull
+    (r : TypedRelation (Fin.append (fun i => Option (colTypeOfList lA i)) (fun i => Option (colTypeOfList lB i)))) :
+    TypedRelationOfList (lA.map .nullable ++ lB.map .nullable) :=
+  { labels := fun j => r.labels (Fin.cast (by simp) j),
+    rows := r.rows.image (fun t => TypedTupleOfList.append (ofOption (splitTuple t).1) (ofOption (splitTuple t).2)) }
+
 def parseTypedTupleFilter  (schemaStr : List (String × String)) (str : String) : TermElabM Expr := do
   let .ok stx := Parser.runParserCategory (← getEnv) `term str | throwError "Failed to parse filter expression: {str}"
   let schema := schemaStr.map (fun (name, colType) => (name.toName, sqlProxy colType))
@@ -208,27 +248,30 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       return (← mkAppM ``TypedRelationOfList.append #[e1, e2], s1 ++ s2)
     | `(sql_from| $f1:sql_from LEFT JOIN $t:ident ON $cond:term)
     | `(sql_from| $f1:sql_from LEFT OUTER JOIN $t:ident ON $cond:term) =>
-      outerJoin f1 t cond ``leftOuterJoin false true
+      outerJoin f1 t cond ``leftOuterJoin ``ofOuterLeft false true
     | `(sql_from| $f1:sql_from RIGHT JOIN $t:ident ON $cond:term)
     | `(sql_from| $f1:sql_from RIGHT OUTER JOIN $t:ident ON $cond:term) =>
-      outerJoin f1 t cond ``rightOuterJoin true false
+      outerJoin f1 t cond ``rightOuterJoin ``ofOuterRight true false
     | `(sql_from| $f1:sql_from FULL JOIN $t:ident ON $cond:term)
     | `(sql_from| $f1:sql_from FULL OUTER JOIN $t:ident ON $cond:term) =>
-      outerJoin f1 t cond ``fullOuterJoin true true
+      outerJoin f1 t cond ``fullOuterJoin ``ofOuterFull true true
     | _ => throwError "Unsupported FROM clause: {← PrettyPrinter.ppCategory `sql_from dbs}"
-  -- `A LEFT/RIGHT/FULL OUTER JOIN t ON cond` → the corresponding operator. The `ON` condition is a
-  -- two-tuple predicate (left tuple, right tuple), exactly like the semi/anti-join correlations.
-  -- The output schema wraps the null-padded side's columns in `.nullable` (their values become
-  -- `Option`), matching the operator's `Fin.append … (fun i => Option _)` result type.
+  -- `A LEFT/RIGHT/FULL OUTER JOIN t ON cond` → the corresponding operator, then reconciled back to
+  -- the canonical list schema by `reindexName` (`ofOuterLeft`/…) so `WHERE`/projection over the
+  -- result elaborate. The `ON` condition is a two-tuple predicate (left tuple, right tuple), exactly
+  -- like the semi/anti-join correlations. The output schema wraps the null-padded side's columns in
+  -- `.nullable` (their values become `Option`).
   outerJoin (f1 : TSyntax `sql_from) (t : TSyntax `ident) (cond : Term)
-      (opName : Name) (nullLeft nullRight : Bool) : TermElabM (Expr × List (Name × SQLTypeProxy)) := do
+      (opName reindexName : Name) (nullLeft nullRight : Bool) :
+      TermElabM (Expr × List (Name × SQLTypeProxy)) := do
     let (e1, s1) ← productPair f1
     let (e2, s2) ← productPair (← `(sql_from| $t:ident))
     let condExpr ← elabTypedTupleFilter [(.anonymous, s1), (t.getId, s2)] cond
     let joinExpr ← mkAppM opName #[e1, e2, condExpr]
+    let reindexed ← mkAppM reindexName #[joinExpr]
     let nul : List (Name × SQLTypeProxy) → List (Name × SQLTypeProxy) :=
       List.map (fun (n, ty) => (n, .nullable ty))
-    return (joinExpr, (if nullLeft then nul s1 else s1) ++ (if nullRight then nul s2 else s2))
+    return (reindexed, (if nullLeft then nul s1 else s1) ++ (if nullRight then nul s2 else s2))
   -- Apply a `WHERE` clause to `rel`. `[NOT] EXISTS (subquery)` and `x [NOT] IN (subquery)` become a
   -- `semijoin`/`antijoin`; anything else is an ordinary `restriction` by a tuple predicate.
   elabWhere (rel : Expr) (schema : List (Name × SQLTypeProxy)) (filter : Term) : TermElabM Expr := do
