@@ -271,7 +271,7 @@ fails to typecheck. Full 3VL (4.2) and NULL-aware aggregates (4.5) remain delibe
       `colTypeOfList (l1 ++ l2.map .nullable)` by rebuilding each row (`splitTuple` +
       `TypedTupleOfList.append` + a new `ofOption`, whose recursion on the list sidesteps the
       heterogeneous `List.length_map` domains a plain cast couldn't bridge). So **projection and `WHERE`
-      over an outer join now elaborate**. Verified in **Example 27**: LEFT/RIGHT/FULL, `OUTER` synonym,
+      over an outer join now elaborate**. Verified in **Example 26**: LEFT/RIGHT/FULL, `OUTER` synonym,
       qualified/unqualified `ON`, `ON`-commute, `WHERE amount IS NULL AND …` commute over a LEFT JOIN,
       and `COALESCE(amount,0)` projected out of one — all by `sql_equiv`.
       **Follow-up:** bridge the *parsed* form (which passes through the `ofOuter*` reindex) to the

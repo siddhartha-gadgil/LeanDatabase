@@ -5,14 +5,16 @@ open LeanDatabase Lean
 /-!
 # Example 21 — the new surface features, one identity each
 
-A single reference file for the parser features added in Phases 1–4. Each is proved by a bare
-`sql_equiv`. For the *same* features shown in context next to an older rewrite see Example 2 (CTE)
-and Example 18 (scalar); for all of them mixed into one query see Example 25.
+A single reference file for the parser features added in Phases 1–4: one identity each, then all of
+them mixed into one complex query at the end. Each is proved by a bare `sql_equiv`. For the *same*
+features shown in context next to an older rewrite see Example 2 (CTE) and Example 18 (scalar).
 
-Sections: qualified star · `CASE` without `ELSE` · scalar functions · `CAST` · CTE · `NULL`.
+Sections: qualified star · `CASE` without `ELSE` · scalar functions · `CAST` · CTE · `NULL` ·
+everything-at-once.
 -/
 
 namespace Example21
+set_option maxHeartbeats 800000
 
 /-! ## Qualified star `t.*` -/
 CREATE TABLE sa (a INT, b STRING)
@@ -94,6 +96,21 @@ theorem is_null_commutes :
 theorem coalesce_projects :
     sql%([nu_schema]) "SELECT COALESCE(amt, 0) AS a FROM nu WHERE id > 1 AND id < 9"
       = sql%([nu_schema]) "SELECT COALESCE(amt, 0) AS a FROM nu WHERE id < 9 AND id > 1" := by
+  sql_equiv
+
+/-! ## Everything at once
+
+One realistic optimizer rewrite exercising many features together: a **CTE** vs. the same filter
+inlined, `GROUP BY` with two aggregates (`SUM`/`COUNT`), a **scalar** `ROUND` over the sum,
+**`COALESCE`** on a **nullable** column, and **`CASE`-no-`ELSE`** vs. explicit **`ELSE NULL`** inside
+the `COUNT`. Both sides denote the same grouped result set, so a bare `sql_equiv` closes it. -/
+CREATE TABLE sales (g INT, region STRING, active BOOL, amt INT NULL, big BOOL)
+
+theorem everything_at_once :
+    sql%([sales_schema])
+        "WITH f AS (SELECT * FROM sales WHERE region = \"US\" AND active) SELECT g, ROUND(SUM(COALESCE(amt, 0)), 2) AS s, COUNT(CASE WHEN big THEN 1 END) AS c FROM f GROUP BY g"
+      = sql%([sales_schema])
+        "SELECT g, ROUND(SUM(COALESCE(amt, 0)), 2) AS s, COUNT(CASE WHEN big THEN 1 ELSE NULL END) AS c FROM sales WHERE region = \"US\" AND active GROUP BY g" := by
   sql_equiv
 
 end Example21
