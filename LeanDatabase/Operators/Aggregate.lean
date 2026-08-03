@@ -284,10 +284,14 @@ def groupMinInt
     (f t = groupMinInt key (key t) rel f) ↔ ∀ s ∈ (group key (key t) rel).rows, f t ≤ f s :=
   eq_groupMinInt_iff key (key t) rel f t (self_mem_group key rel t ht)
 
+/-- `AVG(f)` is **exact** (`Rat`) division, not truncating `Int` division (S2). SQL `AVG(int)` of
+`{1,2}` is `1.5`, not `1`. Because the result is `Rat` while `SUM/COUNT` is `Int`, the false claim
+`AVG(b) = SUM(b)/COUNT(*)` is a *type error*, not merely unprovable — same discipline as `CAST`. -/
 def groupAvg (key : TypedTuple colType → K)
     (k : K)
     (rel : TypedRelation colType)
-    (f : TypedTuple colType → Int) : Int := (groupSum key k rel f)/ (Int.ofNat (groupCount key k rel))
+    (f : TypedTuple colType → Int) : Rat :=
+  (groupSum key k rel f : Rat) / (groupCount key k rel : Rat)
 
 /-- `AVG` counterpart of `group_restrict_of_forall` — a `WHERE`-restricted `groupAvg` equals the
 unrestricted one when the restriction predicate is implied by membership in group `k`. -/
@@ -331,10 +335,10 @@ def groupCountDistinct {β : Type} [DecidableEq β] (key : TypedTuple colType �
     (rel : TypedRelation colType) (f : TypedTuple colType → β) : Nat :=
   ((group key k rel).rows.image f).card
 
-/-- `AVG(DISTINCT f)` = `SUM(DISTINCT f) / COUNT(DISTINCT f)`. -/
+/-- `AVG(DISTINCT f)` = `SUM(DISTINCT f) / COUNT(DISTINCT f)`, exact (`Rat`) division (see `groupAvg`). -/
 def groupAvgDistinct (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
-    (f : TypedTuple colType → Int) : Int :=
-  groupSumDistinct key k rel f / Int.ofNat (groupCountDistinct key k rel f)
+    (f : TypedTuple colType → Int) : Rat :=
+  (groupSumDistinct key k rel f : Rat) / (groupCountDistinct key k rel f : Rat)
 
 /-- `EVERY` / `BOOL_AND(p)` — true iff every row in the group satisfies `p`. -/
 def groupBoolAnd (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)

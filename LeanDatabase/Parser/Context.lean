@@ -257,6 +257,7 @@ def AggKind.wrapNat : AggKind → Bool
 /-- The SQL column type of the aggregate's result. -/
 def AggKind.resultType : AggKind → SQLTypeProxy
   | .boolAnd | .boolOr => .bool
+  | .avg | .avgDistinct => .float   -- AVG is exact `Rat` division (S2)
   | _ => .int
 
 /-- Builds one grouped aggregate per lifted `(freshName, kind, expr)`: each `expr` is elaborated
