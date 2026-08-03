@@ -257,6 +257,10 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
           tableVars.findSome? (fun (e, name, cols) => if name == db.getId then some (e, name, cols) else none)
           | throwError s!"Unknown table {db.getId}"
         return (tableExpr, columns)
+    | `(sql_from| $t:ident AS $_x:ident) =>
+      -- Aliased table: refs `x.col` were already rewritten to `t.col` by `expandNames`, so we just
+      -- resolve the base table `t` and keep its base-qualified columns.
+      productPair (← `(sql_from| $t:ident))
     | `(sql_from| ( $sub:sql_query ) AS $_alias:ident) => do
       let (lamSub, subSchema) ← elabSqlQueryCore tableVars ctes sub
       let vars := tableVars.map (fun (relVar, _, _) => relVar)
@@ -367,7 +371,13 @@ def parseSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (str : S
   let tables := tables.map (fun (tableName, columns) => (tableName, schemaWithFullNames tableName columns))
   let .ok stx := Parser.runParserCategory (← getEnv) `sql_query str | throwError "Failed to parse SQL query: {str}"
   let labels := tables.foldl (fun acc (_, columns) => acc ++ columns.map (fun (name, _) => name)) []
-  let stx ← expandNames labels stx
+  let aliases := collectAliases stx
+  -- A base table under two aliases (self-join) would collapse to identical column names here; reject
+  -- rather than silently merge them (needs per-alias column renaming — a follow-up).
+  let bases := aliases.map (·.2)
+  if bases.length != bases.eraseDups.length then
+    throwError "self-join / same base table under multiple aliases is not yet supported"
+  let stx ← expandNames labels stx aliases
   elabSqlQuery tables stx
 
 

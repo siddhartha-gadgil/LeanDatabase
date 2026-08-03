@@ -116,15 +116,20 @@ syntax "BOOL_AND" "(" term ")" : term
 syntax "EVERY" "(" term ")" : term
 syntax "BOOL_OR" "(" term ")" : term
 
-def expandNames (labels : List Name) (stx: Syntax) : MetaM Syntax := do
+def expandNames (labels : List Name) (stx: Syntax) (aliases : List (Name × Name) := []) :
+    MetaM Syntax := do
   let pairs ← labels.filterMapM fun label => do
     let shorter? := label.components.getLast?
     pure <| shorter?.map fun shorter => (shorter, label.getPrefix)
   stx.replaceM fun id => do
     let idName := id.getId
-    match pairs.find? (fun (shorter, _) => shorter.isPrefixOf idName) with
-    | some (_, pfx) => pure <| mkIdent <| pfx ++ idName
-    | none => return none
+    -- alias-qualified `o.col` → `base.col` (the table's canonical prefix)
+    match aliases.find? (fun (a, _) => a != idName && a.isPrefixOf idName) with
+    | some (a, base) => pure <| mkIdent <| idName.replacePrefix a base
+    | none =>
+      match pairs.find? (fun (shorter, _) => shorter.isPrefixOf idName) with
+      | some (_, pfx) => pure <| mkIdent <| pfx ++ idName
+      | none => return none
 
 /--
 Expressions for projection functions for each column in a schema, along with the type of the tuple that contains them.

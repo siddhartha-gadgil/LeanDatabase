@@ -50,6 +50,7 @@ def sqlOrderCol : TSyntax `sql_order_item → TSyntax `sql_col
 
 -- Base Cases (The atomic sources of data)
 syntax ident : sql_from                               -- 1. Standard table name
+syntax ident "AS" ident : sql_from                    -- 1b. Aliased table (`t AS x`)
 syntax "(" sql_query ")" "AS" ident : sql_from       -- 2. Subquery with mandatory alias
 
 -- Recursive Cases (Chaining joins from left to right)
@@ -129,8 +130,18 @@ partial def escapeJoin (stx : Syntax) : MetaM <| TSyntax `sql_query := do
 partial def getIdents (stx : TSyntax `sql_from) : List Name :=
   match stx with
   | `(sql_from| $db:ident) => [db.getId]
+  | `(sql_from| $t:ident AS $_:ident) => [t.getId]
   | `(sql_from| $f1:sql_from , $f2:sql_from) => getIdents f1 ++ getIdents f2
   | _ => []
+
+/-- Collect `(alias, baseTable)` pairs from every `t AS x` anywhere in a query, so `expandNames` can
+rewrite `x.col → t.col` before elaboration. -/
+partial def collectAliases : Syntax → List (Name × Name)
+  | stx =>
+    let here := match stx with
+      | `(sql_from| $t:ident AS $x:ident) => [(x.getId, t.getId)]
+      | _ => []
+    stx.getArgs.foldl (fun acc s => acc ++ collectAliases s) here
 
 /-! ## Term-level `WHERE`-predicate combinators -/
 
