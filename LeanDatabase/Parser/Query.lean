@@ -185,16 +185,27 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
         let e' ← mkAppM ``TypedRelation.mapByList #[filteredExpr, toExpr nameStrs, m]
         pure (e', names.zip types)
       | _ => throwError "Unexpected syntax for SQL query"
-    -- DISTINCT / ORDER BY / LIMIT are all the identity on a `Finset` (erased by `sql_equiv`).
+    -- ORDER BY erases only when no LIMIT is above it; under a LIMIT the key is folded into the
+    -- opaque `limit` instead of erased (S1). A bare LIMIT gets a canonical Unit key.
     let rel ← if distinct?.isSome then mkAppM ``distinct #[rel] else pure rel
-    let rel ← match ord with
-      | none => pure rel
+    let keyExpr? ← match ord with
+      | none => pure none
       | some ords => do
-        let (key, _) ← elabTypedTupleProjection [(.anonymous, outSchema)] (ords.getElems.toList.map (fun o => sqlColTerm (sqlOrderCol o)))
-        mkAppM ``orderBy #[key, rel]
+        let (key, _) ← elabTypedTupleProjection [(.anonymous, outSchema)]
+          (ords.getElems.toList.map (fun o => sqlColTerm (sqlOrderCol o)))
+        pure (some key)
     let rel ← match lim with
-      | none => pure rel
-      | some k => mkAppM ``limit #[toExpr k.getNat, rel]
+      | none =>
+        match keyExpr? with
+        | some key => mkAppM ``orderBy #[key, rel]
+        | none => pure rel
+      | some k => do
+        let key ← match keyExpr? with
+          | some key => pure key
+          | none => do
+            let (key, _) ← elabTypedTupleProjection [(.anonymous, outSchema)] []
+            pure key
+        mkAppM ``limit #[toExpr k.getNat, key, rel]
     return (← mkLambdaFVars vars.toArray rel, outSchema)
   | `(sql_query| SELECT $cols:sql_col,* FROM $dbs:sql_from $[WHERE $filter?]?
       GROUP BY $groups:ident,* $[HAVING $having?]? $[;]?) => do

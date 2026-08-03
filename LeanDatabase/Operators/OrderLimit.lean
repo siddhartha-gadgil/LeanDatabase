@@ -35,14 +35,16 @@ The `key` is kept only for documentation; it has no effect on the resulting set 
 @[simp, grind =] theorem orderBy_eq (key : TypedTuple colType → K) (rel : TypedRelation colType) :
     orderBy key rel = rel := rfl
 
-/-- `LIMIT k` is opaque under set semantics: without row order, the choice of which rows survive is
-unobservable. So `limit` is only equal to itself; it does not erase to the identity. Use
-`limit_congr` to rewrite through equal sub-relations. -/
-opaque limit (k : Nat) (rel : TypedRelation colType) : TypedRelation colType := rel
+/-- `LIMIT k` is opaque: without row order, which rows survive is unobservable, so `limit` is only
+equal to itself. The `key` argument is opaque too (S1 fix): under a `LIMIT` the sort key selects the
+surviving rows, so it must not be erased — `ORDER BY a LIMIT k` and `ORDER BY b LIMIT k` must stay
+unequal. (A bare `LIMIT` gets a canonical Unit key.) -/
+opaque limit (k : Nat) (key : TypedTuple colType → K) (rel : TypedRelation colType) :
+    TypedRelation colType := rel
 
-/-- `LIMIT` respects equality of its argument. This is what lets `sql_equiv` prove
-`q₁ LIMIT k = q₂ LIMIT k` from `q₁ = q₂` *without* being able to erase `LIMIT` (which is unsound). -/
-theorem limit_congr {k : Nat} {r1 r2 : TypedRelation colType} (h : r1 = r2) :
-    limit k r1 = limit k r2 := by rw [h]
+/-- `LIMIT` respects equality of its relation argument, with bound and key fixed. Lets `sql_equiv`
+prove `q₁ ORDER BY e LIMIT k = q₂ ORDER BY e LIMIT k` from `q₁ = q₂` without erasing either. -/
+theorem limit_congr {k : Nat} {key : TypedTuple colType → K} {r1 r2 : TypedRelation colType}
+    (h : r1 = r2) : limit k key r1 = limit k key r2 := by rw [h]
 
 end LeanDatabase
