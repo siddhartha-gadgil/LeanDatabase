@@ -185,30 +185,12 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
         let e' ← mkAppM ``TypedRelation.mapByList #[filteredExpr, toExpr nameStrs, m]
         pure (e', names.zip types)
       | _ => throwError "Unexpected syntax for SQL query"
-    -- ORDER BY erases only when no LIMIT is above it; under a LIMIT the key is folded into the
-    -- opaque `limit` instead of erased (S1). A bare LIMIT gets a canonical Unit key.
     let rel ← if distinct?.isSome then mkAppM ``distinct #[rel] else pure rel
-    let keyExpr? ← match ord with
-      | none => pure none
-      | some ords => do
-        let (key, _) ← elabTypedTupleProjection [(.anonymous, outSchema)]
-          (ords.getElems.toList.map (fun o => sqlColTerm (sqlOrderCol o)))
-        pure (some key)
-    let rel ← match lim with
-      | none =>
-        match keyExpr? with
-        | some key => mkAppM ``orderBy #[key, rel]
-        | none => pure rel
-      | some k => do
-        let key ← match keyExpr? with
-          | some key => pure key
-          | none => do
-            let (key, _) ← elabTypedTupleProjection [(.anonymous, outSchema)] []
-            pure key
-        mkAppM ``limit #[toExpr k.getNat, key, rel]
+    let ordCols? := ord.map (fun ords => ords.getElems.toList.map (fun o => sqlColTerm (sqlOrderCol o)))
+    let rel ← applyOrderLimit rel outSchema ordCols? (lim.map (·.getNat))
     return (← mkLambdaFVars vars.toArray rel, outSchema)
-  | `(sql_query| SELECT $cols:sql_col,* FROM $dbs:sql_from $[WHERE $filter?]?
-      GROUP BY $groups:ident,* $[HAVING $having?]? $[;]?) => do
+  | `(sql_query| SELECT $[DISTINCT%$distinct?]? $cols:sql_col,* FROM $dbs:sql_from $[WHERE $filter?]?
+      GROUP BY $groups:ident,* $[HAVING $having?]? $[ORDER BY $ord:sql_order_item,*]? $[LIMIT $lim:num]? $[;]?) => do
     let groupNames := groups.getElems.map (fun stx => stx.getId)
     let inGroup := fun name => groupNames.any (fun g => g == name)
     let (productExpr, combinedSchema) ← productPair dbs
@@ -234,9 +216,35 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
         mkAppM ``restriction #[h, filteredExpr]
       | none => pure filteredExpr
     let e' ← mkAppM ``TypedRelation.mapByList #[havingFilteredExpr, toExpr nameStrs, m]
-    return (← mkLambdaFVars vars.toArray e', names.zip types)
+    let outSchema := names.zip types
+    let rel ← if distinct?.isSome then mkAppM ``distinct #[e'] else pure e'
+    let ordCols? := ord.map (fun ords => ords.getElems.toList.map (fun o => sqlColTerm (sqlOrderCol o)))
+    let rel ← applyOrderLimit rel outSchema ordCols? (lim.map (·.getNat))
+    return (← mkLambdaFVars vars.toArray rel, outSchema)
   | _ => throwError "Unexpected syntax for SQL query"
   where
+  -- ORDER BY / LIMIT emit, shared by the plain and GROUP BY SELECT arms. ORDER BY erases only when
+  -- no LIMIT is above it; under a LIMIT the sort key is folded into the opaque `limit` (S1). A bare
+  -- LIMIT gets a canonical Unit key (the empty projection).
+  applyOrderLimit (rel : Expr) (outSchema : List (Name × SQLTypeProxy))
+      (ordCols? : Option (List Syntax.Term)) (limK? : Option Nat) : TermElabM Expr := do
+    let keyExpr? ← match ordCols? with
+      | none => pure none
+      | some cols => do
+        let (key, _) ← elabTypedTupleProjection [(.anonymous, outSchema)] cols
+        pure (some key)
+    match limK? with
+    | none =>
+      match keyExpr? with
+      | some key => mkAppM ``orderBy #[key, rel]
+      | none => pure rel
+    | some k => do
+      let key ← match keyExpr? with
+        | some key => pure key
+        | none => do
+          let (key, _) ← elabTypedTupleProjection [(.anonymous, outSchema)] []
+          pure key
+      mkAppM ``limit #[toExpr k, key, rel]
   -- The FROM relation + its schema
   productPair (dbs: TSyntax `sql_from) : TermElabM (Expr × List (Name × SQLTypeProxy)) := do
     match dbs with
@@ -266,6 +274,19 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
     | `(sql_from| $f1:sql_from FULL JOIN $t:ident ON $cond:term)
     | `(sql_from| $f1:sql_from FULL OUTER JOIN $t:ident ON $cond:term) =>
       outerJoin f1 t cond ``fullOuterJoin ``ofOuterFull true true
+    -- Inner `JOIN ON` / `CROSS JOIN` handled here (not just via `escapeJoin`) so they compose with
+    -- GROUP BY / ORDER BY / LIMIT, which `escapeJoin`'s whole-query rewrite doesn't reach (C1).
+    | `(sql_from| $f1:sql_from JOIN $t:ident ON $cond:term) => do
+      let (e1, s1) ← productPair f1
+      let (e2, s2) ← productPair (← `(sql_from| $t:ident))
+      let combined := s1 ++ s2
+      let appended ← mkAppM ``TypedRelationOfList.append #[e1, e2]
+      let condExpr ← elabTypedTupleFilter [(.anonymous, combined)] cond
+      return (← mkAppM ``restriction #[condExpr, appended], combined)
+    | `(sql_from| $f1:sql_from CROSS JOIN $t:ident) => do
+      let (e1, s1) ← productPair f1
+      let (e2, s2) ← productPair (← `(sql_from| $t:ident))
+      return (← mkAppM ``TypedRelationOfList.append #[e1, e2], s1 ++ s2)
     | _ => throwError "Unsupported FROM clause: {← PrettyPrinter.ppCategory `sql_from dbs}"
   -- `A LEFT/RIGHT/FULL OUTER JOIN t ON cond` → the corresponding operator, then reconciled back to
   -- the canonical list schema by `reindexName` (`ofOuterLeft`/…) so `WHERE`/projection over the
@@ -319,7 +340,30 @@ def elabSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (stx: Syn
   let stx ← escapeJoin stx
   elabSqlQueryCore tableVars [] stx
 
+private def copyDoubleQuoted : List Char → String → String × List Char
+  | [], acc => (acc, [])
+  | '"' :: rest, acc => (acc.push '"', rest)
+  | c :: rest, acc => copyDoubleQuoted rest (acc.push c)
+
+private def convSingleQuoted : List Char → String → String × List Char
+  | [], acc => (acc.push '"', [])
+  | '\'' :: '\'' :: rest, acc => convSingleQuoted rest (acc.push '\'')   -- SQL `''` = escaped quote
+  | '\'' :: rest, acc => (acc.push '"', rest)
+  | '"' :: rest, acc => convSingleQuoted rest ((acc.push '\\').push '"') -- escape inner `"`
+  | c :: rest, acc => convSingleQuoted rest (acc.push c)
+
+private partial def normalizeGo : List Char → String → String
+  | [], acc => acc
+  | '"' :: rest, acc => let (acc, rest) := copyDoubleQuoted rest (acc.push '"'); normalizeGo rest acc
+  | '\'' :: rest, acc => let (acc, rest) := convSingleQuoted rest (acc.push '"'); normalizeGo rest acc
+  | c :: rest, acc => normalizeGo rest (acc.push c)
+
+/-- Rewrite SQL single-quoted string literals `'…'` to the double-quoted form the grammar accepts.
+`''` becomes an escaped quote; existing `"…"` regions are copied verbatim (C3). -/
+def normalizeSqlLiterals (s : String) : String := normalizeGo s.toList ""
+
 def parseSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (str : String) : TermElabM (Expr × List (Name × SQLTypeProxy)) := do
+  let str := normalizeSqlLiterals str
   let tables := tables.map (fun (tableName, columns) => (tableName, schemaWithFullNames tableName columns))
   let .ok stx := Parser.runParserCategory (← getEnv) `sql_query str | throwError "Failed to parse SQL query: {str}"
   let labels := tables.foldl (fun acc (_, columns) => acc ++ columns.map (fun (name, _) => name)) []

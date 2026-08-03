@@ -255,6 +255,11 @@ syntax:max "LOWER" "(" term ")" : term
 syntax:max "TRIM" "(" term ")" : term
 syntax:max "LENGTH" "(" term ")" : term
 
+-- `EXTRACT(YEAR FROM d)` — the SQL-standard spelling of `YEAR(d)`/`MONTH(d)`/`DAY(d)`.
+syntax:max "EXTRACT" "(" "YEAR" "FROM" term ")" : term
+syntax:max "EXTRACT" "(" "MONTH" "FROM" term ")" : term
+syntax:max "EXTRACT" "(" "DAY" "FROM" term ")" : term
+
 -- `CAST(x AS <type>)`. The `::` cast form is intentionally unsupported — overriding `::` would
 -- clobber `List.cons` globally. Elaborated (type-directed) in `Parser/Context.lean`, NOT as a macro:
 -- the coercion depends on the *source* type (int→float is a real coercion, ROADMAP 2.4).
@@ -290,6 +295,9 @@ macro_rules
   | `(LOWER($x))     => `($(mkIdent `LeanDatabase.Scalar.lowerOf) $x)
   | `(TRIM($x))      => `($(mkIdent `LeanDatabase.Scalar.trimOf) $x)
   | `(LENGTH($x))    => `($(mkIdent `LeanDatabase.Scalar.lengthOf) $x)
+  | `(EXTRACT(YEAR FROM $x))  => `($(mkIdent `LeanDatabase.Scalar.yearOf) $x)
+  | `(EXTRACT(MONTH FROM $x)) => `($(mkIdent `LeanDatabase.Scalar.monthOf) $x)
+  | `(EXTRACT(DAY FROM $x))   => `($(mkIdent `LeanDatabase.Scalar.dayOf) $x)
 
 /-!
 ## Aggregates (`SUM`/`COUNT`/`AVG`/`MIN`/`MAX`)
