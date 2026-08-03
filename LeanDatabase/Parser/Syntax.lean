@@ -271,6 +271,13 @@ syntax:max "EXTRACT" "(" "YEAR" "FROM" term ")" : term
 syntax:max "EXTRACT" "(" "MONTH" "FROM" term ")" : term
 syntax:max "EXTRACT" "(" "DAY" "FROM" term ")" : term
 
+-- Date/string scalars (opaque; cancel identically on both sides).
+syntax:max "TO_DATE" "(" term ")" : term
+syntax:max "TO_TIMESTAMP" "(" term ")" : term
+syntax:max "DATE_TRUNC" "(" term "," term ")" : term
+syntax:max "CONCAT" "(" term "," term ")" : term
+syntax:max "SUBSTR" "(" term "," term "," term ")" : term
+
 -- `CAST(x AS <type>)`. The `::` cast form is intentionally unsupported — overriding `::` would
 -- clobber `List.cons` globally. Elaborated (type-directed) in `Parser/Context.lean`, NOT as a macro:
 -- the coercion depends on the *source* type (int→float is a real coercion, ROADMAP 2.4).
@@ -309,6 +316,11 @@ macro_rules
   | `(EXTRACT(YEAR FROM $x))  => `($(mkIdent `LeanDatabase.Scalar.yearOf) $x)
   | `(EXTRACT(MONTH FROM $x)) => `($(mkIdent `LeanDatabase.Scalar.monthOf) $x)
   | `(EXTRACT(DAY FROM $x))   => `($(mkIdent `LeanDatabase.Scalar.dayOf) $x)
+  | `(TO_DATE($x))            => `($(mkIdent `LeanDatabase.Scalar.toDate) $x)
+  | `(TO_TIMESTAMP($x))       => `($(mkIdent `LeanDatabase.Scalar.toTimestamp) $x)
+  | `(DATE_TRUNC($u, $x))     => `($(mkIdent `LeanDatabase.Scalar.dateTrunc) $u $x)
+  | `(CONCAT($a, $b))         => `($(mkIdent `LeanDatabase.Scalar.concat) $a $b)
+  | `(SUBSTR($x, $i, $n))     => `($(mkIdent `LeanDatabase.Scalar.substr) $x $i $n)
 
 /-!
 ## Aggregates (`SUM`/`COUNT`/`AVG`/`MIN`/`MAX`)

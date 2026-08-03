@@ -61,6 +61,24 @@ P4. If only one phase ships, ship P3.
 
 ---
 
+# Audit follow-ups (`report.md`, 2026-08)
+
+An external review (`report.md`) found soundness bugs, coverage gaps, and stale scaffolding. Status:
+
+| id | issue | status |
+|---|---|---|
+| S1 | `ORDER BY` erased under `LIMIT` → false top-N equalities | **fixed.** `limit` is now opaque in the order key too (`Operators/OrderLimit.lean`); `ORDER BY a LIMIT k ≠ ORDER BY b LIMIT k`. Emitted at `Parser/Query.lean` (`applyOrderLimit`). |
+| S2 | `AVG` = truncating `Int` division | **fixed.** `groupAvg`/`groupAvgDistinct` return exact `Rat`; `AVG = SUM/COUNT` is now a *type error* (like `CAST`). |
+| S3 | self-correlated / self-join silently drops the outer binder | **mitigated (fail-loud).** Same base table under two aliases is rejected, not miscompiled. Full self-join (per-alias column rename) is a follow-up. |
+| S4 | ambiguous unqualified column resolves silently to the first | **open.** Both sides resolve the same way, so no false positive; a diagnostic is the fix. |
+| C1 | clause-combination matrix holes (`GROUP BY … ORDER BY`, inner `JOIN … GROUP BY`, …) | **fixed.** GROUP BY arm now takes `DISTINCT`/`ORDER BY`/`LIMIT`; inner `JOIN`/`CROSS JOIN` handled in `productPair` so they compose with GROUP BY/ORDER BY/LIMIT. |
+| C2 | no table aliases | **done (single-table).** `FROM t AS x` via an `expandNames` alias rewrite. Join-RHS aliases and self-joins are follow-ups (guarded above). |
+| C3 | dialect front-end (0 raw corpus queries parse) | **partial.** Single-quoted string literals normalized (`'x'→"x"`) and `EXTRACT(part FROM d)` added. Quoted identifiers, 3-part names, and more scalars remain. |
+| I1/I2 | coverage ledger unverified; CI doesn't run the guard | **open.** |
+| — | dead scaffolding (orphaned `sorry` files, `elabSelectCmd`, `Products` build leak) | **removed.** |
+
+---
+
 # Phase 0 — Soundness (BLOCKING; do not add features on a broken base)
 
 Under the set-semantics decision, the two items from the audit split apart: one dissolves, one is a

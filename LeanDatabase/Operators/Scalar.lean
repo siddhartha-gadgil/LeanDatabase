@@ -34,11 +34,18 @@ opaque yearOf (x : String) : Int := 0
 opaque monthOf (x : String) : Int := 0
 opaque dayOf (x : String) : Int := 0
 
+/-- Date/timestamp construction and truncation — dates are `String`s, so these are `String`-valued. -/
+opaque toDate (x : String) : String := x
+opaque toTimestamp (x : String) : String := x
+opaque dateTrunc (unit : String) (x : String) : String := x
+
 /-- String functions. -/
 opaque upperOf (x : String) : String := x
 opaque lowerOf (x : String) : String := x
 opaque trimOf (x : String) : String := x
 opaque lengthOf (x : String) : Int := 0
+opaque concat (a : String) (b : String) : String := a
+opaque substr (x : String) (start : Int) (len : Int) : String := x
 
 /-! ## `CAST` — a *real* coercion, never opaque (ROADMAP 2.4)
 
