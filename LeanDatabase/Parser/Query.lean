@@ -278,6 +278,20 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
     | `(sql_from| $f1:sql_from FULL JOIN $t:ident ON $cond:term)
     | `(sql_from| $f1:sql_from FULL OUTER JOIN $t:ident ON $cond:term) =>
       outerJoin f1 t cond ``fullOuterJoin ``ofOuterFull true true
+    -- Aliased-RHS joins: the alias resolved away in `expandNames`, so delegate to the base table.
+    | `(sql_from| $f1:sql_from JOIN $t:ident AS $_x:ident ON $cond:term) =>
+      productPair (← `(sql_from| $f1:sql_from JOIN $t:ident ON $cond:term))
+    | `(sql_from| $f1:sql_from CROSS JOIN $t:ident AS $_x:ident) =>
+      productPair (← `(sql_from| $f1:sql_from CROSS JOIN $t:ident))
+    | `(sql_from| $f1:sql_from LEFT JOIN $t:ident AS $_x:ident ON $cond:term)
+    | `(sql_from| $f1:sql_from LEFT OUTER JOIN $t:ident AS $_x:ident ON $cond:term) =>
+      outerJoin f1 t cond ``leftOuterJoin ``ofOuterLeft false true
+    | `(sql_from| $f1:sql_from RIGHT JOIN $t:ident AS $_x:ident ON $cond:term)
+    | `(sql_from| $f1:sql_from RIGHT OUTER JOIN $t:ident AS $_x:ident ON $cond:term) =>
+      outerJoin f1 t cond ``rightOuterJoin ``ofOuterRight true false
+    | `(sql_from| $f1:sql_from FULL JOIN $t:ident AS $_x:ident ON $cond:term)
+    | `(sql_from| $f1:sql_from FULL OUTER JOIN $t:ident AS $_x:ident ON $cond:term) =>
+      outerJoin f1 t cond ``fullOuterJoin ``ofOuterFull true true
     -- Inner `JOIN ON` / `CROSS JOIN` handled here (not just via `escapeJoin`) so they compose with
     -- GROUP BY / ORDER BY / LIMIT, which `escapeJoin`'s whole-query rewrite doesn't reach (C1).
     | `(sql_from| $f1:sql_from JOIN $t:ident ON $cond:term) => do

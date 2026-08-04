@@ -70,12 +70,23 @@ An external review (`report.md`) found soundness bugs, coverage gaps, and stale 
 | S1 | `ORDER BY` erased under `LIMIT` → false top-N equalities | **fixed.** `limit` is now opaque in the order key too (`Operators/OrderLimit.lean`); `ORDER BY a LIMIT k ≠ ORDER BY b LIMIT k`. Emitted at `Parser/Query.lean` (`applyOrderLimit`). |
 | S2 | `AVG` = truncating `Int` division | **fixed.** `groupAvg`/`groupAvgDistinct` return exact `Rat`; `AVG = SUM/COUNT` is now a *type error* (like `CAST`). |
 | S3 | self-correlated / self-join silently drops the outer binder | **mitigated (fail-loud).** Same base table under two aliases is rejected, not miscompiled. Full self-join (per-alias column rename) is a follow-up. |
-| S4 | ambiguous unqualified column resolves silently to the first | **open.** Both sides resolve the same way, so no false positive; a diagnostic is the fix. |
+| S4 | ambiguous unqualified column resolves silently to the first | **open (needs scoped resolution).** A global ambiguity check false-errors on UNION-branch/subquery queries where each scope sees one table; a correct diagnostic needs per-FROM-scope name resolution, which `expandNames` (flat, whole-query) doesn't have. Both sides resolve identically today, so no false positive. |
 | C1 | clause-combination matrix holes (`GROUP BY … ORDER BY`, inner `JOIN … GROUP BY`, …) | **fixed.** GROUP BY arm now takes `DISTINCT`/`ORDER BY`/`LIMIT`; inner `JOIN`/`CROSS JOIN` handled in `productPair` so they compose with GROUP BY/ORDER BY/LIMIT. |
-| C2 | no table aliases | **done (single-table).** `FROM t AS x` via an `expandNames` alias rewrite. Join-RHS aliases and self-joins are follow-ups (guarded above). |
-| C3 | dialect front-end (0 raw corpus queries parse) | **partial.** Single-quoted string literals normalized (`'x'→"x"`) and `EXTRACT(part FROM d)` added. Quoted identifiers, 3-part names, and more scalars remain. |
+| C2 | no table aliases | **done.** `FROM t AS x` and aliased-RHS joins (`… JOIN u AS y ON …`, inner + all outer) via an `expandNames` alias rewrite. Self-joins (same base table twice) still rejected fail-loud — need per-alias column rename. |
+| C3 | dialect front-end (0 raw corpus queries parse) | **partial.** Single-quoted string literals normalized (`'x'→"x"`); `EXTRACT(part FROM d)`, `TO_DATE`/`TO_TIMESTAMP`/`DATE_TRUNC`/`CONCAT`/`SUBSTR` added. **Quoted identifiers `t."DATE"` (100% of corpus) need a decision** — the corpus uses `"…"` for *identifiers* and `'…'` for strings, but this project's examples write string literals as `"…"`. Supporting `"…"`-identifiers means committing to SQL convention (single=string, double=identifier) and migrating existing examples off `"US"`-style string literals. 3-part dotted names ride on the same decision. |
 | I1/I2 | coverage ledger unverified; CI doesn't run the guard | **improved.** `coverage.py` VERIFIED is now a live filesystem check (a recorded pass whose file is absent is *not* counted and is named); the guard is wired into CI and runs VERIFIED-only when the corpus is absent. Root cause remains: `Sf*.lean` proofs are gitignored, so `lake build`/CI never checks them — commit them (or drop the "machine-checked" claim) to close fully. |
 | — | dead scaffolding (orphaned `sorry` files, `elabSelectCmd`, `Products` build leak) | **removed.** |
+
+### Shipped in this pass
+
+- [x] **S1** — `LIMIT` opaque in the order key; `ORDER BY … LIMIT` no longer erases the sort key.
+- [x] **S2** — `AVG` is exact `Rat` division; `AVG = SUM/COUNT` is now a type error.
+- [x] **C1** — clause-combination matrix: GROUP BY composes with `DISTINCT`/`ORDER BY`/`LIMIT`; inner `JOIN`/`CROSS JOIN` in `productPair`.
+- [x] **C2** — table aliases `FROM t AS x` + aliased-RHS joins (inner + all outer); self-joins fail loud.
+- [x] **C3 (partial)** — single-quoted strings normalized; `EXTRACT` + `TO_DATE`/`TO_TIMESTAMP`/`DATE_TRUNC`/`CONCAT`/`SUBSTR`.
+- [x] **I1/I2** — `coverage.py` VERIFIED is a live filesystem check; wired into CI.
+- [x] **Hygiene** — deleted orphaned `sorry`-files + `elabSelectCmd` + `Products` leak; `NUMBER/NUMERIC/DECIMAL → Rat`; dead `crossProductRel` collision code; legacy `SQLType.FLOAT → Rat`; unused-section-var warning.
+- [ ] **S3 (full self-join)**, **S4 (ambiguous-column diagnostic)**, **C3 quoted identifiers** — open (see table above).
 
 ---
 

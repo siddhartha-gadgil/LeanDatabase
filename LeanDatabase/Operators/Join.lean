@@ -345,6 +345,7 @@ theorem liftNullable_isNull_empty {l : Nat} {ct : Fin l → Type} [∀ i, Decida
 section OuterJoinLaws
 variable [∀ i, Inhabited (colType1 i)] [∀ i, Inhabited (colType2 i)]
 
+omit [∀ i, Inhabited (colType1 i)] in
 /-- **The "find unmatched rows" identity** — `A LEFT JOIN B ON cond` keeping only the rows where a
 right column `i` `IS NULL` is exactly the null-padded **anti-join**: the matched rows all carry
 `some` in the right columns (so `IS NULL` drops them), leaving only the unmatched `A` rows padded

@@ -49,7 +49,7 @@ def SQLType.toLeanType : SQLType → Type
   | SQLType.INT => Int
   | SQLType.VARCHAR _ => String
   | SQLType.BOOL => Bool
-  | SQLType.FLOAT => Float
+  | SQLType.FLOAT => Rat   -- match `SQLTypeProxy.float` (Rat), so FLOAT means real, not `Float`
   | SQLType.TEXT => String
 
 instance : ToString SQLType where

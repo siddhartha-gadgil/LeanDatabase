@@ -67,6 +67,17 @@ syntax sql_from "RIGHT" "OUTER" "JOIN" ident "ON" term : sql_from
 syntax sql_from "FULL" "JOIN" ident "ON" term : sql_from
 syntax sql_from "FULL" "OUTER" "JOIN" ident "ON" term : sql_from
 
+-- 7. Aliased-RHS join forms (`… JOIN t AS x ON …`). The alias resolves away in `expandNames`, so
+-- these delegate to the base-table join in `productPair`.
+syntax sql_from "JOIN" ident "AS" ident "ON" term : sql_from
+syntax sql_from "CROSS" "JOIN" ident "AS" ident : sql_from
+syntax sql_from "LEFT" "JOIN" ident "AS" ident "ON" term : sql_from
+syntax sql_from "LEFT" "OUTER" "JOIN" ident "AS" ident "ON" term : sql_from
+syntax sql_from "RIGHT" "JOIN" ident "AS" ident "ON" term : sql_from
+syntax sql_from "RIGHT" "OUTER" "JOIN" ident "AS" ident "ON" term : sql_from
+syntax sql_from "FULL" "JOIN" ident "AS" ident "ON" term : sql_from
+syntax sql_from "FULL" "OUTER" "JOIN" ident "AS" ident "ON" term : sql_from
+
 syntax "SELECT " (" DISTINCT ")? sql_cols " FROM " sql_from (" WHERE " term)?  (" GROUP " " BY " ident,* (" HAVING " term)?)? (" ORDER " " BY " sql_order_item,*)? (" LIMIT " num)? (";")? : sql_query
 
 -- Binary set operators on whole queries, as one keyword-parameterised production. Our relations
@@ -140,6 +151,14 @@ partial def collectAliases : Syntax → List (Name × Name)
   | stx =>
     let here := match stx with
       | `(sql_from| $t:ident AS $x:ident) => [(x.getId, t.getId)]
+      | `(sql_from| $_:sql_from JOIN $t:ident AS $x:ident ON $_) => [(x.getId, t.getId)]
+      | `(sql_from| $_:sql_from CROSS JOIN $t:ident AS $x:ident) => [(x.getId, t.getId)]
+      | `(sql_from| $_:sql_from LEFT JOIN $t:ident AS $x:ident ON $_) => [(x.getId, t.getId)]
+      | `(sql_from| $_:sql_from LEFT OUTER JOIN $t:ident AS $x:ident ON $_) => [(x.getId, t.getId)]
+      | `(sql_from| $_:sql_from RIGHT JOIN $t:ident AS $x:ident ON $_) => [(x.getId, t.getId)]
+      | `(sql_from| $_:sql_from RIGHT OUTER JOIN $t:ident AS $x:ident ON $_) => [(x.getId, t.getId)]
+      | `(sql_from| $_:sql_from FULL JOIN $t:ident AS $x:ident ON $_) => [(x.getId, t.getId)]
+      | `(sql_from| $_:sql_from FULL OUTER JOIN $t:ident AS $x:ident ON $_) => [(x.getId, t.getId)]
       | _ => []
     stx.getArgs.foldl (fun acc s => acc ++ collectAliases s) here
 

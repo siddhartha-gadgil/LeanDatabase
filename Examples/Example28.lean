@@ -24,9 +24,9 @@ CREATE TABLE depts (dept INT, active BOOL)
 the `WHERE` conjuncts commute. -/
 theorem aliased_join_group_order :
     sql%([sales_schema, depts_schema])
-        "SELECT s.dept, ROUND(SUM(s.amt), 2) AS total FROM sales AS s JOIN depts ON s.dept = depts.dept WHERE s.region = 'US' AND depts.active GROUP BY s.dept ORDER BY s.dept"
+        "SELECT s.dept, ROUND(SUM(s.amt), 2) AS total FROM sales AS s JOIN depts AS dd ON s.dept = dd.dept WHERE s.region = 'US' AND dd.active GROUP BY s.dept ORDER BY s.dept"
       = sql%([sales_schema, depts_schema])
-        "SELECT s.dept, ROUND(SUM(s.amt), 2) AS total FROM sales AS s JOIN depts ON s.dept = depts.dept WHERE depts.active AND s.region = 'US' GROUP BY s.dept ORDER BY s.dept" := by
+        "SELECT s.dept, ROUND(SUM(s.amt), 2) AS total FROM sales AS s JOIN depts AS dd ON s.dept = dd.dept WHERE dd.active AND s.region = 'US' GROUP BY s.dept ORDER BY s.dept" := by
   sql_equiv
 
 /-- `GROUP BY … ORDER BY … LIMIT` with the same sort key on both sides: closes by `limit_congr`
