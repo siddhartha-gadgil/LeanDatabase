@@ -239,10 +239,13 @@ recursive fixpoint, the genuinely hard part, is almost pure ignorable tail.
       CTE (`SELECT a FROM (SELECT a,b …)`) collapses to one `mapByList`. Verified passthrough,
       `WHERE`-carrying, projected-through, and chained (`y` references `x`) CTEs all prove; full build
       green (the global lemma broke nothing).
-- [ ] **3.4 Scalar subquery in `SELECT` (L). NOT STARTED — the remaining Phase-3 work.** **71.2%** of
-      queries. `(SELECT SUM(x) FROM t)` in a select-list is an ungrouped aggregate → `relSum`/`relCount`.
-      Uncorrelated first, then correlated (harder). This is a large task on its own; the CTE core
-      above is the headline +27pt unlock, this is additive.
+- [x] **3.4 Scalar subquery in `SELECT` (L). ✅ DONE (uncorrelated).** `(SELECT AGG(x) FROM t [WHERE p])`
+      in a select-list → the whole-relation aggregate (`relSum`/`relCount`/`relCountDistinct`), an `Int`
+      constant. `elabScalarSubquery`/`preprocessScalarSubqueries` (`Parser/Query.lean`) elaborate the
+      inner aggregate and inject it via `exprToSyntax`; a bare-term `sql_col` production (auto-named)
+      lets the inner aggregate go unaliased. **Correlated** subqueries (inner `WHERE` references the
+      outer row) are the remaining half — they need the value computed per outer row, not as a constant.
+      See Example 30. (Corpus note: scalar-subquery-in-SELECT is ~2.2%, not the roadmap's earlier 71.2%.)
 - [ ] **3.5 `WITH RECURSIVE` (XL).** 3 queries. **Out of scope** — the grammar rejects it.
 
 ---

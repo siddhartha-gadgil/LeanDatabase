@@ -23,16 +23,28 @@ syntax ident "." "*" : sql_cols     -- qualified star `t.*` — every column of 
 declare_syntax_cat sql_col
 syntax ident : sql_col
 syntax term "AS" ident : sql_col
+syntax (priority := low) term : sql_col                            -- bare computed column, auto-named
+syntax (priority := high) "(" sql_query ")" "AS" ident : sql_col   -- scalar subquery `(SELECT AGG … ) AS name` (3.4)
 syntax sql_col,* : sql_cols
 
+/-- Auto-name for a bare (unaliased) computed column: its source text with non-ident chars dropped,
+so `SUM(amt)` → `SUMamt`. Deterministic, so both sides of an equivalence agree. -/
+def autoColName (t : Syntax) : Name :=
+  Name.mkSimple <| ((t.reprint.getD "col").toList.filter (fun c => c.isAlphanum || c == '_')).asString
+
+-- Scalar-subquery columns are rewritten to `term AS ident` before this is called, so the subquery
+-- case is unreachable here.
 def sqlColTerm : TSyntax `sql_col → Syntax.Term
   | `(sql_col| $col:ident) => col
   | `(sql_col| $col:term AS $_:ident) => col
+  | `(sql_col| $col:term) => col
   | _ => unreachable!
 
 def sqlColName : TSyntax `sql_col → Name
   | `(sql_col| $col:ident) => col.getId
   | `(sql_col| $_:term AS $x:ident) => x.getId
+  | `(sql_col| ( $_:sql_query ) AS $x:ident) => x.getId
+  | `(sql_col| $col:term) => autoColName col.raw
   | _ => unreachable!
 
 -- `ORDER BY` items carry an optional `ASC`/`DESC`. Under set semantics row order is not observable,
