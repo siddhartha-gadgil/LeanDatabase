@@ -115,6 +115,8 @@ partial def liftAggExprs (stx : Syntax) :
     | `(MIN($e:term))   => record .min e
     | `(MAX($e:term))   => record .max e
     | `(AVG($e:term))   => record .avg e
+    | `(STDDEV($e:term)) | `(STDDEV_POP($e:term)) | `(STDDEV_SAMP($e:term)) => record .stddev e
+    | `(VARIANCE($e:term)) | `(VAR_POP($e:term)) | `(VAR_SAMP($e:term)) => record .variance e
     | `(COUNT(CASE $[WHEN $cs THEN $_vs]* END))
     | `(COUNT(CASE $[WHEN $cs THEN $_vs]* ELSE NULL END)) => do
         -- `COUNT(CASE WHEN p THEN _ [ELSE NULL] END)` counts the rows where some `p` holds — a

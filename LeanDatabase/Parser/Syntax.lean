@@ -291,78 +291,89 @@ Uninterpreted-by-default: each SQL scalar becomes an `opaque` constant from `Ope
 (emitted as a fully-qualified ident so this file stays dependency-free, as with `LIKE`). Identical
 calls cancel by congruence. Adding a scalar = one `opaque` there + one syntax/macro line here.
 `CAST` is intentionally *not* here — it needs a real coercion (ROADMAP 2.4). -/
-syntax:max "ROUND" "(" term ")" : term
-syntax:max "ROUND" "(" term "," term ")" : term
-syntax:max "ABS" "(" term ")" : term
-syntax:max "CEIL" "(" term ")" : term
-syntax:max "FLOOR" "(" term ")" : term
-syntax:max "YEAR" "(" term ")" : term
-syntax:max "MONTH" "(" term ")" : term
-syntax:max "DAY" "(" term ")" : term
-syntax:max "UPPER" "(" term ")" : term
-syntax:max "LOWER" "(" term ")" : term
-syntax:max "TRIM" "(" term ")" : term
-syntax:max "LENGTH" "(" term ")" : term
+open Lean in
+/-- `scalarN "SQLNAME" "constName"` declares a 1/2/3-arg SQL scalar in one line: the syntax **and**
+the rewrite to `LeanDatabase.Scalar.constName` (emitted hygiene-free, since this file doesn't import
+`Scalar`). Adding an ordinary opaque scalar = one `opaque` in `Scalar.lean` + one line below. -/
+macro "scalar1" kw:str fn:str : command => do
+  let nm : Name := `LeanDatabase.Scalar ++ fn.getString.toName
+  `(macro:max $kw:str "(" x:term ")" : term => `($$(mkIdent $(quote nm)) $$x))
+macro "scalar2" kw:str fn:str : command => do
+  let nm : Name := `LeanDatabase.Scalar ++ fn.getString.toName
+  `(macro:max $kw:str "(" a:term "," b:term ")" : term => `($$(mkIdent $(quote nm)) $$a $$b))
+macro "scalar3" kw:str fn:str : command => do
+  let nm : Name := `LeanDatabase.Scalar ++ fn.getString.toName
+  `(macro:max $kw:str "(" a:term "," b:term "," c:term ")" : term =>
+      `($$(mkIdent $(quote nm)) $$a $$b $$c))
 
--- `EXTRACT(YEAR FROM d)` — the SQL-standard spelling of `YEAR(d)`/`MONTH(d)`/`DAY(d)`.
-syntax:max "EXTRACT" "(" "YEAR" "FROM" term ")" : term
-syntax:max "EXTRACT" "(" "MONTH" "FROM" term ")" : term
-syntax:max "EXTRACT" "(" "DAY" "FROM" term ")" : term
+-- The scalar table — one line each (numeric, string, date). All opaque, cancel by congruence.
+scalar1 "ABS" "abs"
+scalar1 "CEIL" "ceil"
+scalar1 "FLOOR" "floor"
+scalar1 "SIGN" "sign"
+scalar1 "SQRT" "sqrtOf"
+scalar1 "EXP" "expOf"
+scalar1 "LN" "lnOf"
+scalar1 "TRUNC" "truncNum"
+scalar1 "UPPER" "upperOf"
+scalar1 "LOWER" "lowerOf"
+scalar1 "TRIM" "trimOf"
+scalar1 "LTRIM" "ltrimOf"
+scalar1 "RTRIM" "rtrimOf"
+scalar1 "INITCAP" "initcapOf"
+scalar1 "REVERSE" "reverseOf"
+scalar1 "LENGTH" "lengthOf"
+scalar1 "YEAR" "yearOf"
+scalar1 "MONTH" "monthOf"
+scalar1 "DAY" "dayOf"
+scalar1 "QUARTER" "quarterOf"
+scalar1 "WEEK" "weekOf"
+scalar1 "HOUR" "hourOf"
+scalar1 "MINUTE" "minuteOf"
+scalar1 "SECOND" "secondOf"
+scalar1 "DAYOFWEEK" "dayOfWeek"
+scalar1 "TO_DATE" "toDate"
+scalar1 "TO_TIMESTAMP" "toTimestamp"
+scalar1 "LAST_DAY" "lastDay"
+scalar2 "MOD" "modOf"
+scalar2 "POWER" "powerOf"
+scalar2 "POW" "powerOf"
+scalar2 "LOG" "logOf"
+scalar2 "GREATEST" "greatestOf"
+scalar2 "LEAST" "leastOf"
+scalar2 "CONCAT" "concat"
+scalar2 "REGEXP_SUBSTR" "regexpSubstr"
+scalar2 "STRPOS" "strposOf"
+scalar2 "POSITION" "strposOf"
+scalar2 "DATE_TRUNC" "dateTrunc"
+scalar2 "DATE_PART" "datePart"
+scalar3 "SUBSTR" "substr"
+scalar3 "SPLIT_PART" "splitPart"
+scalar3 "REPLACE" "replaceOf"
+scalar3 "REGEXP_REPLACE" "regexpReplace"
+scalar3 "LPAD" "lpadOf"
+scalar3 "RPAD" "rpadOf"
+scalar3 "DATEDIFF" "dateDiff"
+scalar3 "DATE_ADD" "dateAdd"
 
--- Date/string scalars (opaque; cancel identically on both sides).
-syntax:max "TO_DATE" "(" term ")" : term
-syntax:max "TO_TIMESTAMP" "(" term ")" : term
-syntax:max "DATE_TRUNC" "(" term "," term ")" : term
-syntax:max "CONCAT" "(" term "," term ")" : term
-syntax:max "SUBSTR" "(" term "," term "," term ")" : term
-syntax:max "SPLIT_PART" "(" term "," term "," term ")" : term
-syntax:max "REGEXP_SUBSTR" "(" term "," term ")" : term
-syntax:max "REPLACE" "(" term "," term "," term ")" : term
-
--- More numeric scalars (opaque).
-syntax:max "SIGN" "(" term ")" : term
-syntax:max "SQRT" "(" term ")" : term
-syntax:max "EXP" "(" term ")" : term
-syntax:max "LN" "(" term ")" : term
-syntax:max "TRUNC" "(" term ")" : term
-syntax:max "MOD" "(" term "," term ")" : term
-syntax:max "POWER" "(" term "," term ")" : term
-syntax:max "POW" "(" term "," term ")" : term
-syntax:max "LOG" "(" term "," term ")" : term
-syntax:max "GREATEST" "(" term "," term ")" : term
-syntax:max "GREATEST" "(" term "," term "," term ")" : term
-syntax:max "LEAST" "(" term "," term ")" : term
-syntax:max "LEAST" "(" term "," term "," term ")" : term
-
--- More string scalars (opaque).
-syntax:max "REGEXP_REPLACE" "(" term "," term "," term ")" : term
-syntax:max "LTRIM" "(" term ")" : term
-syntax:max "RTRIM" "(" term ")" : term
-syntax:max "INITCAP" "(" term ")" : term
-syntax:max "REVERSE" "(" term ")" : term
-syntax:max "LPAD" "(" term "," term "," term ")" : term
-syntax:max "RPAD" "(" term "," term "," term ")" : term
-syntax:max "STRPOS" "(" term "," term ")" : term
-syntax:max "POSITION" "(" term "," term ")" : term
-
--- More date scalars (opaque).
-syntax:max "QUARTER" "(" term ")" : term
-syntax:max "WEEK" "(" term ")" : term
-syntax:max "HOUR" "(" term ")" : term
-syntax:max "MINUTE" "(" term ")" : term
-syntax:max "SECOND" "(" term ")" : term
-syntax:max "DAYOFWEEK" "(" term ")" : term
-syntax:max "DATEDIFF" "(" term "," term "," term ")" : term
-syntax:max "DATE_PART" "(" term "," term ")" : term
-syntax:max "DATE_ADD" "(" term "," term "," term ")" : term
-syntax:max "LAST_DAY" "(" term ")" : term
-
--- Conditional scalars. `NVL` = `COALESCE`; `NVL2(x,a,b)` picks by null-ness; `IFF`/`IF(c,a,b)` is a
--- value-level conditional (like `CASE WHEN c THEN a ELSE b`).
-syntax:max "NVL" "(" term "," term ")" : term
-syntax:max "NVL2" "(" term "," term "," term ")" : term
-syntax:max "IFF" "(" term "," term "," term ")" : term
-syntax:max "IF" "(" term "," term "," term ")" : term
+-- Non-uniform scalars (special emission), as `macro` one-liners.
+open Lean in
+macro:max "ROUND" "(" x:term ")" : term => `($(mkIdent `LeanDatabase.Scalar.round) $x 0)
+open Lean in
+macro:max "ROUND" "(" x:term "," n:term ")" : term => `($(mkIdent `LeanDatabase.Scalar.round) $x $n)
+open Lean in
+macro:max "EXTRACT" "(" "YEAR" "FROM" x:term ")" : term => `($(mkIdent `LeanDatabase.Scalar.yearOf) $x)
+open Lean in
+macro:max "EXTRACT" "(" "MONTH" "FROM" x:term ")" : term => `($(mkIdent `LeanDatabase.Scalar.monthOf) $x)
+open Lean in
+macro:max "EXTRACT" "(" "DAY" "FROM" x:term ")" : term => `($(mkIdent `LeanDatabase.Scalar.dayOf) $x)
+-- 3-arg GREATEST/LEAST fold to the 2-arg form; conditionals are genuine (not opaque).
+macro:max "GREATEST" "(" a:term "," b:term "," c:term ")" : term => `(GREATEST(GREATEST($a, $b), $c))
+macro:max "LEAST" "(" a:term "," b:term "," c:term ")" : term => `(LEAST(LEAST($a, $b), $c))
+macro:max "NVL" "(" x:term "," d:term ")" : term => `(Option.getD $x $d)
+macro:max "NVL2" "(" x:term "," a:term "," b:term ")" : term => `(bif Option.isSome $x then $a else $b)
+macro:max "IFF" "(" c:term "," a:term "," b:term ")" : term => `(bif ($c : Bool) then $a else $b)
+macro:max "IF" "(" c:term "," a:term "," b:term ")" : term => `(bif ($c : Bool) then $a else $b)
 
 -- `CAST(x AS <type>)`. The `::` cast form is intentionally unsupported — overriding `::` would
 -- clobber `List.cons` globally. Elaborated (type-directed) in `Parser/Context.lean`, NOT as a macro:
@@ -381,71 +392,6 @@ syntax "STRING" : sql_cast_type
 syntax "TEXT" : sql_cast_type
 syntax "VARCHAR" : sql_cast_type
 syntax:max "CAST" "(" term "AS" sql_cast_type ")" : term
-
--- Emit the opaque constants as raw (non-hygienic) idents that resolve at the *use* site — this file
--- doesn't import `Operators/Scalar.lean`, so a literal quoted name would be hygiene-marked and fail
--- to resolve (same reason the `LIKE` macro above uses `mkIdent`).
-open Lean in
-macro_rules
-  | `(ROUND($x))     => `($(mkIdent `LeanDatabase.Scalar.round) $x 0)
-  | `(ROUND($x, $n)) => `($(mkIdent `LeanDatabase.Scalar.round) $x $n)
-  | `(ABS($x))       => `($(mkIdent `LeanDatabase.Scalar.abs) $x)
-  | `(CEIL($x))      => `($(mkIdent `LeanDatabase.Scalar.ceil) $x)
-  | `(FLOOR($x))     => `($(mkIdent `LeanDatabase.Scalar.floor) $x)
-  | `(YEAR($x))      => `($(mkIdent `LeanDatabase.Scalar.yearOf) $x)
-  | `(MONTH($x))     => `($(mkIdent `LeanDatabase.Scalar.monthOf) $x)
-  | `(DAY($x))       => `($(mkIdent `LeanDatabase.Scalar.dayOf) $x)
-  | `(UPPER($x))     => `($(mkIdent `LeanDatabase.Scalar.upperOf) $x)
-  | `(LOWER($x))     => `($(mkIdent `LeanDatabase.Scalar.lowerOf) $x)
-  | `(TRIM($x))      => `($(mkIdent `LeanDatabase.Scalar.trimOf) $x)
-  | `(LENGTH($x))    => `($(mkIdent `LeanDatabase.Scalar.lengthOf) $x)
-  | `(EXTRACT(YEAR FROM $x))  => `($(mkIdent `LeanDatabase.Scalar.yearOf) $x)
-  | `(EXTRACT(MONTH FROM $x)) => `($(mkIdent `LeanDatabase.Scalar.monthOf) $x)
-  | `(EXTRACT(DAY FROM $x))   => `($(mkIdent `LeanDatabase.Scalar.dayOf) $x)
-  | `(TO_DATE($x))            => `($(mkIdent `LeanDatabase.Scalar.toDate) $x)
-  | `(TO_TIMESTAMP($x))       => `($(mkIdent `LeanDatabase.Scalar.toTimestamp) $x)
-  | `(DATE_TRUNC($u, $x))     => `($(mkIdent `LeanDatabase.Scalar.dateTrunc) $u $x)
-  | `(CONCAT($a, $b))         => `($(mkIdent `LeanDatabase.Scalar.concat) $a $b)
-  | `(SUBSTR($x, $i, $n))     => `($(mkIdent `LeanDatabase.Scalar.substr) $x $i $n)
-  | `(SPLIT_PART($x, $d, $n)) => `($(mkIdent `LeanDatabase.Scalar.splitPart) $x $d $n)
-  | `(REGEXP_SUBSTR($x, $p))  => `($(mkIdent `LeanDatabase.Scalar.regexpSubstr) $x $p)
-  | `(REPLACE($x, $a, $b))    => `($(mkIdent `LeanDatabase.Scalar.replaceOf) $x $a $b)
-  | `(SIGN($x))               => `($(mkIdent `LeanDatabase.Scalar.sign) $x)
-  | `(SQRT($x))               => `($(mkIdent `LeanDatabase.Scalar.sqrtOf) $x)
-  | `(EXP($x))                => `($(mkIdent `LeanDatabase.Scalar.expOf) $x)
-  | `(LN($x))                 => `($(mkIdent `LeanDatabase.Scalar.lnOf) $x)
-  | `(TRUNC($x))              => `($(mkIdent `LeanDatabase.Scalar.truncNum) $x)
-  | `(MOD($a, $b))            => `($(mkIdent `LeanDatabase.Scalar.modOf) $a $b)
-  | `(POWER($a, $b))          => `($(mkIdent `LeanDatabase.Scalar.powerOf) $a $b)
-  | `(POW($a, $b))            => `($(mkIdent `LeanDatabase.Scalar.powerOf) $a $b)
-  | `(LOG($a, $b))            => `($(mkIdent `LeanDatabase.Scalar.logOf) $a $b)
-  | `(GREATEST($a, $b))       => `($(mkIdent `LeanDatabase.Scalar.greatestOf) $a $b)
-  | `(GREATEST($a, $b, $c))   => `($(mkIdent `LeanDatabase.Scalar.greatestOf) ($(mkIdent `LeanDatabase.Scalar.greatestOf) $a $b) $c)
-  | `(LEAST($a, $b))          => `($(mkIdent `LeanDatabase.Scalar.leastOf) $a $b)
-  | `(LEAST($a, $b, $c))      => `($(mkIdent `LeanDatabase.Scalar.leastOf) ($(mkIdent `LeanDatabase.Scalar.leastOf) $a $b) $c)
-  | `(REGEXP_REPLACE($x, $p, $r)) => `($(mkIdent `LeanDatabase.Scalar.regexpReplace) $x $p $r)
-  | `(LTRIM($x))              => `($(mkIdent `LeanDatabase.Scalar.ltrimOf) $x)
-  | `(RTRIM($x))              => `($(mkIdent `LeanDatabase.Scalar.rtrimOf) $x)
-  | `(INITCAP($x))            => `($(mkIdent `LeanDatabase.Scalar.initcapOf) $x)
-  | `(REVERSE($x))            => `($(mkIdent `LeanDatabase.Scalar.reverseOf) $x)
-  | `(LPAD($x, $n, $p))       => `($(mkIdent `LeanDatabase.Scalar.lpadOf) $x $n $p)
-  | `(RPAD($x, $n, $p))       => `($(mkIdent `LeanDatabase.Scalar.rpadOf) $x $n $p)
-  | `(STRPOS($x, $s))         => `($(mkIdent `LeanDatabase.Scalar.strposOf) $x $s)
-  | `(POSITION($x, $s))       => `($(mkIdent `LeanDatabase.Scalar.strposOf) $x $s)
-  | `(QUARTER($x))            => `($(mkIdent `LeanDatabase.Scalar.quarterOf) $x)
-  | `(WEEK($x))               => `($(mkIdent `LeanDatabase.Scalar.weekOf) $x)
-  | `(HOUR($x))               => `($(mkIdent `LeanDatabase.Scalar.hourOf) $x)
-  | `(MINUTE($x))             => `($(mkIdent `LeanDatabase.Scalar.minuteOf) $x)
-  | `(SECOND($x))             => `($(mkIdent `LeanDatabase.Scalar.secondOf) $x)
-  | `(DAYOFWEEK($x))          => `($(mkIdent `LeanDatabase.Scalar.dayOfWeek) $x)
-  | `(DATEDIFF($u, $a, $b))   => `($(mkIdent `LeanDatabase.Scalar.dateDiff) $u $a $b)
-  | `(DATE_PART($p, $d))      => `($(mkIdent `LeanDatabase.Scalar.datePart) $p $d)
-  | `(DATE_ADD($u, $n, $d))   => `($(mkIdent `LeanDatabase.Scalar.dateAdd) $u $n $d)
-  | `(LAST_DAY($d))           => `($(mkIdent `LeanDatabase.Scalar.lastDay) $d)
-  | `(NVL($x, $d))            => `(Option.getD $x $d)
-  | `(NVL2($x, $a, $b))       => `(bif Option.isSome $x then $a else $b)
-  | `(IFF($c, $a, $b))        => `(bif ($c : Bool) then $a else $b)
-  | `(IF($c, $a, $b))         => `(bif ($c : Bool) then $a else $b)
 
 /-!
 ## Aggregates (`SUM`/`COUNT`/`AVG`/`MIN`/`MAX`)

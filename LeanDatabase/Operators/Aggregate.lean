@@ -293,6 +293,13 @@ def groupAvg (key : TypedTuple colType → K)
     (f : TypedTuple colType → Int) : Rat :=
   (groupSum key k rel f : Rat) / (groupCount key k rel : Rat)
 
+/-- `STDDEV(f)` / `VARIANCE(f)` — statistical aggregates, uninterpreted (`Rat`-valued). They cancel
+identically on both sides of an equivalence; we don't model their arithmetic. -/
+opaque groupStddev (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
+    (f : TypedTuple colType → Int) : Rat := 0
+opaque groupVariance (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
+    (f : TypedTuple colType → Int) : Rat := 0
+
 /-- `AVG` counterpart of `group_restrict_of_forall` — a `WHERE`-restricted `groupAvg` equals the
 unrestricted one when the restriction predicate is implied by membership in group `k`. -/
 theorem groupAvg_restrict_of_forall (key : TypedTuple colType → K) (k : K)
@@ -483,5 +490,5 @@ end LeanDatabase.TypedAgg
 /- Re-export the aggregate operators into the top-level `LeanDatabase` namespace-/
 namespace LeanDatabase
 export LeanDatabase.TypedAgg
-  (group groupCount groupSum groupKeys groupMax groupMaxInt groupMinInt groupAvg groupSumDistinct groupCountDistinct groupAvgDistinct groupBoolAnd groupBoolOr relCount relSum relMax relMin relCountDistinct relAvg groupBy)
+  (group groupCount groupSum groupKeys groupMax groupMaxInt groupMinInt groupAvg groupSumDistinct groupCountDistinct groupAvgDistinct groupBoolAnd groupBoolOr groupStddev groupVariance relCount relSum relMax relMin relCountDistinct relAvg groupBy)
 end LeanDatabase

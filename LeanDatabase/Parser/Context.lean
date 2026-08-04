@@ -115,6 +115,12 @@ syntax "MAX" "(" term ")" : term
 syntax "BOOL_AND" "(" term ")" : term
 syntax "EVERY" "(" term ")" : term
 syntax "BOOL_OR" "(" term ")" : term
+syntax "STDDEV" "(" term ")" : term
+syntax "STDDEV_POP" "(" term ")" : term
+syntax "STDDEV_SAMP" "(" term ")" : term
+syntax "VARIANCE" "(" term ")" : term
+syntax "VAR_POP" "(" term ")" : term
+syntax "VAR_SAMP" "(" term ")" : term
 
 def expandNames (labels : List Name) (stx: Syntax) (aliases : List (Name × Name) := []) :
     MetaM Syntax := do
@@ -228,6 +234,7 @@ inductive AggKind where
   | sum | min | max | avg | count
   | sumDistinct | countDistinct | avgDistinct
   | boolAnd | boolOr
+  | stddev | variance
   deriving DecidableEq
 
 /-- The summand shape: `void` (no argument, `COUNT(*)`), an `Int`/`Bool` expression, or a type-probed
@@ -246,6 +253,8 @@ def AggKind.op : AggKind → Name
   | .avgDistinct => ``groupAvgDistinct
   | .boolAnd => ``groupBoolAnd
   | .boolOr => ``groupBoolOr
+  | .stddev => ``groupStddev
+  | .variance => ``groupVariance
 
 /-- The summand each aggregate feeds its operator. -/
 def AggKind.summand : AggKind → AggSummand
@@ -262,7 +271,7 @@ def AggKind.wrapNat : AggKind → Bool
 /-- The SQL column type of the aggregate's result. -/
 def AggKind.resultType : AggKind → SQLTypeProxy
   | .boolAnd | .boolOr => .bool
-  | .avg | .avgDistinct => .float   -- AVG is exact `Rat` division (S2)
+  | .avg | .avgDistinct | .stddev | .variance => .float   -- Rat-valued
   | _ => .int
 
 /-- Builds one grouped aggregate per lifted `(freshName, kind, expr)`: each `expr` is elaborated
