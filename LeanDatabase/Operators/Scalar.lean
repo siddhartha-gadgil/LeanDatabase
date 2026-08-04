@@ -80,6 +80,7 @@ opaque reverseOf (x : String) : String := x
 opaque lpadOf (x : String) (n : Int) (pad : String) : String := x
 opaque rpadOf (x : String) (n : Int) (pad : String) : String := x
 opaque strposOf (x : String) (sub : String) : Int := 0
+opaque arrayToString (a : String) (delim : String) : String := a
 
 /-! ## `CAST` — a *real* coercion, never opaque (ROADMAP 2.4)
 

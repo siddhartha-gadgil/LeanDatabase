@@ -265,10 +265,11 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
           tableVars.findSome? (fun (e, name, cols) => if cands.contains name then some (e, name, cols) else none)
           | throwError s!"Unknown table {full}"
         return (tableExpr, columns)
-    | `(sql_from| $t:ident AS $x:ident) => do
-      -- Aliased table: resolve the base and rename its columns to the alias prefix, so two aliases of
-      -- the *same* base table get distinct columns (self-joins, S3). The relation is positional, so
-      -- renaming labels is all that's needed.
+    | `(sql_from| $t:ident AS $x:ident)
+    | `(sql_from| $t:ident $x:ident) => do
+      -- Aliased table (`t AS x` or bare `t x`): resolve the base and rename its columns to the alias
+      -- prefix, so two aliases of the *same* base table get distinct columns (self-joins, S3). The
+      -- relation is positional, so renaming labels is all that's needed.
       let (e, cols) ← productPair (← `(sql_from| $t:ident))
       let baseP := (t.getId.components.getLast?).getD t.getId
       return (e, cols.map (fun (n, ty) => (n.replacePrefix baseP x.getId, ty)))
@@ -290,18 +291,26 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
     | `(sql_from| $f1:sql_from FULL OUTER JOIN $t:ident ON $cond:term) =>
       outerJoin f1 t none cond ``fullOuterJoin ``ofOuterFull true true
     -- Aliased-RHS joins: build with the alias-renamed right table (so self-joins get distinct cols).
-    | `(sql_from| $f1:sql_from JOIN $t:ident AS $x:ident ON $cond:term) =>
+    | `(sql_from| $f1:sql_from JOIN $t:ident AS $x:ident ON $cond:term)
+    | `(sql_from| $f1:sql_from JOIN $t:ident $x:ident ON $cond:term) =>
       innerJoin f1 (← `(sql_from| $t:ident AS $x:ident)) (some cond)
-    | `(sql_from| $f1:sql_from CROSS JOIN $t:ident AS $x:ident) =>
+    | `(sql_from| $f1:sql_from CROSS JOIN $t:ident AS $x:ident)
+    | `(sql_from| $f1:sql_from CROSS JOIN $t:ident $x:ident) =>
       innerJoin f1 (← `(sql_from| $t:ident AS $x:ident)) none
     | `(sql_from| $f1:sql_from LEFT JOIN $t:ident AS $x:ident ON $cond:term)
-    | `(sql_from| $f1:sql_from LEFT OUTER JOIN $t:ident AS $x:ident ON $cond:term) =>
+    | `(sql_from| $f1:sql_from LEFT OUTER JOIN $t:ident AS $x:ident ON $cond:term)
+    | `(sql_from| $f1:sql_from LEFT JOIN $t:ident $x:ident ON $cond:term)
+    | `(sql_from| $f1:sql_from LEFT OUTER JOIN $t:ident $x:ident ON $cond:term) =>
       outerJoin f1 t (some x) cond ``leftOuterJoin ``ofOuterLeft false true
     | `(sql_from| $f1:sql_from RIGHT JOIN $t:ident AS $x:ident ON $cond:term)
-    | `(sql_from| $f1:sql_from RIGHT OUTER JOIN $t:ident AS $x:ident ON $cond:term) =>
+    | `(sql_from| $f1:sql_from RIGHT OUTER JOIN $t:ident AS $x:ident ON $cond:term)
+    | `(sql_from| $f1:sql_from RIGHT JOIN $t:ident $x:ident ON $cond:term)
+    | `(sql_from| $f1:sql_from RIGHT OUTER JOIN $t:ident $x:ident ON $cond:term) =>
       outerJoin f1 t (some x) cond ``rightOuterJoin ``ofOuterRight true false
     | `(sql_from| $f1:sql_from FULL JOIN $t:ident AS $x:ident ON $cond:term)
-    | `(sql_from| $f1:sql_from FULL OUTER JOIN $t:ident AS $x:ident ON $cond:term) =>
+    | `(sql_from| $f1:sql_from FULL OUTER JOIN $t:ident AS $x:ident ON $cond:term)
+    | `(sql_from| $f1:sql_from FULL JOIN $t:ident $x:ident ON $cond:term)
+    | `(sql_from| $f1:sql_from FULL OUTER JOIN $t:ident $x:ident ON $cond:term) =>
       outerJoin f1 t (some x) cond ``fullOuterJoin ``ofOuterFull true true
     -- Inner `JOIN ON` / `CROSS JOIN` handled here (not just via `escapeJoin`) so they compose with
     -- GROUP BY / ORDER BY / LIMIT, which `escapeJoin`'s whole-query rewrite doesn't reach (C1).

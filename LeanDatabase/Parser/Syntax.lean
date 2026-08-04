@@ -63,6 +63,7 @@ def sqlOrderCol : TSyntax `sql_order_item → TSyntax `sql_col
 -- Base Cases (The atomic sources of data)
 syntax ident : sql_from                               -- 1. Standard table name
 syntax ident "AS" ident : sql_from                    -- 1b. Aliased table (`t AS x`)
+syntax ident ident : sql_from                         -- 1c. Bare alias (`t x`) — the corpus norm
 syntax "(" sql_query ")" "AS" ident : sql_from       -- 2. Subquery with mandatory alias
 
 -- Recursive Cases (Chaining joins from left to right)
@@ -89,6 +90,15 @@ syntax sql_from "RIGHT" "JOIN" ident "AS" ident "ON" term : sql_from
 syntax sql_from "RIGHT" "OUTER" "JOIN" ident "AS" ident "ON" term : sql_from
 syntax sql_from "FULL" "JOIN" ident "AS" ident "ON" term : sql_from
 syntax sql_from "FULL" "OUTER" "JOIN" ident "AS" ident "ON" term : sql_from
+-- 7b. Bare-alias RHS (`… JOIN t x ON …`) — same, without `AS`.
+syntax sql_from "JOIN" ident ident "ON" term : sql_from
+syntax sql_from "CROSS" "JOIN" ident ident : sql_from
+syntax sql_from "LEFT" "JOIN" ident ident "ON" term : sql_from
+syntax sql_from "LEFT" "OUTER" "JOIN" ident ident "ON" term : sql_from
+syntax sql_from "RIGHT" "JOIN" ident ident "ON" term : sql_from
+syntax sql_from "RIGHT" "OUTER" "JOIN" ident ident "ON" term : sql_from
+syntax sql_from "FULL" "JOIN" ident ident "ON" term : sql_from
+syntax sql_from "FULL" "OUTER" "JOIN" ident ident "ON" term : sql_from
 
 syntax "SELECT " (" DISTINCT ")? sql_cols " FROM " sql_from (" WHERE " term)?  (" GROUP " " BY " ident,* (" HAVING " term)?)? (" ORDER " " BY " sql_order_item,*)? (" LIMIT " num)? (";")? : sql_query
 
@@ -154,6 +164,7 @@ partial def getIdents (stx : TSyntax `sql_from) : List Name :=
   match stx with
   | `(sql_from| $db:ident) => [db.getId]
   | `(sql_from| $t:ident AS $_:ident) => [t.getId]
+  | `(sql_from| $t:ident $_:ident) => [t.getId]
   | `(sql_from| $f1:sql_from , $f2:sql_from) => getIdents f1 ++ getIdents f2
   | _ => []
 
@@ -173,6 +184,15 @@ partial def collectAliases : Syntax → List (Name × Name) :=
       | `(sql_from| $_:sql_from RIGHT OUTER JOIN $t:ident AS $x:ident ON $_) => [(x.getId, baseOf t)]
       | `(sql_from| $_:sql_from FULL JOIN $t:ident AS $x:ident ON $_) => [(x.getId, baseOf t)]
       | `(sql_from| $_:sql_from FULL OUTER JOIN $t:ident AS $x:ident ON $_) => [(x.getId, baseOf t)]
+      | `(sql_from| $t:ident $x:ident) => [(x.getId, baseOf t)]
+      | `(sql_from| $_:sql_from JOIN $t:ident $x:ident ON $_) => [(x.getId, baseOf t)]
+      | `(sql_from| $_:sql_from CROSS JOIN $t:ident $x:ident) => [(x.getId, baseOf t)]
+      | `(sql_from| $_:sql_from LEFT JOIN $t:ident $x:ident ON $_) => [(x.getId, baseOf t)]
+      | `(sql_from| $_:sql_from LEFT OUTER JOIN $t:ident $x:ident ON $_) => [(x.getId, baseOf t)]
+      | `(sql_from| $_:sql_from RIGHT JOIN $t:ident $x:ident ON $_) => [(x.getId, baseOf t)]
+      | `(sql_from| $_:sql_from RIGHT OUTER JOIN $t:ident $x:ident ON $_) => [(x.getId, baseOf t)]
+      | `(sql_from| $_:sql_from FULL JOIN $t:ident $x:ident ON $_) => [(x.getId, baseOf t)]
+      | `(sql_from| $_:sql_from FULL OUTER JOIN $t:ident $x:ident ON $_) => [(x.getId, baseOf t)]
       | _ => []
     stx.getArgs.foldl (fun acc s => acc ++ collectAliases s) here
 
@@ -284,6 +304,17 @@ macro_rules
 -- intercepts exactly that shape and rewrites it to the indicator sum.
 syntax:90 "CASE" ( "WHEN" term "THEN" term ) + "END" : term
 
+-- Simple `CASE e WHEN v1 THEN r1 … [ELSE d] END` → the searched form comparing `e == vᵢ`.
+syntax:90 "CASE" term ( "WHEN" term "THEN" term ) + "ELSE" term "END" : term
+syntax:90 "CASE" term ( "WHEN" term "THEN" term ) + "END" : term
+macro_rules
+  | `(CASE $e:term $[WHEN $vs THEN $rs]* ELSE $d END) => do
+      let cs ← vs.mapM fun v => `($e == $v)
+      `(CASE $[WHEN $cs THEN $rs]* ELSE $d END)
+  | `(CASE $e:term $[WHEN $vs THEN $rs]* END) => do
+      let cs ← vs.mapM fun v => `($e == $v)
+      `(CASE $[WHEN $cs THEN $rs]* END)
+
 
 /-! ## Scalar functions
 
@@ -354,7 +385,9 @@ scalar3 "REGEXP_REPLACE" "regexpReplace"
 scalar3 "LPAD" "lpadOf"
 scalar3 "RPAD" "rpadOf"
 scalar3 "DATEDIFF" "dateDiff"
+scalar3 "TIMESTAMPDIFF" "dateDiff"
 scalar3 "DATE_ADD" "dateAdd"
+scalar2 "ARRAY_TO_STRING" "arrayToString"
 
 -- Non-uniform scalars (special emission), as `macro` one-liners.
 open Lean in
