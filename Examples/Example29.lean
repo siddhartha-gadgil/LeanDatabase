@@ -45,6 +45,13 @@ theorem postfix_cast :
       = sql%([TIMESERIES_schema]) "SELECT SUM(val)::FLOAT AS r FROM TIMESERIES WHERE val < 9 AND val > 1 GROUP BY VARIABLE" := by
   sql_equiv
 
+/-- Identifiers are case-insensitive: the same query in UPPER, lower, and `MixedCase` (table, alias,
+and columns) all denote the same relation, since every identifier folds to a common case. -/
+theorem case_insensitive :
+    sql%([TIMESERIES_schema]) "SELECT t.VAL FROM TimeSeries AS t WHERE t.Val > 1 AND t.val < 9"
+      = sql%([TIMESERIES_schema]) "SELECT val FROM timeseries WHERE val > 1 AND val < 9" := by
+  sql_equiv
+
 /-- The whole corpus shape at once: 3-part quoted tables, aliases, quoted `ON` columns, and an
 `IN`-list rewritten as an `OR`-chain — the first `crossskill` record's difference. -/
 theorem corpus_join :

@@ -438,10 +438,28 @@ private partial def castGo : List Char → List Char → List Char
 def normalizeSqlLiterals (s : String) : String :=
   (castGo (normalizeGo s.toList "").toList []).reverse.asString
 
+/-- Fold a `Name`'s string components to lowercase (case-insensitive identifiers, C3). -/
+def lowerName (n : Name) : Name :=
+  n.components.foldl (init := Name.anonymous) fun acc c =>
+    match c with
+    | .str _ s => acc.str s.toLower
+    | .num _ k => acc.num k
+    | _ => acc
+
+/-- Lowercase every `ident` in the parsed query — keyword atoms and string literals are untouched, so
+`SELECT`/`FROM` and `'US'` are unaffected while `T."Col"` and table names fold. -/
+def lowerIdents (stx : Syntax) : Syntax :=
+  stx.replaceM (m := Id) fun s => match s with
+    | .ident info raw val pre => some (.ident info raw (lowerName val) pre)
+    | _ => none
+
 def parseSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (str : String) : TermElabM (Expr × List (Name × SQLTypeProxy)) := do
   let str := normalizeSqlLiterals str
+  -- Case-insensitive identifiers: fold the schema and the query's idents to a common (lower) case.
+  let tables := tables.map (fun (t, cols) => (lowerName t, cols.map (fun (c, ty) => (lowerName c, ty))))
   let tables := tables.map (fun (tableName, columns) => (tableName, schemaWithFullNames tableName columns))
   let .ok stx := Parser.runParserCategory (← getEnv) `sql_query str | throwError "Failed to parse SQL query: {str}"
+  let stx := lowerIdents stx
   let labels := tables.foldl (fun acc (_, columns) => acc ++ columns.map (fun (name, _) => name)) []
   let aliases := collectAliases stx
   -- A base table under two aliases (self-join) would collapse to identical column names here; reject
@@ -455,34 +473,34 @@ def parseSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (str : S
 
 /-! ## Smoke tests — the parser elaborates, and `grind` proves the equivalences -/
 
-def egTypedTupleFilter := parseTypedTupleFilter [("age", "Int"), ("isActive", "Bool"), ("height", "Float")] "age > 30 && isActive"
+def egTypedTupleFilter := parseTypedTupleFilter [("age", "Int"), ("isactive", "Bool"), ("height", "Float")] "age > 30 && isactive"
 
-def egTypedTupleFilter' := parseTypedTupleFilter [("age", "Int"), ("isActive", "Bool"), ("height", "Float")] "age > 30 && isActive && age > 20"
+def egTypedTupleFilter' := parseTypedTupleFilter [("age", "Int"), ("isactive", "Bool"), ("height", "Float")] "age > 30 && isactive && age > 20"
 
-def egTypedRelFilter := parseTypedRelFilter [("table", [("age", "Int"), ("isActive", "Bool"), ("height", "Float")])] "age > 30 && isActive && height < 180"
+def egTypedRelFilter := parseTypedRelFilter [("table", [("age", "Int"), ("isactive", "Bool"), ("height", "Float")])] "age > 30 && isactive && height < 180"
 
-def egTypedRelFilter' := parseTypedRelFilter [("table", [("age", "Int"), ("isActive", "Bool"), ("height", "Float")])] "age > 30 && isActive && age > 20 && height < 180"
+def egTypedRelFilter' := parseTypedRelFilter [("table", [("age", "Int"), ("isactive", "Bool"), ("height", "Float")])] "age > 30 && isactive && age > 20 && height < 180"
 
-def egSqlQuery := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT * FROM table WHERE age > 30 && isActive && height < 180"
+def egSqlQuery := parseSqlQuery [(`table, [(`age, .int), (`isactive, .bool), (`height, .float)])] "SELECT * FROM table WHERE age > 30 && isactive && height < 180"
 
-def egSqlQuery' := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT * FROM table WHERE age > 30 && isActive && height < 180 && age > 20"
+def egSqlQuery' := parseSqlQuery [(`table, [(`age, .int), (`isactive, .bool), (`height, .float)])] "SELECT * FROM table WHERE age > 30 && isactive && height < 180 && age > 20"
 
-def egSqlQuery₁ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT age FROM table WHERE age > 30 && isActive && height < 180"
+def egSqlQuery₁ := parseSqlQuery [(`table, [(`age, .int), (`isactive, .bool), (`height, .float)])] "SELECT age FROM table WHERE age > 30 && isactive && height < 180"
 
-def egSqlQuery₂ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT age, height FROM table WHERE age > 30 && isActive && height < 180"
+def egSqlQuery₂ := parseSqlQuery [(`table, [(`age, .int), (`isactive, .bool), (`height, .float)])] "SELECT age, height FROM table WHERE age > 30 && isactive && height < 180"
 
-def egSqlQuery₃ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)]), (`table2, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT * FROM table, table2  WHERE table.age > 30 && table.isActive && table.height < 180"
+def egSqlQuery₃ := parseSqlQuery [(`table, [(`age, .int), (`isactive, .bool), (`height, .float)]), (`table2, [(`age, .int), (`isactive, .bool), (`height, .float)])] "SELECT * FROM table, table2  WHERE table.age > 30 && table.isactive && table.height < 180"
 
-def egSqlQuery₄ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT 2 * age AS doubled_age FROM table WHERE age > 30 && isActive && height < 180"
+def egSqlQuery₄ := parseSqlQuery [(`table, [(`age, .int), (`isactive, .bool), (`height, .float)])] "SELECT 2 * age AS doubled_age FROM table WHERE age > 30 && isactive && height < 180"
 
-def egSqlQuery₅ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT COUNT(*) AS count FROM table WHERE age > 30 && isActive && height < 180 GROUP BY age"
+def egSqlQuery₅ := parseSqlQuery [(`table, [(`age, .int), (`isactive, .bool), (`height, .float)])] "SELECT COUNT(*) AS count FROM table WHERE age > 30 && isactive && height < 180 GROUP BY age"
 
-def egSqlQuery₆ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT SUM(age) AS count FROM table WHERE age > 30 && isActive && height < 180 GROUP BY isActive"
+def egSqlQuery₆ := parseSqlQuery [(`table, [(`age, .int), (`isactive, .bool), (`height, .float)])] "SELECT SUM(age) AS count FROM table WHERE age > 30 && isactive && height < 180 GROUP BY isactive"
 
-def egSqlQuery₇ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])] "SELECT SUM(age) AS sum FROM table WHERE age > 30 && isActive && height < 180 GROUP BY isActive HAVING SUM(age) < 100"
+def egSqlQuery₇ := parseSqlQuery [(`table, [(`age, .int), (`isactive, .bool), (`height, .float)])] "SELECT SUM(age) AS sum FROM table WHERE age > 30 && isactive && height < 180 GROUP BY isactive HAVING SUM(age) < 100"
 
 -- SELECT CASE WHEN age > 30 THEN 1 ELSE 0 END AS flag ...
-def egSqlQuery₈ := parseSqlQuery [(`table, [(`age, .int), (`isActive, .bool), (`height, .float)])]
+def egSqlQuery₈ := parseSqlQuery [(`table, [(`age, .int), (`isactive, .bool), (`height, .float)])]
   "SELECT CASE WHEN age > 30 THEN 1 ELSE 0 END AS flag FROM table"
 
 elab "egTypedTupleFilter%" : term => do
@@ -552,9 +570,9 @@ info: fun (table : TypedRelationOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQL
   restriction
     (fun (coords : TypedTupleOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float]) ↦
       let table.age := coords 0;
-      let table.isActive := coords 1;
+      let table.isactive := coords 1;
       let table.height := coords 2;
-      decide (table.age > 30) && table.isActive && decide (table.height < 180))
+      decide (table.age > 30) && table.isactive && decide (table.height < 180))
     table : TypedRelationOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float] →
   TypedRelation (colTypeOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float])
 -/
@@ -577,9 +595,9 @@ info: fun table ↦
   (restriction
         (fun coords ↦
           let table.age := coords 0;
-          let table.isActive := coords 1;
+          let table.isactive := coords 1;
           let table.height := coords 2;
-          decide (table.age > 30) && table.isActive && decide (table.height < 180))
+          decide (table.age > 30) && table.isactive && decide (table.height < 180))
         table).mapByList
     ["table.age"] fun coords ↦
     let table.age := coords 0;
@@ -596,9 +614,9 @@ info: fun table ↦
   (restriction
         (fun coords ↦
           let table.age := coords 0;
-          let table.isActive := coords 1;
+          let table.isactive := coords 1;
           let table.height := coords 2;
-          decide (table.age > 30) && table.isActive && decide (table.height < 180))
+          decide (table.age > 30) && table.isactive && decide (table.height < 180))
         table).mapByList
     ["table.age", "table.height"] fun coords ↦
     let table.age := coords 0;
@@ -619,9 +637,9 @@ info: fun table table2 ↦
   restriction
     (fun coords ↦
       let table.age := coords 0;
-      let table.isActive := coords 1;
+      let table.isactive := coords 1;
       let table.height := coords 2;
-      decide (table.age > 30) && table.isActive && decide (table.height < 180))
+      decide (table.age > 30) && table.isactive && decide (table.height < 180))
     (table.append
       table2) : TypedRelationOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float] →
   TypedRelationOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float] →
@@ -638,9 +656,9 @@ info: fun table ↦
   (restriction
         (fun coords ↦
           let table.age := coords 0;
-          let table.isActive := coords 1;
+          let table.isactive := coords 1;
           let table.height := coords 2;
-          decide (table.age > 30) && table.isActive && decide (table.height < 180))
+          decide (table.age > 30) && table.isactive && decide (table.height < 180))
         table).mapByList
     ["doubled_age"] fun coords ↦
     let table.age := coords 0;
@@ -656,9 +674,9 @@ info: fun table ↦
   (restriction
         (fun coords ↦
           let table.age := coords 0;
-          let table.isActive := coords 1;
+          let table.isactive := coords 1;
           let table.height := coords 2;
-          decide (table.age > 30) && table.isActive && decide (table.height < 180))
+          decide (table.age > 30) && table.isactive && decide (table.height < 180))
         table).mapByList
     ["count"] fun coords ↦
     let __agg0 :=
@@ -680,9 +698,9 @@ info: fun table ↦
   (restriction
         (fun coords ↦
           let table.age := coords 0;
-          let table.isActive := coords 1;
+          let table.isactive := coords 1;
           let table.height := coords 2;
-          decide (table.age > 30) && table.isActive && decide (table.height < 180))
+          decide (table.age > 30) && table.isactive && decide (table.height < 180))
         table).mapByList
     ["count"] fun coords ↦
     let __agg0 :=
@@ -712,9 +730,9 @@ info: fun table ↦
         (restriction
           (fun coords ↦
             let table.age := coords 0;
-            let table.isActive := coords 1;
+            let table.isactive := coords 1;
             let table.height := coords 2;
-            decide (table.age > 30) && table.isActive && decide (table.height < 180))
+            decide (table.age > 30) && table.isactive && decide (table.height < 180))
           table)).mapByList
     ["sum"] fun coords ↦
     let __agg0 :=
