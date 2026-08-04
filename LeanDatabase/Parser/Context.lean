@@ -235,7 +235,7 @@ inductive AggKind where
   | sumDistinct | countDistinct | avgDistinct
   | boolAnd | boolOr
   | stddev | variance
-  deriving DecidableEq
+  deriving DecidableEq, Inhabited
 
 /-- The summand shape: `void` (no argument, `COUNT(*)`), an `Int`/`Bool` expression, or a type-probed
 expression (`COUNT(DISTINCT …)`, which counts distinct values of any column type). -/

@@ -43,6 +43,34 @@ def baseifyIdents (aliasMap : List (Name × Name)) (stx : Syntax) : Syntax :=
     | .ident info raw val pre => some (.ident info raw (baseifyName aliasMap val) pre)
     | _ => none
 
+/-- A scalar subquery deferred to *projection-context* elaboration. Building the aggregate there —
+rather than up front as a constant — lets a **correlated** inner `WHERE` (referencing outer columns)
+resolve against the outer row's let-vars, which are in scope only inside the projection. -/
+structure DeferredSubq where
+  innerRel : Expr
+  innerSchema : List (Name × SQLTypeProxy)
+  kind : AggKind
+  summand : Option Expr           -- `fun innerTuple => arg`, for SUM / COUNT(DISTINCT)
+  cond : Option Syntax            -- inner `WHERE` (may reference outer columns)
+  deriving Inhabited
+
+initialize scalarSubqStash : IO.Ref (Array DeferredSubq) ← IO.mkRef #[]
+
+/-- Placeholder for a scalar subquery; elaborated in the projection context so correlations bind. -/
+syntax "sqlDeferredSubq% " num : term
+
+elab_rules : term
+  | `(sqlDeferredSubq% $i:num) => do
+    let d := (← scalarSubqStash.get)[i.getNat]!
+    let rel ← match d.cond with
+      | some cond => do mkAppM ``restriction #[← elabTypedTupleFilter [(.anonymous, d.innerSchema)] cond, d.innerRel]
+      | none => pure d.innerRel
+    match d.kind with
+    | .count => mkAppM ``Int.ofNat #[← mkAppM ``relCount #[rel]]
+    | .sum => mkAppM ``relSum #[d.summand.get!, rel]
+    | .countDistinct => mkAppM ``Int.ofNat #[← mkAppM ``relCountDistinct #[d.summand.get!, rel]]
+    | _ => throwError "scalar subquery: only SUM / COUNT / COUNT(DISTINCT) are supported"
+
 def ofOption : {l : List SQLTypeProxy} →
     ((i : Fin l.length) → Option (colTypeOfList l i)) → TypedTupleOfList (l.map .nullable)
   | [], _ => TypedTupleOfList.nil
@@ -348,45 +376,40 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       mkAppM (if isNeg then ``antijoin else ``semijoin) #[rel, sExpr, cond]
     | _ => throwError "subquery expects `SELECT … FROM table …`"
 
-  -- A scalar subquery `(SELECT AGG(x) FROM t [WHERE p])` in a SELECT column → the whole-relation
-  -- aggregate (`relSum`/`relCount`/`relCountDistinct`), an `Int` constant. Uncorrelated only: the
-  -- inner `WHERE` is elaborated against the inner schema alone, so an outer-column reference fails.
-  elabScalarSubquery (q : TSyntax `sql_query) : TermElabM Expr := do
+  -- Rewrite a scalar-subquery column `(SELECT AGG(x) FROM t [WHERE p]) AS n` to a `sqlDeferredSubq%`
+  -- placeholder + stash entry. The inner *relation* (outer-independent) is built now via `productPair`;
+  -- the inner `WHERE` — which may be **correlated** (reference outer columns) — is stored and
+  -- elaborated later, inside the projection context, where the outer row's let-vars are in scope.
+  stashSubq (q : TSyntax `sql_query) (name : TSyntax `ident) : TermElabM (TSyntax `sql_col) := do
     match q with
     | `(sql_query| SELECT $sel:sql_cols FROM $sdb:sql_from $[WHERE $p?]? $[;]?) => do
       let (rel, schema) ← productPair sdb
-      let rel ← match p? with
-        | some p => do mkAppM ``restriction #[← elabTypedTupleFilter [(.anonymous, schema)] p, rel]
-        | none => pure rel
-      let `(sql_cols| $c:sql_col,*) := sel
-        | throwError "scalar subquery must SELECT exactly one aggregate"
-      let #[col] := c.getElems | throwError "scalar subquery must SELECT exactly one aggregate"
-      let (_, aggs) ← (liftAggExprs (sqlColTerm col)).run #[]
+      let `(sql_cols| $c:sql_col,*) := sel | throwError "scalar subquery must SELECT one aggregate"
+      let #[col1] := c.getElems | throwError "scalar subquery must SELECT one aggregate"
+      let (_, aggs) ← (liftAggExprs (sqlColTerm col1)).run #[]
       let #[(_, kind, argStx)] := aggs
         | throwError "scalar subquery column must be a single aggregate (SUM/COUNT)"
-      -- summand `fun (t : inner tuple) => body` over the inner schema
-      let summand (asInt : Bool) : TermElabM Expr :=
+      let mkSummand (asInt : Bool) : TermElabM Expr :=
         withSchemasTupleVars [(.anonymous, schema)] (fun _ => true) fun vars =>
           mkLambdaLetsFVars vars (if asInt then elabTermEnsuringType argStx (mkConst ``Int)
                                   else Prod.snd <$> elabAsSql argStx)
-      match kind with
-      | .count => do mkAppM ``Int.ofNat #[← mkAppM ``relCount #[rel]]
-      | .sum => do mkAppM ``relSum #[← summand true, rel]
-      | .countDistinct => do mkAppM ``Int.ofNat #[← mkAppM ``relCountDistinct #[← summand false, rel]]
-      | _ => throwError "scalar subquery: only SUM / COUNT / COUNT(DISTINCT) are supported"
+      let summand? ← match kind with
+        | .count => pure none
+        | .sum => some <$> mkSummand true
+        | .countDistinct => some <$> mkSummand false
+        | _ => throwError "scalar subquery: only SUM / COUNT / COUNT(DISTINCT) are supported"
+      let idx := (← scalarSubqStash.get).size
+      scalarSubqStash.modify (·.push
+        { innerRel := rel, innerSchema := schema, kind, summand := summand?, cond := p?.map (·.raw) })
+      `(sql_col| (sqlDeferredSubq% $(quote idx)) AS $name:ident)
     | _ => throwError "unsupported scalar subquery shape"
 
-  -- Rewrite scalar-subquery columns `(SELECT …) AS n` to `<elaborated Int constant> AS n` so the
-  -- ordinary projection path handles them; other columns pass through unchanged.
   preprocessScalarSubqueries (cols : Array (TSyntax `sql_col)) :
       TermElabM (Array (TSyntax `sql_col)) := do
     let mut out := #[]
     for col in cols do
       match col with
-      | `(sql_col| ( $q:sql_query ) AS $name:ident) =>
-        let v ← elabScalarSubquery q
-        let vSyn ← Lean.Elab.Term.exprToSyntax v
-        out := out.push (← `(sql_col| $vSyn:term AS $name:ident))
+      | `(sql_col| ( $q:sql_query ) AS $name:ident) => out := out.push (← stashSubq q name)
       | _ => out := out.push col
     return out
 

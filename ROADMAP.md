@@ -72,7 +72,7 @@ An external review (`report.md`) found soundness bugs, coverage gaps, and stale 
 | S3 | self-correlated / self-join silently drops the outer binder | **fixed.** An aliased table's columns are renamed to the alias prefix (`productPair`), so two aliases of the same base table get distinct columns and a self-join is a genuine self cross-product. Output labels are mapped back to base (`baseifyName`) so aliased/non-aliased queries still agree and CTEs keep resolving. See Example 28 `self_join`. |
 | S4 | ambiguous unqualified column resolves silently to the first | **open (needs scoped resolution).** A global ambiguity check false-errors on UNION-branch/subquery queries where each scope sees one table; a correct diagnostic needs per-FROM-scope name resolution, which `expandNames` (flat, whole-query) doesn't have. Both sides resolve identically today, so no false positive. |
 | C1 | clause-combination matrix holes (`GROUP BY … ORDER BY`, inner `JOIN … GROUP BY`, ungrouped aggregates, …) | **fixed — one unified SELECT arm.** The two SELECT elaborators (plain / GROUP BY) are merged into a single arm reading every optional slot once (`elabSelect`), so all clause combinations compose and a new clause is added in one place. Inner `JOIN`/`CROSS JOIN` in `productPair`; ungrouped aggregates = group over the empty key; `EXISTS`/`IN` in `WHERE` now work with GROUP BY too (the merged arm routes WHERE through `elabWhere` uniformly). |
-| C2 | no table aliases | **done.** `FROM t AS x` and aliased-RHS joins (`… JOIN u AS y ON …`, inner + all outer) via an `expandNames` alias rewrite. Self-joins (same base table twice) still rejected fail-loud — need per-alias column rename. |
+| C2 | no table aliases | **done.** `FROM t AS x` and aliased-RHS joins (`… JOIN u AS y ON …`, inner + all outer). Aliased columns are renamed to the alias prefix (`productPair`), so self-joins work (see S3); output labels are mapped back to base (`baseifyName`) so aliased/non-aliased queries agree and CTEs keep resolving. |
 | C3 | dialect front-end (0 raw corpus queries parse) | **done (surface).** Committed to the SQL-standard convention: single-quote = string, double-quote = identifier. `normalizeSqlLiterals` unquotes `"…"` identifiers, resolves 3-part dotted table names (`"DB"."SC"."T"` → declared `T`), and normalizes `'…'` strings; examples migrated off `"…"`-string literals (transparent). `X::TYPE` postfix casts rewrite to `CAST(X AS TYPE)` (size dropped) reusing the sound cast; `EXTRACT`, `TO_DATE`/`TO_TIMESTAMP`/`DATE_TRUNC`/`CONCAT`/`SUBSTR`/`SPLIT_PART`/`REGEXP_SUBSTR`/`REPLACE`. **Case-insensitive identifiers**: every ident folds to lowercase (schema + query), so `T."Col"`/`col`/`COL` all match. Remaining: bare identifiers that collide with a Lean keyword (`variable`, `end`, …) still need quoting-or-uppercase to parse; long-tail scalars. See Example 29. |
 | I1/I2 | coverage ledger unverified; CI doesn't run the guard | **improved.** `coverage.py` VERIFIED is now a live filesystem check (a recorded pass whose file is absent is *not* counted and is named); the guard is wired into CI and runs VERIFIED-only when the corpus is absent. Root cause remains: `Sf*.lean` proofs are gitignored, so `lake build`/CI never checks them — commit them (or drop the "machine-checked" claim) to close fully. |
 | — | dead scaffolding (orphaned `sorry` files, `elabSelectCmd`, `Products` build leak) | **removed.** |
@@ -88,7 +88,8 @@ An external review (`report.md`) found soundness bugs, coverage gaps, and stale 
 - [x] **Hygiene** — deleted orphaned `sorry`-files + `elabSelectCmd` + `Products` leak; `NUMBER/NUMERIC/DECIMAL → Rat`; dead `crossProductRel` collision code; legacy `SQLType.FLOAT → Rat`; unused-section-var warning.
 - [x] **`::` casts + more scalars** — `X::TYPE → CAST(X AS TYPE)` (sound); `SPLIT_PART`/`REGEXP_SUBSTR`/`REPLACE`.
 - [x] **Case-insensitive identifiers** — schema + query idents fold to lowercase; ungrouped aggregates (`SELECT COUNT(*)`).
-- [ ] **S3 (full self-join)**, **S4 (ambiguous-column diagnostic)**, **keyword-collision idents** — open (see table above).
+- [x] **S3 (self-joins)** — aliased columns renamed per-alias; **3.4 correlated scalar subqueries** — deferred/stash elaboration in projection context.
+- [ ] **S4 (ambiguous-column diagnostic)**, **keyword-collision idents** — open (see table above).
 
 ---
 
@@ -239,12 +240,13 @@ recursive fixpoint, the genuinely hard part, is almost pure ignorable tail.
       CTE (`SELECT a FROM (SELECT a,b …)`) collapses to one `mapByList`. Verified passthrough,
       `WHERE`-carrying, projected-through, and chained (`y` references `x`) CTEs all prove; full build
       green (the global lemma broke nothing).
-- [x] **3.4 Scalar subquery in `SELECT` (L). ✅ DONE (uncorrelated).** `(SELECT AGG(x) FROM t [WHERE p])`
-      in a select-list → the whole-relation aggregate (`relSum`/`relCount`/`relCountDistinct`), an `Int`
-      constant. `elabScalarSubquery`/`preprocessScalarSubqueries` (`Parser/Query.lean`) elaborate the
-      inner aggregate and inject it via `exprToSyntax`; a bare-term `sql_col` production (auto-named)
-      lets the inner aggregate go unaliased. **Correlated** subqueries (inner `WHERE` references the
-      outer row) are the remaining half — they need the value computed per outer row, not as a constant.
+- [x] **3.4 Scalar subquery in `SELECT` (L). ✅ DONE (uncorrelated + correlated).**
+      `(SELECT AGG(x) FROM t [WHERE p])` in a select-list → the whole-relation aggregate
+      (`relSum`/`relCount`/`relCountDistinct`). `preprocessScalarSubqueries` (`Parser/Query.lean`) builds
+      the inner relation and stashes a `DeferredSubq`, emitting a `sqlDeferredSubq%` placeholder; the
+      term elaborator builds the aggregate *inside the projection context*, so a **correlated** inner
+      `WHERE` (referencing the outer row) resolves against the outer let-vars and the value is computed
+      per outer row. A bare-term `sql_col` production (auto-named) lets the inner aggregate go unaliased.
       See Example 30. (Corpus note: scalar-subquery-in-SELECT is ~2.2%, not the roadmap's earlier 71.2%.)
 - [ ] **3.5 `WITH RECURSIVE` (XL).** 3 queries. **Out of scope** — the grammar rejects it.
 
