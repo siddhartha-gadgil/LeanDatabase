@@ -33,9 +33,9 @@ CREATE TABLE orders (customer_id INT, status STRING, total_amount INT)
 
 theorem query_equivalence :
     sql%([orders_schema])
-        "SELECT customer_id, SUM(CASE WHEN status = \"completed\" THEN total_amount ELSE 0 END) AS completed_total FROM orders GROUP BY customer_id HAVING SUM(CASE WHEN status = \"completed\" THEN total_amount ELSE 0 END) > 1000"
+        "SELECT customer_id, SUM(CASE WHEN status = 'completed' THEN total_amount ELSE 0 END) AS completed_total FROM orders GROUP BY customer_id HAVING SUM(CASE WHEN status = 'completed' THEN total_amount ELSE 0 END) > 1000"
       = sql%([orders_schema])
-        "SELECT customer_id, SUM(total_amount) AS completed_total FROM orders WHERE status = \"completed\" GROUP BY customer_id HAVING SUM(total_amount) > 1000" := by
+        "SELECT customer_id, SUM(total_amount) AS completed_total FROM orders WHERE status = 'completed' GROUP BY customer_id HAVING SUM(total_amount) > 1000" := by
   funext orders
   -- fold each `SUM(CASE)` into the matching `WHERE`-restricted `SUM`; now both sides share the same
   -- per-key output and `HAVING`, differing only in whether the base was `WHERE`-restricted.

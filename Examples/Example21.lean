@@ -108,9 +108,9 @@ CREATE TABLE sales (g INT, region STRING, active BOOL, amt INT NULL, big BOOL)
 
 theorem everything_at_once :
     sql%([sales_schema])
-        "WITH f AS (SELECT * FROM sales WHERE region = \"US\" AND active) SELECT g, ROUND(SUM(COALESCE(amt, 0)), 2) AS s, COUNT(CASE WHEN big THEN 1 END) AS c FROM f GROUP BY g"
+        "WITH f AS (SELECT * FROM sales WHERE region = 'US' AND active) SELECT g, ROUND(SUM(COALESCE(amt, 0)), 2) AS s, COUNT(CASE WHEN big THEN 1 END) AS c FROM f GROUP BY g"
       = sql%([sales_schema])
-        "SELECT g, ROUND(SUM(COALESCE(amt, 0)), 2) AS s, COUNT(CASE WHEN big THEN 1 ELSE NULL END) AS c FROM sales WHERE region = \"US\" AND active GROUP BY g" := by
+        "SELECT g, ROUND(SUM(COALESCE(amt, 0)), 2) AS s, COUNT(CASE WHEN big THEN 1 ELSE NULL END) AS c FROM sales WHERE region = 'US' AND active GROUP BY g" := by
   sql_equiv
 
 end Example21

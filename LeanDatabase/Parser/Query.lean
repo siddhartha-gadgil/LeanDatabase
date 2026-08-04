@@ -249,13 +249,18 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
   productPair (dbs: TSyntax `sql_from) : TermElabM (Expr × List (Name × SQLTypeProxy)) := do
     match dbs with
     | `(sql_from| $db:ident) => do
-      -- CTEs shadow base tables: a `FROM x` referencing a `WITH x AS (…)` inlines the CTE relation.
-      match ctes.findSome? (fun (name, e, cols) => if name == db.getId then some (e, cols) else none) with
+      -- A dotted table name (`"DB"."SCH"."T"` → `DB.SCH.T`) resolves to the declared table by its
+      -- last component when the full name isn't declared. CTEs shadow base tables.
+      let full := db.getId
+      let cands := full :: (match full.components.getLast? with
+        | some last => if last == full then [] else [last]
+        | none => [])
+      match ctes.findSome? (fun (name, e, cols) => if cands.contains name then some (e, cols) else none) with
       | some (cteExpr, cteCols) => return (cteExpr, cteCols)
       | none =>
         let .some (tableExpr, _, columns) :=
-          tableVars.findSome? (fun (e, name, cols) => if name == db.getId then some (e, name, cols) else none)
-          | throwError s!"Unknown table {db.getId}"
+          tableVars.findSome? (fun (e, name, cols) => if cands.contains name then some (e, name, cols) else none)
+          | throwError s!"Unknown table {full}"
         return (tableExpr, columns)
     | `(sql_from| $t:ident AS $_x:ident) =>
       -- Aliased table: refs `x.col` were already rewritten to `t.col` by `expandNames`, so we just
@@ -358,10 +363,12 @@ def elabSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (stx: Syn
   let stx ← escapeJoin stx
   elabSqlQueryCore tableVars [] stx
 
-private def copyDoubleQuoted : List Char → String → String × List Char
+-- A `"…"` quoted **identifier**: strip the quotes, emit the inner text bare. Dots between quoted
+-- parts (`"A"."B"`) sit outside the quotes, so the main loop copies them → `A.B`.
+private def unquoteIdent : List Char → String → String × List Char
   | [], acc => (acc, [])
-  | '"' :: rest, acc => (acc.push '"', rest)
-  | c :: rest, acc => copyDoubleQuoted rest (acc.push c)
+  | '"' :: rest, acc => (acc, rest)
+  | c :: rest, acc => unquoteIdent rest (acc.push c)
 
 private def convSingleQuoted : List Char → String → String × List Char
   | [], acc => (acc.push '"', [])
@@ -372,12 +379,13 @@ private def convSingleQuoted : List Char → String → String × List Char
 
 private partial def normalizeGo : List Char → String → String
   | [], acc => acc
-  | '"' :: rest, acc => let (acc, rest) := copyDoubleQuoted rest (acc.push '"'); normalizeGo rest acc
+  | '"' :: rest, acc => let (acc, rest) := unquoteIdent rest acc; normalizeGo rest acc
   | '\'' :: rest, acc => let (acc, rest) := convSingleQuoted rest (acc.push '"'); normalizeGo rest acc
   | c :: rest, acc => normalizeGo rest (acc.push c)
 
-/-- Rewrite SQL single-quoted string literals `'…'` to the double-quoted form the grammar accepts.
-`''` becomes an escaped quote; existing `"…"` regions are copied verbatim (C3). -/
+/-- Normalize SQL surface quoting to what the grammar accepts (C3): single-quoted string literals
+`'…'` → the grammar's `"…"` form, and double-quoted **identifiers** `"…"` → bare identifiers
+(`"A"."B"."C"` → `A.B.C`). This is the SQL-standard convention (single = string, double = identifier). -/
 def normalizeSqlLiterals (s : String) : String := normalizeGo s.toList ""
 
 def parseSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (str : String) : TermElabM (Expr × List (Name × SQLTypeProxy)) := do

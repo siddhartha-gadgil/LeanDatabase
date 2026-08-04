@@ -35,16 +35,16 @@ CREATE TABLE table (status STRING, priority STRING)
 
 /-- `query_Or` ≡ `query_Union`. -/
 theorem or_eq_union :
-    sql%([table_schema]) "SELECT * FROM table WHERE status = \"open\" OR priority = \"high\""
+    sql%([table_schema]) "SELECT * FROM table WHERE status = 'open' OR priority = 'high'"
       = sql%([table_schema])
-          "SELECT * FROM table WHERE status = \"open\" UNION SELECT * FROM table WHERE priority = \"high\"" := by
+          "SELECT * FROM table WHERE status = 'open' UNION SELECT * FROM table WHERE priority = 'high'" := by
   sql_equiv
 
 /-- `query_Or` ≡ `query_UnionAll` (disjoint branches). -/
 theorem or_eq_union_all :
-    sql%([table_schema]) "SELECT * FROM table WHERE status = \"open\" OR priority = \"high\""
+    sql%([table_schema]) "SELECT * FROM table WHERE status = 'open' OR priority = 'high'"
       = sql%([table_schema])
-          "SELECT * FROM table WHERE status = \"open\" UNION ALL SELECT * FROM table WHERE priority = \"high\" AND status <> \"open\"" := by
+          "SELECT * FROM table WHERE status = 'open' UNION ALL SELECT * FROM table WHERE priority = 'high' AND status <> 'open'" := by
   sql_equiv
 
 end Example10

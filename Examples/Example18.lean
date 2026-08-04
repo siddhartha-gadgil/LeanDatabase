@@ -20,7 +20,7 @@ namespace Example18
 CREATE TABLE table (name STRING, age INT)
 
 theorem query_equivalence :
-    sql%([table_schema]) "SELECT * FROM table WHERE name LIKE \"%\" ORDER BY age LIMIT 10"
+    sql%([table_schema]) "SELECT * FROM table WHERE name LIKE '%' ORDER BY age LIMIT 10"
       = sql%([table_schema]) "SELECT * FROM table ORDER BY age LIMIT 10" := by
   sql_equiv
 
@@ -29,7 +29,7 @@ theorem query_equivalence :
 `LIMIT 10` is preserved by congruence — old and new together. (The `ORDER BY` is dropped here because
 it may only reference projected output columns, and this query projects `ROUND(age,0)`, not `age`.) -/
 theorem query_equivalence_scalar :
-    sql%([table_schema]) "SELECT ROUND(age, 0) AS a FROM table WHERE name LIKE \"%\" LIMIT 10"
+    sql%([table_schema]) "SELECT ROUND(age, 0) AS a FROM table WHERE name LIKE '%' LIMIT 10"
       = sql%([table_schema]) "SELECT ROUND(age, 0) AS a FROM table LIMIT 10" := by
   sql_equiv
 
