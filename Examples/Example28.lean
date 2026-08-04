@@ -38,4 +38,14 @@ theorem grouped_order_limit :
         "SELECT dept, SUM(amt) AS s FROM sales WHERE dept > 2 AND region = 'US' GROUP BY dept ORDER BY dept LIMIT 10" := by
   sql_equiv
 
+/-- A **self-join**: the same base table under two aliases gets distinct columns (`s1.*` vs `s2.*`),
+so `sales AS s1 JOIN sales AS s2` is a genuine self cross-product — the canonical idiom that used to
+be rejected (S3). Here the `ON` and `WHERE` conjuncts commute. -/
+theorem self_join :
+    sql%([sales_schema])
+        "SELECT s1.amt FROM sales AS s1 JOIN sales AS s2 ON s1.dept = s2.dept WHERE s2.amt > s1.amt AND s1.region = 'US'"
+      = sql%([sales_schema])
+        "SELECT s1.amt FROM sales AS s1 JOIN sales AS s2 ON s1.dept = s2.dept WHERE s1.region = 'US' AND s2.amt > s1.amt" := by
+  sql_equiv
+
 end Example28

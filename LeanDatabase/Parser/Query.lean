@@ -29,6 +29,20 @@ with `TypedTupleOfList.append` + `splitTuple` (the inner join gets this for free
 `TypedRelationOfList.append`). `ofOption` turns the `Option`-family right/left part into the
 `.nullable`-list form; recursion on the list avoids `Fin.cast` gymnastics. -/
 
+/-- Map an alias prefix back to its base table (`e1.col → emp.col`), so a projected column's *output*
+label is base-qualified regardless of aliasing — an aliased and non-aliased query then agree, and CTE
+column resolution (which relies on base-qualified names) keeps working. -/
+def baseifyName (aliasMap : List (Name × Name)) (n : Name) : Name :=
+  aliasMap.foldl (fun acc (al, base) =>
+    if al != acc && al.isPrefixOf acc then acc.replacePrefix al base else acc) n
+
+/-- Rewrite every `ident` in a syntax tree by `baseifyName` — used to point `ORDER BY` refs at the
+base-qualified output labels. -/
+def baseifyIdents (aliasMap : List (Name × Name)) (stx : Syntax) : Syntax :=
+  stx.replaceM (m := Id) fun s => match s with
+    | .ident info raw val pre => some (.ident info raw (baseifyName aliasMap val) pre)
+    | _ => none
+
 def ofOption : {l : List SQLTypeProxy} →
     ((i : Fin l.length) → Option (colTypeOfList l i)) → TypedTupleOfList (l.map .nullable)
   | [], _ => TypedTupleOfList.nil
@@ -171,9 +185,13 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       | some filter => elabWhere productExpr combinedSchema filter
       | none => pure productExpr
     let groupNames := (groups.map (fun g => g.getElems.map (·.getId))).getD #[]
-    let (rel, outSchema) ← elabSelect sel combinedSchema filteredExpr groupNames groups.isSome having?.join
+    let aliasMap := collectAliases dbs
+    let (rel, outSchema) ← elabSelect sel combinedSchema filteredExpr groupNames groups.isSome
+      having?.join aliasMap
     let rel ← if distinct?.isSome then mkAppM ``distinct #[rel] else pure rel
-    let ordCols? := ord.map (fun ords => ords.getElems.toList.map (fun o => sqlColTerm (sqlOrderCol o)))
+    -- ORDER BY resolves against the (base-qualified) output labels, so baseify its column refs too.
+    let ordCols? := ord.map (fun ords => ords.getElems.toList.map
+      (fun o => ⟨baseifyIdents aliasMap (sqlColTerm (sqlOrderCol o))⟩))
     let rel ← applyOrderLimit rel outSchema ordCols? (lim.map (·.getNat))
     return (← mkLambdaFVars vars.toArray rel, outSchema)
   | _ => throwError "Unexpected syntax for SQL query"
@@ -217,10 +235,13 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
           tableVars.findSome? (fun (e, name, cols) => if cands.contains name then some (e, name, cols) else none)
           | throwError s!"Unknown table {full}"
         return (tableExpr, columns)
-    | `(sql_from| $t:ident AS $_x:ident) =>
-      -- Aliased table: refs `x.col` were already rewritten to `t.col` by `expandNames`, so we just
-      -- resolve the base table `t` and keep its base-qualified columns.
-      productPair (← `(sql_from| $t:ident))
+    | `(sql_from| $t:ident AS $x:ident) => do
+      -- Aliased table: resolve the base and rename its columns to the alias prefix, so two aliases of
+      -- the *same* base table get distinct columns (self-joins, S3). The relation is positional, so
+      -- renaming labels is all that's needed.
+      let (e, cols) ← productPair (← `(sql_from| $t:ident))
+      let baseP := (t.getId.components.getLast?).getD t.getId
+      return (e, cols.map (fun (n, ty) => (n.replacePrefix baseP x.getId, ty)))
     | `(sql_from| ( $sub:sql_query ) AS $_alias:ident) => do
       let (lamSub, subSchema) ← elabSqlQueryCore tableVars ctes sub
       let vars := tableVars.map (fun (relVar, _, _) => relVar)
@@ -231,52 +252,64 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       return (← mkAppM ``TypedRelationOfList.append #[e1, e2], s1 ++ s2)
     | `(sql_from| $f1:sql_from LEFT JOIN $t:ident ON $cond:term)
     | `(sql_from| $f1:sql_from LEFT OUTER JOIN $t:ident ON $cond:term) =>
-      outerJoin f1 t cond ``leftOuterJoin ``ofOuterLeft false true
+      outerJoin f1 t none cond ``leftOuterJoin ``ofOuterLeft false true
     | `(sql_from| $f1:sql_from RIGHT JOIN $t:ident ON $cond:term)
     | `(sql_from| $f1:sql_from RIGHT OUTER JOIN $t:ident ON $cond:term) =>
-      outerJoin f1 t cond ``rightOuterJoin ``ofOuterRight true false
+      outerJoin f1 t none cond ``rightOuterJoin ``ofOuterRight true false
     | `(sql_from| $f1:sql_from FULL JOIN $t:ident ON $cond:term)
     | `(sql_from| $f1:sql_from FULL OUTER JOIN $t:ident ON $cond:term) =>
-      outerJoin f1 t cond ``fullOuterJoin ``ofOuterFull true true
-    -- Aliased-RHS joins: the alias resolved away in `expandNames`, so delegate to the base table.
-    | `(sql_from| $f1:sql_from JOIN $t:ident AS $_x:ident ON $cond:term) =>
-      productPair (← `(sql_from| $f1:sql_from JOIN $t:ident ON $cond:term))
-    | `(sql_from| $f1:sql_from CROSS JOIN $t:ident AS $_x:ident) =>
-      productPair (← `(sql_from| $f1:sql_from CROSS JOIN $t:ident))
-    | `(sql_from| $f1:sql_from LEFT JOIN $t:ident AS $_x:ident ON $cond:term)
-    | `(sql_from| $f1:sql_from LEFT OUTER JOIN $t:ident AS $_x:ident ON $cond:term) =>
-      outerJoin f1 t cond ``leftOuterJoin ``ofOuterLeft false true
-    | `(sql_from| $f1:sql_from RIGHT JOIN $t:ident AS $_x:ident ON $cond:term)
-    | `(sql_from| $f1:sql_from RIGHT OUTER JOIN $t:ident AS $_x:ident ON $cond:term) =>
-      outerJoin f1 t cond ``rightOuterJoin ``ofOuterRight true false
-    | `(sql_from| $f1:sql_from FULL JOIN $t:ident AS $_x:ident ON $cond:term)
-    | `(sql_from| $f1:sql_from FULL OUTER JOIN $t:ident AS $_x:ident ON $cond:term) =>
-      outerJoin f1 t cond ``fullOuterJoin ``ofOuterFull true true
+      outerJoin f1 t none cond ``fullOuterJoin ``ofOuterFull true true
+    -- Aliased-RHS joins: build with the alias-renamed right table (so self-joins get distinct cols).
+    | `(sql_from| $f1:sql_from JOIN $t:ident AS $x:ident ON $cond:term) =>
+      innerJoin f1 (← `(sql_from| $t:ident AS $x:ident)) (some cond)
+    | `(sql_from| $f1:sql_from CROSS JOIN $t:ident AS $x:ident) =>
+      innerJoin f1 (← `(sql_from| $t:ident AS $x:ident)) none
+    | `(sql_from| $f1:sql_from LEFT JOIN $t:ident AS $x:ident ON $cond:term)
+    | `(sql_from| $f1:sql_from LEFT OUTER JOIN $t:ident AS $x:ident ON $cond:term) =>
+      outerJoin f1 t (some x) cond ``leftOuterJoin ``ofOuterLeft false true
+    | `(sql_from| $f1:sql_from RIGHT JOIN $t:ident AS $x:ident ON $cond:term)
+    | `(sql_from| $f1:sql_from RIGHT OUTER JOIN $t:ident AS $x:ident ON $cond:term) =>
+      outerJoin f1 t (some x) cond ``rightOuterJoin ``ofOuterRight true false
+    | `(sql_from| $f1:sql_from FULL JOIN $t:ident AS $x:ident ON $cond:term)
+    | `(sql_from| $f1:sql_from FULL OUTER JOIN $t:ident AS $x:ident ON $cond:term) =>
+      outerJoin f1 t (some x) cond ``fullOuterJoin ``ofOuterFull true true
     -- Inner `JOIN ON` / `CROSS JOIN` handled here (not just via `escapeJoin`) so they compose with
     -- GROUP BY / ORDER BY / LIMIT, which `escapeJoin`'s whole-query rewrite doesn't reach (C1).
-    | `(sql_from| $f1:sql_from JOIN $t:ident ON $cond:term) => do
-      let (e1, s1) ← productPair f1
-      let (e2, s2) ← productPair (← `(sql_from| $t:ident))
-      let combined := s1 ++ s2
-      let appended ← mkAppM ``TypedRelationOfList.append #[e1, e2]
+    | `(sql_from| $f1:sql_from JOIN $t:ident ON $cond:term) =>
+      innerJoin f1 (← `(sql_from| $t:ident)) (some cond)
+    | `(sql_from| $f1:sql_from CROSS JOIN $t:ident) =>
+      innerJoin f1 (← `(sql_from| $t:ident)) none
+    | _ => throwError "Unsupported FROM clause: {← PrettyPrinter.ppCategory `sql_from dbs}"
+  -- Inner / cross join: cross-product of `f1` and `rhs` (each elaborated by `productPair`, so an
+  -- aliased RHS is already renamed), restricted by the `ON` predicate over the combined schema.
+  innerJoin (f1 rhs : TSyntax `sql_from) (cond? : Option Term) :
+      TermElabM (Expr × List (Name × SQLTypeProxy)) := do
+    let (e1, s1) ← productPair f1
+    let (e2, s2) ← productPair rhs
+    let combined := s1 ++ s2
+    let appended ← mkAppM ``TypedRelationOfList.append #[e1, e2]
+    match cond? with
+    | some cond => do
       let condExpr ← elabTypedTupleFilter [(.anonymous, combined)] cond
       return (← mkAppM ``restriction #[condExpr, appended], combined)
-    | `(sql_from| $f1:sql_from CROSS JOIN $t:ident) => do
-      let (e1, s1) ← productPair f1
-      let (e2, s2) ← productPair (← `(sql_from| $t:ident))
-      return (← mkAppM ``TypedRelationOfList.append #[e1, e2], s1 ++ s2)
-    | _ => throwError "Unsupported FROM clause: {← PrettyPrinter.ppCategory `sql_from dbs}"
+    | none => return (appended, combined)
   -- `A LEFT/RIGHT/FULL OUTER JOIN t ON cond` → the corresponding operator, then reconciled back to
   -- the canonical list schema by `reindexName` (`ofOuterLeft`/…) so `WHERE`/projection over the
   -- result elaborate. The `ON` condition is a two-tuple predicate (left tuple, right tuple), exactly
   -- like the semi/anti-join correlations. The output schema wraps the null-padded side's columns in
   -- `.nullable` (their values become `Option`).
-  outerJoin (f1 : TSyntax `sql_from) (t : TSyntax `ident) (cond : Term)
-      (opName reindexName : Name) (nullLeft nullRight : Bool) :
+  outerJoin (f1 : TSyntax `sql_from) (t : TSyntax `ident) (rhsAlias : Option (TSyntax `ident))
+      (cond : Term) (opName reindexName : Name) (nullLeft nullRight : Bool) :
       TermElabM (Expr × List (Name × SQLTypeProxy)) := do
     let (e1, s1) ← productPair f1
-    let (e2, s2) ← productPair (← `(sql_from| $t:ident))
-    let condExpr ← elabTypedTupleFilter [(.anonymous, s1), (t.getId, s2)] cond
+    let (e2, s2raw) ← productPair (← `(sql_from| $t:ident))
+    -- an aliased RHS renames its columns to the alias prefix (self-join safe)
+    let baseP := (t.getId.components.getLast?).getD t.getId
+    let rhsP := (rhsAlias.map (·.getId)).getD baseP
+    let s2 := match rhsAlias with
+      | some x => s2raw.map (fun (n, ty) => (n.replacePrefix baseP x.getId, ty))
+      | none => s2raw
+    let condExpr ← elabTypedTupleFilter [(.anonymous, s1), (rhsP, s2)] cond
     let joinExpr ← mkAppM opName #[e1, e2, condExpr]
     let reindexed ← mkAppM reindexName #[joinExpr]
     let nul : List (Name × SQLTypeProxy) → List (Name × SQLTypeProxy) :=
@@ -360,7 +393,8 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
   -- aggregate in the list — an ungrouped aggregate is just a group over the empty key. Otherwise it
   -- is a plain positional projection. Returns `(relation, output schema)`.
   elabSelect (sel : TSyntax `sql_cols) (combinedSchema : List (Name × SQLTypeProxy))
-      (filteredExpr : Expr) (groupNames : Array Name) (hasGroupBy : Bool) (having? : Option Term) :
+      (filteredExpr : Expr) (groupNames : Array Name) (hasGroupBy : Bool) (having? : Option Term)
+      (aliasMap : List (Name × Name)) :
       TermElabM (Expr × List (Name × SQLTypeProxy)) := do
     match sel with
     | `(sql_cols| *) => pure (filteredExpr, combinedSchema)
@@ -368,15 +402,15 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       let pfx := t.getId
       let picked := combinedSchema.filter (fun (name, _) => pfx.isPrefixOf name)
       if picked.isEmpty then throwError s!"Unknown table {pfx} in `{pfx}.*`"
-      let names := picked.map (·.1)
-      let cols : List Syntax.Term := names.map (fun n => mkIdent n)
+      let cols : List Syntax.Term := picked.map (fun (n, _) => mkIdent n)
+      let names := picked.map (fun (n, _) => baseifyName aliasMap n)
       let (m, types) ← elabTypedTupleProjection [(.anonymous, combinedSchema)] cols
       pure (← mkAppM ``TypedRelation.mapByList #[filteredExpr, toExpr (names.map (·.toString)), m],
             names.zip types)
     | `(sql_cols| $cols:sql_col,*) => do
       let colStxs ← preprocessScalarSubqueries cols.getElems
       let colTerms := colStxs.map sqlColTerm
-      let names := colStxs.map sqlColName |>.toList
+      let names := colStxs.map sqlColName |>.toList |>.map (baseifyName aliasMap)
       let nameStrs := names.map (·.toString)
       let (liftedRaw, selAggs) ← (colTerms.toList.mapM liftAggExprs).run #[]
       if selAggs.isEmpty && !hasGroupBy then
@@ -491,14 +525,15 @@ def parseSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (str : S
   let tables := tables.map (fun (tableName, columns) => (tableName, schemaWithFullNames tableName columns))
   let .ok stx := Parser.runParserCategory (← getEnv) `sql_query str | throwError "Failed to parse SQL query: {str}"
   let stx := lowerIdents stx
-  let labels := tables.foldl (fun acc (_, columns) => acc ++ columns.map (fun (name, _) => name)) []
-  let aliases := collectAliases stx
-  -- A base table under two aliases (self-join) would collapse to identical column names here; reject
-  -- rather than silently merge them (needs per-alias column renaming — a follow-up).
-  let bases := aliases.map (·.2)
-  if bases.length != bases.eraseDups.length then
-    throwError "self-join / same base table under multiple aliases is not yet supported"
-  let stx ← expandNames labels stx aliases
+  -- Resolution labels: every base column `t.col`, plus each alias's columns under its own prefix
+  -- (`x.col`), so an aliased table's columns — renamed to `x.col` by `productPair` — resolve, and two
+  -- aliases of the same base table stay distinct (self-joins, S3).
+  let baseLabels := tables.foldl (fun acc (_, columns) => acc ++ columns.map (·.1)) []
+  let aliasLabels := (collectAliases stx).foldl (fun acc (al, base) =>
+    match tables.find? (fun (n, _) => n == base) with
+    | some (_, cols) => acc ++ cols.map (fun (n, _) => n.replacePrefix base al)
+    | none => acc) []
+  let stx ← expandNames (baseLabels ++ aliasLabels) stx
   elabSqlQuery tables stx
 
 
