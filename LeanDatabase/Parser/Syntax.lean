@@ -211,6 +211,11 @@ macro:50 x:term:51 " BETWEEN " a:term:51 " AND " b:term:51 : term =>
 -- (not imported here, to keep `Syntax` pure), so emit a raw ident that resolves at the use-site.
 macro:50 x:term:51 " LIKE " p:term:51 : term =>
   `($(Lean.mkIdent (`LeanDatabase ++ `strLike)) $p $x)
+-- `x NOT LIKE p` — negated match; `x ILIKE p` — case-insensitive match.
+macro:50 x:term:51 " NOT " " LIKE " p:term:51 : term =>
+  `(!$(Lean.mkIdent (`LeanDatabase ++ `strLike)) $p $x)
+macro:50 x:term:51 " ILIKE " p:term:51 : term =>
+  `($(Lean.mkIdent (`LeanDatabase ++ `strILike)) $p $x)
 
 /-! ## `NULL` — the sound 2-valued gates (ROADMAP Phase 4, restricted slice)
 
@@ -314,6 +319,51 @@ syntax:max "SPLIT_PART" "(" term "," term "," term ")" : term
 syntax:max "REGEXP_SUBSTR" "(" term "," term ")" : term
 syntax:max "REPLACE" "(" term "," term "," term ")" : term
 
+-- More numeric scalars (opaque).
+syntax:max "SIGN" "(" term ")" : term
+syntax:max "SQRT" "(" term ")" : term
+syntax:max "EXP" "(" term ")" : term
+syntax:max "LN" "(" term ")" : term
+syntax:max "TRUNC" "(" term ")" : term
+syntax:max "MOD" "(" term "," term ")" : term
+syntax:max "POWER" "(" term "," term ")" : term
+syntax:max "POW" "(" term "," term ")" : term
+syntax:max "LOG" "(" term "," term ")" : term
+syntax:max "GREATEST" "(" term "," term ")" : term
+syntax:max "GREATEST" "(" term "," term "," term ")" : term
+syntax:max "LEAST" "(" term "," term ")" : term
+syntax:max "LEAST" "(" term "," term "," term ")" : term
+
+-- More string scalars (opaque).
+syntax:max "REGEXP_REPLACE" "(" term "," term "," term ")" : term
+syntax:max "LTRIM" "(" term ")" : term
+syntax:max "RTRIM" "(" term ")" : term
+syntax:max "INITCAP" "(" term ")" : term
+syntax:max "REVERSE" "(" term ")" : term
+syntax:max "LPAD" "(" term "," term "," term ")" : term
+syntax:max "RPAD" "(" term "," term "," term ")" : term
+syntax:max "STRPOS" "(" term "," term ")" : term
+syntax:max "POSITION" "(" term "," term ")" : term
+
+-- More date scalars (opaque).
+syntax:max "QUARTER" "(" term ")" : term
+syntax:max "WEEK" "(" term ")" : term
+syntax:max "HOUR" "(" term ")" : term
+syntax:max "MINUTE" "(" term ")" : term
+syntax:max "SECOND" "(" term ")" : term
+syntax:max "DAYOFWEEK" "(" term ")" : term
+syntax:max "DATEDIFF" "(" term "," term "," term ")" : term
+syntax:max "DATE_PART" "(" term "," term ")" : term
+syntax:max "DATE_ADD" "(" term "," term "," term ")" : term
+syntax:max "LAST_DAY" "(" term ")" : term
+
+-- Conditional scalars. `NVL` = `COALESCE`; `NVL2(x,a,b)` picks by null-ness; `IFF`/`IF(c,a,b)` is a
+-- value-level conditional (like `CASE WHEN c THEN a ELSE b`).
+syntax:max "NVL" "(" term "," term ")" : term
+syntax:max "NVL2" "(" term "," term "," term ")" : term
+syntax:max "IFF" "(" term "," term "," term ")" : term
+syntax:max "IF" "(" term "," term "," term ")" : term
+
 -- `CAST(x AS <type>)`. The `::` cast form is intentionally unsupported — overriding `::` would
 -- clobber `List.cons` globally. Elaborated (type-directed) in `Parser/Context.lean`, NOT as a macro:
 -- the coercion depends on the *source* type (int→float is a real coercion, ROADMAP 2.4).
@@ -360,6 +410,42 @@ macro_rules
   | `(SPLIT_PART($x, $d, $n)) => `($(mkIdent `LeanDatabase.Scalar.splitPart) $x $d $n)
   | `(REGEXP_SUBSTR($x, $p))  => `($(mkIdent `LeanDatabase.Scalar.regexpSubstr) $x $p)
   | `(REPLACE($x, $a, $b))    => `($(mkIdent `LeanDatabase.Scalar.replaceOf) $x $a $b)
+  | `(SIGN($x))               => `($(mkIdent `LeanDatabase.Scalar.sign) $x)
+  | `(SQRT($x))               => `($(mkIdent `LeanDatabase.Scalar.sqrtOf) $x)
+  | `(EXP($x))                => `($(mkIdent `LeanDatabase.Scalar.expOf) $x)
+  | `(LN($x))                 => `($(mkIdent `LeanDatabase.Scalar.lnOf) $x)
+  | `(TRUNC($x))              => `($(mkIdent `LeanDatabase.Scalar.truncNum) $x)
+  | `(MOD($a, $b))            => `($(mkIdent `LeanDatabase.Scalar.modOf) $a $b)
+  | `(POWER($a, $b))          => `($(mkIdent `LeanDatabase.Scalar.powerOf) $a $b)
+  | `(POW($a, $b))            => `($(mkIdent `LeanDatabase.Scalar.powerOf) $a $b)
+  | `(LOG($a, $b))            => `($(mkIdent `LeanDatabase.Scalar.logOf) $a $b)
+  | `(GREATEST($a, $b))       => `($(mkIdent `LeanDatabase.Scalar.greatestOf) $a $b)
+  | `(GREATEST($a, $b, $c))   => `($(mkIdent `LeanDatabase.Scalar.greatestOf) ($(mkIdent `LeanDatabase.Scalar.greatestOf) $a $b) $c)
+  | `(LEAST($a, $b))          => `($(mkIdent `LeanDatabase.Scalar.leastOf) $a $b)
+  | `(LEAST($a, $b, $c))      => `($(mkIdent `LeanDatabase.Scalar.leastOf) ($(mkIdent `LeanDatabase.Scalar.leastOf) $a $b) $c)
+  | `(REGEXP_REPLACE($x, $p, $r)) => `($(mkIdent `LeanDatabase.Scalar.regexpReplace) $x $p $r)
+  | `(LTRIM($x))              => `($(mkIdent `LeanDatabase.Scalar.ltrimOf) $x)
+  | `(RTRIM($x))              => `($(mkIdent `LeanDatabase.Scalar.rtrimOf) $x)
+  | `(INITCAP($x))            => `($(mkIdent `LeanDatabase.Scalar.initcapOf) $x)
+  | `(REVERSE($x))            => `($(mkIdent `LeanDatabase.Scalar.reverseOf) $x)
+  | `(LPAD($x, $n, $p))       => `($(mkIdent `LeanDatabase.Scalar.lpadOf) $x $n $p)
+  | `(RPAD($x, $n, $p))       => `($(mkIdent `LeanDatabase.Scalar.rpadOf) $x $n $p)
+  | `(STRPOS($x, $s))         => `($(mkIdent `LeanDatabase.Scalar.strposOf) $x $s)
+  | `(POSITION($x, $s))       => `($(mkIdent `LeanDatabase.Scalar.strposOf) $x $s)
+  | `(QUARTER($x))            => `($(mkIdent `LeanDatabase.Scalar.quarterOf) $x)
+  | `(WEEK($x))               => `($(mkIdent `LeanDatabase.Scalar.weekOf) $x)
+  | `(HOUR($x))               => `($(mkIdent `LeanDatabase.Scalar.hourOf) $x)
+  | `(MINUTE($x))             => `($(mkIdent `LeanDatabase.Scalar.minuteOf) $x)
+  | `(SECOND($x))             => `($(mkIdent `LeanDatabase.Scalar.secondOf) $x)
+  | `(DAYOFWEEK($x))          => `($(mkIdent `LeanDatabase.Scalar.dayOfWeek) $x)
+  | `(DATEDIFF($u, $a, $b))   => `($(mkIdent `LeanDatabase.Scalar.dateDiff) $u $a $b)
+  | `(DATE_PART($p, $d))      => `($(mkIdent `LeanDatabase.Scalar.datePart) $p $d)
+  | `(DATE_ADD($u, $n, $d))   => `($(mkIdent `LeanDatabase.Scalar.dateAdd) $u $n $d)
+  | `(LAST_DAY($d))           => `($(mkIdent `LeanDatabase.Scalar.lastDay) $d)
+  | `(NVL($x, $d))            => `(Option.getD $x $d)
+  | `(NVL2($x, $a, $b))       => `(bif Option.isSome $x then $a else $b)
+  | `(IFF($c, $a, $b))        => `(bif ($c : Bool) then $a else $b)
+  | `(IF($c, $a, $b))         => `(bif ($c : Bool) then $a else $b)
 
 /-!
 ## Aggregates (`SUM`/`COUNT`/`AVG`/`MIN`/`MAX`)

@@ -24,15 +24,38 @@ namespace LeanDatabase.Scalar
 /-- `ROUND(x)` / `ROUND(x, n)` — opaque; the digit count is carried but uninterpreted. -/
 opaque round {α : Type} (x : α) (digits : Int) : α := x
 
-/-- `ABS`/`CEIL`/`FLOOR` — numeric endomorphisms, uninterpreted. -/
+/-- `ABS`/`CEIL`/`FLOOR`/`SIGN`/`SQRT`/`EXP`/`LN`/`TRUNC` — numeric endomorphisms, uninterpreted. -/
 opaque abs {α : Type} (x : α) : α := x
 opaque ceil {α : Type} (x : α) : α := x
 opaque floor {α : Type} (x : α) : α := x
+opaque sign {α : Type} (x : α) : α := x
+opaque sqrtOf {α : Type} (x : α) : α := x
+opaque expOf {α : Type} (x : α) : α := x
+opaque lnOf {α : Type} (x : α) : α := x
+opaque truncNum {α : Type} (x : α) : α := x
+
+/-- Binary numeric functions, uninterpreted (`MOD`, `POWER`, `LOG`, `GREATEST`, `LEAST`). -/
+opaque modOf {α : Type} (a b : α) : α := a
+opaque powerOf {α : Type} (a b : α) : α := a
+opaque logOf {α : Type} (a b : α) : α := a
+opaque greatestOf {α : Type} (a b : α) : α := a
+opaque leastOf {α : Type} (a b : α) : α := a
 
 /-- Date-part extractors. Dates are `String`s here; each returns an `Int` component. -/
 opaque yearOf (x : String) : Int := 0
 opaque monthOf (x : String) : Int := 0
 opaque dayOf (x : String) : Int := 0
+opaque quarterOf (x : String) : Int := 0
+opaque weekOf (x : String) : Int := 0
+opaque hourOf (x : String) : Int := 0
+opaque minuteOf (x : String) : Int := 0
+opaque secondOf (x : String) : Int := 0
+opaque dayOfWeek (x : String) : Int := 0
+/-- `DATEDIFF(unit, a, b)` / `DATE_PART(part, d)` / `DATE_ADD`/`LAST_DAY` — dates are `String`s. -/
+opaque dateDiff (unit a b : String) : Int := 0
+opaque datePart (part d : String) : Int := 0
+opaque dateAdd (unit : String) (n : Int) (d : String) : String := d
+opaque lastDay (d : String) : String := d
 
 /-- Date/timestamp construction and truncation — dates are `String`s, so these are `String`-valued. -/
 opaque toDate (x : String) : String := x
@@ -49,6 +72,14 @@ opaque substr (x : String) (start : Int) (len : Int) : String := x
 opaque splitPart (x : String) (delim : String) (n : Int) : String := x
 opaque regexpSubstr (x : String) (pat : String) : String := x
 opaque replaceOf (x : String) (from_ : String) (to_ : String) : String := x
+opaque regexpReplace (x pat rep : String) : String := x
+opaque ltrimOf (x : String) : String := x
+opaque rtrimOf (x : String) : String := x
+opaque initcapOf (x : String) : String := x
+opaque reverseOf (x : String) : String := x
+opaque lpadOf (x : String) (n : Int) (pad : String) : String := x
+opaque rpadOf (x : String) (n : Int) (pad : String) : String := x
+opaque strposOf (x : String) (sub : String) : Int := 0
 
 /-! ## `CAST` — a *real* coercion, never opaque (ROADMAP 2.4)
 

@@ -36,6 +36,9 @@ decreasing_by all_goals grind
 /-- String-level `LIKE`: `val LIKE pat`. -/
 def strLike (pat val : String) : Bool := likeMatch pat.toList val.toList
 
+/-- `ILIKE` — case-insensitive `LIKE` (Snowflake/Postgres): match with both sides lowercased. -/
+def strILike (pat val : String) : Bool := strLike pat.toLower val.toLower
+
 /-- `col LIKE pat` as a `WHERE`/`HAVING` predicate (full `%`/`_` wildcard support). -/
 @[simp, grind] def colLike (proj : TypedTuple colType → String) (pat : String) : TypedTuple colType → Bool :=
   fun t => strLike pat (proj t)
