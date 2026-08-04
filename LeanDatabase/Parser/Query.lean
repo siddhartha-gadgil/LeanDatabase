@@ -10,6 +10,9 @@ import LeanDatabase.Operators.Join
 `parseTypedTupleFilter` / `parseTypedRelFilter` parse a `WHERE`-predicate string against a schema;
 `elabSqlQuery` is the full `SELECT … FROM … WHERE …` entry point that dispatches on query shape and
 composes the per-operator elaborators (`Parser.Context`) with the cross-product operator.
+
+**To add a scalar / aggregate / clause / FROM form / dialect feature, see `Parser/README.md`** — each
+extension point has one home.
 -/
 
 open Lean Meta Elab Term
@@ -156,77 +159,20 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       | _ => throwError "unknown set operation"
     let combined ← mkAppM opName #[lamL.beta vars.toArray, lamR.beta vars.toArray]
     return (← mkLambdaFVars vars.toArray combined, schemaL)
+  -- One SELECT arm for every clause combination. Optional slots (`DISTINCT`, `WHERE`, `GROUP BY` +
+  -- `HAVING`, `ORDER BY`, `LIMIT`) are each read once here, so a new clause/feature is added in a
+  -- single place and applies to grouped and ungrouped queries alike. The pipeline is:
+  -- FROM → WHERE → (project / group+aggregate + HAVING) → DISTINCT → ORDER BY / LIMIT.
   | `(sql_query| SELECT $[DISTINCT%$distinct?]? $sel:sql_cols FROM $dbs:sql_from $[WHERE $filter?]?
-      $[ORDER BY $ord:sql_order_item,*]? $[LIMIT $lim:num]? $[;]?) => do
+      $[GROUP BY $groups:ident,* $[HAVING $having?]?]? $[ORDER BY $ord:sql_order_item,*]?
+      $[LIMIT $lim:num]? $[;]?) => do
     let (productExpr, combinedSchema) ← productPair dbs
     let filteredExpr ← match filter? with
       | some filter => elabWhere productExpr combinedSchema filter
       | none => pure productExpr
-    let (rel, outSchema) ← match sel with
-      | `(sql_cols| *) => pure (filteredExpr, combinedSchema)
-      | `(sql_cols| $t:ident . *) => do
-        -- Qualified star `t.*`: project onto exactly the columns of table `t` (full names have
-        -- prefix `t`). Reuses the same projection path as an explicit column list.
-        let pfx := t.getId
-        let picked := combinedSchema.filter (fun (name, _) => pfx.isPrefixOf name)
-        if picked.isEmpty then throwError s!"Unknown table {pfx} in `{pfx}.*`"
-        let names := picked.map (·.1)
-        let cols : List Syntax.Term := names.map (fun n => mkIdent n)
-        let nameStrs := names.map (·.toString)
-        let (m, types) ← elabTypedTupleProjection [(.anonymous, combinedSchema)] cols
-        let e' ← mkAppM ``TypedRelation.mapByList #[filteredExpr, toExpr nameStrs, m]
-        pure (e', names.zip types)
-      | `(sql_cols| $cols:sql_col,*) => do
-        let colStxs ← preprocessScalarSubqueries cols.getElems
-        let colTerms := colStxs.map sqlColTerm
-        let names := colStxs.map sqlColName |>.toList
-        let nameStrs := names.map (·.toString)
-        -- Ungrouped aggregate (`SELECT COUNT(*) FROM t`, no GROUP BY) = one whole-table group.
-        let (liftedRaw, selAggs) ← (colTerms.toList.mapM fun t => liftAggExprs t).run #[]
-        if selAggs.isEmpty then
-          let (m, types) ← elabTypedTupleProjection [(.anonymous, combinedSchema)] colTerms.toList
-          let e' ← mkAppM ``TypedRelation.mapByList #[filteredExpr, toExpr nameStrs, m]
-          pure (e', names.zip types)
-        else
-          let liftedCols : List Syntax.Term := liftedRaw.map (⟨·⟩)
-          let (m, types) ← elabTypedTupleGroupProjection
-            [(.anonymous, combinedSchema)] liftedCols (fun _ => false) filteredExpr selAggs.toList
-          let e' ← mkAppM ``TypedRelation.mapByList #[filteredExpr, toExpr nameStrs, m]
-          pure (e', names.zip types)
-      | _ => throwError "Unexpected syntax for SQL query"
+    let groupNames := (groups.map (fun g => g.getElems.map (·.getId))).getD #[]
+    let (rel, outSchema) ← elabSelect sel combinedSchema filteredExpr groupNames groups.isSome having?.join
     let rel ← if distinct?.isSome then mkAppM ``distinct #[rel] else pure rel
-    let ordCols? := ord.map (fun ords => ords.getElems.toList.map (fun o => sqlColTerm (sqlOrderCol o)))
-    let rel ← applyOrderLimit rel outSchema ordCols? (lim.map (·.getNat))
-    return (← mkLambdaFVars vars.toArray rel, outSchema)
-  | `(sql_query| SELECT $[DISTINCT%$distinct?]? $cols:sql_col,* FROM $dbs:sql_from $[WHERE $filter?]?
-      GROUP BY $groups:ident,* $[HAVING $having?]? $[ORDER BY $ord:sql_order_item,*]? $[LIMIT $lim:num]? $[;]?) => do
-    let groupNames := groups.getElems.map (fun stx => stx.getId)
-    let inGroup := fun name => groupNames.any (fun g => g == name)
-    let (productExpr, combinedSchema) ← productPair dbs
-    let filteredExpr ← match filter? with
-      | some filter => do
-        let filter ← elabTypedTupleFilter [(.anonymous, combinedSchema)] filter
-        mkAppM ``restriction #[filter, productExpr]
-      | none => pure productExpr
-    let colStxs ← preprocessScalarSubqueries cols.getElems
-    let colTerms := colStxs.map sqlColTerm
-    let names := colStxs.map sqlColName |>.toList
-    let nameStrs := names.map (·.toString)
-    -- Lift aggregate expressions (`SUM(a*b)`, `MIN(...)`, …) out of the SELECT list / HAVING.
-    let (liftedRaw, selAggs) ← (colTerms.toList.mapM fun t => liftAggExprs t).run #[]
-    let liftedCols : List Syntax.Term := liftedRaw.map (⟨·⟩)
-    let (m, types) ← elabTypedTupleGroupProjection
-      [(.anonymous, combinedSchema)] liftedCols inGroup filteredExpr selAggs.toList
-    let havingFilteredExpr ← match having? with
-      | some having => do
-        let (having, havAggs) ← (liftAggExprs having).run #[]
-        let h ← elabTypedTupleGroupFilter
-          [(.anonymous, combinedSchema)] having inGroup filteredExpr havAggs.toList
-        mkAppM ``restriction #[h, filteredExpr]
-      | none => pure filteredExpr
-    let e' ← mkAppM ``TypedRelation.mapByList #[havingFilteredExpr, toExpr nameStrs, m]
-    let outSchema := names.zip types
-    let rel ← if distinct?.isSome then mkAppM ``distinct #[e'] else pure e'
     let ordCols? := ord.map (fun ords => ords.getElems.toList.map (fun o => sqlColTerm (sqlOrderCol o)))
     let rel ← applyOrderLimit rel outSchema ordCols? (lim.map (·.getNat))
     return (← mkLambdaFVars vars.toArray rel, outSchema)
@@ -408,6 +354,49 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
         out := out.push (← `(sql_col| $vSyn:term AS $name:ident))
       | _ => out := out.push col
     return out
+
+  -- The SELECT projection: `*`, qualified star `t.*`, or a column list. A column list is *grouped*
+  -- (via `elabTypedTupleGroupProjection` + optional HAVING) when there is a GROUP BY **or** an
+  -- aggregate in the list — an ungrouped aggregate is just a group over the empty key. Otherwise it
+  -- is a plain positional projection. Returns `(relation, output schema)`.
+  elabSelect (sel : TSyntax `sql_cols) (combinedSchema : List (Name × SQLTypeProxy))
+      (filteredExpr : Expr) (groupNames : Array Name) (hasGroupBy : Bool) (having? : Option Term) :
+      TermElabM (Expr × List (Name × SQLTypeProxy)) := do
+    match sel with
+    | `(sql_cols| *) => pure (filteredExpr, combinedSchema)
+    | `(sql_cols| $t:ident . *) => do
+      let pfx := t.getId
+      let picked := combinedSchema.filter (fun (name, _) => pfx.isPrefixOf name)
+      if picked.isEmpty then throwError s!"Unknown table {pfx} in `{pfx}.*`"
+      let names := picked.map (·.1)
+      let cols : List Syntax.Term := names.map (fun n => mkIdent n)
+      let (m, types) ← elabTypedTupleProjection [(.anonymous, combinedSchema)] cols
+      pure (← mkAppM ``TypedRelation.mapByList #[filteredExpr, toExpr (names.map (·.toString)), m],
+            names.zip types)
+    | `(sql_cols| $cols:sql_col,*) => do
+      let colStxs ← preprocessScalarSubqueries cols.getElems
+      let colTerms := colStxs.map sqlColTerm
+      let names := colStxs.map sqlColName |>.toList
+      let nameStrs := names.map (·.toString)
+      let (liftedRaw, selAggs) ← (colTerms.toList.mapM liftAggExprs).run #[]
+      if selAggs.isEmpty && !hasGroupBy then
+        let (m, types) ← elabTypedTupleProjection [(.anonymous, combinedSchema)] colTerms.toList
+        pure (← mkAppM ``TypedRelation.mapByList #[filteredExpr, toExpr nameStrs, m], names.zip types)
+      else
+        let inGroup := fun name => groupNames.any (· == name)
+        let liftedCols : List Syntax.Term := liftedRaw.map (⟨·⟩)
+        let (m, types) ← elabTypedTupleGroupProjection
+          [(.anonymous, combinedSchema)] liftedCols inGroup filteredExpr selAggs.toList
+        let havingFilteredExpr ← match having? with
+          | some having => do
+            let (having, havAggs) ← (liftAggExprs having).run #[]
+            let h ← elabTypedTupleGroupFilter
+              [(.anonymous, combinedSchema)] having inGroup filteredExpr havAggs.toList
+            mkAppM ``restriction #[h, filteredExpr]
+          | none => pure filteredExpr
+        pure (← mkAppM ``TypedRelation.mapByList #[havingFilteredExpr, toExpr nameStrs, m],
+              names.zip types)
+    | _ => throwError "Unexpected SELECT column syntax"
 
 def elabSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (stx: Syntax) :
     TermElabM (Expr × List (Name × SQLTypeProxy)) := withTableVars tables fun tableVars => do
