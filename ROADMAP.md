@@ -74,7 +74,7 @@ An external review (`report.md`) found soundness bugs, coverage gaps, and stale 
 | C1 | clause-combination matrix holes (`GROUP BY … ORDER BY`, inner `JOIN … GROUP BY`, …) | **fixed.** GROUP BY arm now takes `DISTINCT`/`ORDER BY`/`LIMIT`; inner `JOIN`/`CROSS JOIN` handled in `productPair` so they compose with GROUP BY/ORDER BY/LIMIT. |
 | C2 | no table aliases | **done (single-table).** `FROM t AS x` via an `expandNames` alias rewrite. Join-RHS aliases and self-joins are follow-ups (guarded above). |
 | C3 | dialect front-end (0 raw corpus queries parse) | **partial.** Single-quoted string literals normalized (`'x'→"x"`) and `EXTRACT(part FROM d)` added. Quoted identifiers, 3-part names, and more scalars remain. |
-| I1/I2 | coverage ledger unverified; CI doesn't run the guard | **open.** |
+| I1/I2 | coverage ledger unverified; CI doesn't run the guard | **improved.** `coverage.py` VERIFIED is now a live filesystem check (a recorded pass whose file is absent is *not* counted and is named); the guard is wired into CI and runs VERIFIED-only when the corpus is absent. Root cause remains: `Sf*.lean` proofs are gitignored, so `lake build`/CI never checks them — commit them (or drop the "machine-checked" claim) to close fully. |
 | — | dead scaffolding (orphaned `sorry` files, `elabSelectCmd`, `Products` build leak) | **removed.** |
 
 ---

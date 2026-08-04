@@ -81,9 +81,11 @@ def sqlProxy (sqlType : String) : SQLTypeProxy :=
   else if s.startsWith "float" then .float
   else if s.startsWith "double" then .float
   else if s.startsWith "real" then .float
-  else if s.startsWith "number" then .int
-  else if s.startsWith "numeric" then .int
-  else if s.startsWith "decimal" then .int
+  -- NUMBER/NUMERIC/DECIMAL carry an unknown scale → treat as real (Rat), never Int, so a division
+  -- can't be laundered from real to truncating (the CAST hazard 2.4, at the DDL).
+  else if s.startsWith "number" then .float
+  else if s.startsWith "numeric" then .float
+  else if s.startsWith "decimal" then .float
   else if s.startsWith "bigint" then .int
   else if s.startsWith "smallint" then .int
   else if s.startsWith "text" then .string

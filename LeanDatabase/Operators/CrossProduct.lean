@@ -61,15 +61,7 @@ Note: we rename labels if they are same bases on given aliases prefix
 @[simp, grind .]
 def crossProductRel (r1 : TypedRelation colType1) (r2 : TypedRelation colType2) :
     TypedRelation (Fin.append colType1 colType2) :=
-
-  -- Check if labels are not same, then prefixLabel them
-  let l1_list := List.ofFn r1.labels
-  let l2_list := List.ofFn r2.labels
-
-  let hasCollision := l1_list.any (fun label => l2_list.contains label)
-
   {
-    -- Combine the determined labels
     labels := Fin.append r1.labels r2.labels
 
     -- Combine Rows (Cartesian Product)
