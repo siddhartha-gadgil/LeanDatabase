@@ -29,9 +29,6 @@ def elabCreateTableCmd : CommandElab := fun stx => do
   match stx with
   | `(command| CREATE TABLE $tname:ident ($[$idents:ident $data_types:data_type],*) ) =>
 
-    let colNames := idents.map (fun id => quote id.getId.toString)
-    let n := quote colNames.size
-
     -- Base `(leanType, proxy)` for a `base_type`, before applying the optional `NULL` wrapper.
     let baseInfo : TSyntax `LeanDatabase.base_type → CommandElabM (TSyntax `term × TSyntax `term) := fun
       | `(base_type| INT)        => return (← `(ℤ),      ← `((.int : SQLTypeProxy)))
@@ -55,31 +52,16 @@ def elabCreateTableCmd : CommandElab := fun stx => do
     let schemaCmd ← `(def $schemaName : Lean.Name × List (Lean.Name × SQLTypeProxy) :=
       ($(quote tname.getId), [$colPairs,*]))
 
-    let alts_types ← typesList.mapIdxM fun idx t => do
-      let idxLit := Syntax.mkNumLit (toString idx)
-      `(matchAltExpr| | $idxLit => $t)
-
-    let alts_labels ← colNames.mapIdxM fun idx l => do
-      let idxLit := Syntax.mkNumLit (toString idx)
-      `(matchAltExpr| | $idxLit => $l)
-
-    let labels ← `(fun (x: Fin $n) => match x with $alts_labels:matchAlt*)
-    let alts_tc ← typesList.mapIdxM fun idx _ => do
-      let idxLit := Syntax.mkNumLit (toString idx)
-      `(matchAltExpr| | $idxLit => inferInstance)
-
+    -- `t_types := colTypeOfList [proxies]` reuses the list-indexed column types, whose
+    -- DecidableEq / LinearOrder / Inhabited instances are proven generically (any length). This
+    -- replaces a bespoke `match (x : Fin n)` per column, which Lean can't prove exhaustive for the
+    -- corpus's 30-70-column tables. Labels index a `List String` by `x.val` — total, no match needed.
     let typesDefName := Lean.mkIdent (Name.mkSimple s!"{tname.getId}_types")
-    let typesDefCmd ← `(abbrev $typesDefName : Fin $n → Type := fun x => match x with $alts_types:matchAlt*)
-
+    let nameTerms : Array (TSyntax `term) ← idents.mapM fun id => `($(quote id.getId.toString))
+    let labels ← `(fun x => ([$nameTerms,*] : List String).getD x.val "")
+    let typesDefCmd ← `(abbrev $typesDefName := LeanDatabase.colTypeOfList [$proxyList,*])
     let cmd ← `(def $tname : LeanDatabase.TypedRelation $typesDefName := { labels := $labels, rows := ∅ })
-    let instDecCmd ← `(instance : (i : Fin $n) → DecidableEq ($typesDefName i) :=
-      fun x => match x with $alts_tc:matchAlt*)
-    let instOrdCmd ← `(instance : (i : Fin $n) → LinearOrder ($typesDefName i) :=
-      fun x => match x with $alts_tc:matchAlt*)
-
     elabCommand typesDefCmd
-    elabCommand instDecCmd
-    elabCommand instOrdCmd
     elabCommand cmd
     elabCommand schemaCmd
 

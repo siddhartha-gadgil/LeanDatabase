@@ -114,6 +114,20 @@ instance instInhabitedProxyType : (t : SQLTypeProxy) → Inhabited t.type
 instance sqlTypeInhabited (l : List SQLTypeProxy) : (i : Fin l.length) → Inhabited (colTypeOfList l i) :=
   fun i => instInhabitedProxyType (l.get i)
 
+/-- Every column type is a `LinearOrder` (needed by the per-column order the `CREATE TABLE` macro
+otherwise emitted by hand). Provided generically here so many-column tables need no per-column
+instance. `Option _` via `instLinearOrderOption`. -/
+instance instLinearOrderProxyType : (t : SQLTypeProxy) → LinearOrder t.type
+  | .int => inferInstance
+  | .bool => inferInstance
+  | .float => inferInstance
+  | .string => inferInstance
+  | .timestamp => inferInstance
+  | .nullable t => @instLinearOrderOption _ (instLinearOrderProxyType t)
+
+instance sqlTypeLinearOrder (l : List SQLTypeProxy) : (i : Fin l.length) → LinearOrder (colTypeOfList l i) :=
+  fun i => instLinearOrderProxyType (l.get i)
+
 instance sqlTypeDecEq (l: List SQLTypeProxy) : (i : Fin l.length) → DecidableEq (colTypeOfList l i) := by
   match l with
   | [] =>

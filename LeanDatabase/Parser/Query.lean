@@ -462,11 +462,13 @@ def elabSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (stx: Syn
   let stx ← escapeJoin stx
   elabSqlQueryCore tableVars [] stx
 
--- A `"…"` quoted **identifier**: strip the quotes, emit the inner text bare. Dots between quoted
--- parts (`"A"."B"`) sit outside the quotes, so the main loop copies them → `A.B`.
+-- A `"…"` quoted **identifier** → a Lean guillemet identifier `«…»`, which is immune to keyword
+-- collisions (a column named `"YEAR"`/`"END"`/`"COUNT"` won't hit the function/keyword token). The
+-- resulting `Name` is the same as the bare form, so it still matches the (case-folded) schema. Dots
+-- between quoted parts (`"A"."B"`) sit outside the quotes, so the main loop copies them → `«A».«B»`.
 private def unquoteIdent : List Char → String → String × List Char
-  | [], acc => (acc, [])
-  | '"' :: rest, acc => (acc, rest)
+  | [], acc => (acc.push '»', [])
+  | '"' :: rest, acc => (acc.push '»', rest)
   | c :: rest, acc => unquoteIdent rest (acc.push c)
 
 private def convSingleQuoted : List Char → String → String × List Char
@@ -478,7 +480,7 @@ private def convSingleQuoted : List Char → String → String × List Char
 
 private partial def normalizeGo : List Char → String → String
   | [], acc => acc
-  | '"' :: rest, acc => let (acc, rest) := unquoteIdent rest acc; normalizeGo rest acc
+  | '"' :: rest, acc => let (acc, rest) := unquoteIdent rest (acc.push '«'); normalizeGo rest acc
   | '\'' :: rest, acc => let (acc, rest) := convSingleQuoted rest (acc.push '"'); normalizeGo rest acc
   | c :: rest, acc => normalizeGo rest (acc.push c)
 
