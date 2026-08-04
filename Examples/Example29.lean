@@ -24,10 +24,25 @@ theorem quoted_columns :
       = sql%([TIMESERIES_schema]) "SELECT VARIABLE FROM TIMESERIES WHERE DATE = 'x'" := by
   sql_equiv
 
+/-- Ungrouped whole-table aggregate (`COUNT(DISTINCT …)` with no `GROUP BY`) over a 3-part quoted
+table — the `sf_bq327` corpus shape. The two `WHERE` conjuncts commute. -/
+theorem ungrouped_aggregate :
+    sql%([TIMESERIES_schema]) "SELECT COUNT(DISTINCT \"VARIABLE\") AS n FROM \"DB\".\"SC\".\"TIMESERIES\" WHERE val > 0 AND val < 9"
+      = sql%([TIMESERIES_schema]) "SELECT COUNT(DISTINCT \"VARIABLE\") AS n FROM \"DB\".\"SC\".\"TIMESERIES\" WHERE val < 9 AND val > 0" := by
+  sql_equiv
+
 /-- A 3-part dotted table name resolves to the declared table by its last component. -/
 theorem three_part_name :
     sql%([TIMESERIES_schema]) "SELECT val FROM \"MYDB\".\"PUBLIC\".\"TIMESERIES\" WHERE val > 1"
       = sql%([TIMESERIES_schema]) "SELECT val FROM TIMESERIES WHERE val > 1" := by
+  sql_equiv
+
+/-- `X::TYPE` postfix casts (26% of the corpus) rewrite to `CAST(X AS TYPE)`, inheriting its sound
+semantics: `SUM(val)::FLOAT` is a real `Rat` cast (so it is *not* provably the integer `SUM`), and a
+`(size)` on the type is dropped. Here the same cast cancels over a commuted `WHERE`. -/
+theorem postfix_cast :
+    sql%([TIMESERIES_schema]) "SELECT SUM(val)::FLOAT AS r FROM TIMESERIES WHERE val > 1 AND val < 9 GROUP BY VARIABLE"
+      = sql%([TIMESERIES_schema]) "SELECT SUM(val)::FLOAT AS r FROM TIMESERIES WHERE val < 9 AND val > 1 GROUP BY VARIABLE" := by
   sql_equiv
 
 /-- The whole corpus shape at once: 3-part quoted tables, aliases, quoted `ON` columns, and an

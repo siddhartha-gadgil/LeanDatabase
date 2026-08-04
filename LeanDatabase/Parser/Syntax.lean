@@ -298,6 +298,9 @@ syntax:max "TO_TIMESTAMP" "(" term ")" : term
 syntax:max "DATE_TRUNC" "(" term "," term ")" : term
 syntax:max "CONCAT" "(" term "," term ")" : term
 syntax:max "SUBSTR" "(" term "," term "," term ")" : term
+syntax:max "SPLIT_PART" "(" term "," term "," term ")" : term
+syntax:max "REGEXP_SUBSTR" "(" term "," term ")" : term
+syntax:max "REPLACE" "(" term "," term "," term ")" : term
 
 -- `CAST(x AS <type>)`. The `::` cast form is intentionally unsupported — overriding `::` would
 -- clobber `List.cons` globally. Elaborated (type-directed) in `Parser/Context.lean`, NOT as a macro:
@@ -342,6 +345,9 @@ macro_rules
   | `(DATE_TRUNC($u, $x))     => `($(mkIdent `LeanDatabase.Scalar.dateTrunc) $u $x)
   | `(CONCAT($a, $b))         => `($(mkIdent `LeanDatabase.Scalar.concat) $a $b)
   | `(SUBSTR($x, $i, $n))     => `($(mkIdent `LeanDatabase.Scalar.substr) $x $i $n)
+  | `(SPLIT_PART($x, $d, $n)) => `($(mkIdent `LeanDatabase.Scalar.splitPart) $x $d $n)
+  | `(REGEXP_SUBSTR($x, $p))  => `($(mkIdent `LeanDatabase.Scalar.regexpSubstr) $x $p)
+  | `(REPLACE($x, $a, $b))    => `($(mkIdent `LeanDatabase.Scalar.replaceOf) $x $a $b)
 
 /-!
 ## Aggregates (`SUM`/`COUNT`/`AVG`/`MIN`/`MAX`)

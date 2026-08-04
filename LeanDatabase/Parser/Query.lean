@@ -178,12 +178,21 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
         pure (e', names.zip types)
       | `(sql_cols| $cols:sql_col,*) => do
         let colStxs := cols.getElems
-        let cols := colStxs.map sqlColTerm
+        let colTerms := colStxs.map sqlColTerm
         let names := colStxs.map sqlColName |>.toList
         let nameStrs := names.map (·.toString)
-        let (m, types) ← elabTypedTupleProjection [(.anonymous, combinedSchema)] cols.toList
-        let e' ← mkAppM ``TypedRelation.mapByList #[filteredExpr, toExpr nameStrs, m]
-        pure (e', names.zip types)
+        -- Ungrouped aggregate (`SELECT COUNT(*) FROM t`, no GROUP BY) = one whole-table group.
+        let (liftedRaw, selAggs) ← (colTerms.toList.mapM fun t => liftAggExprs t).run #[]
+        if selAggs.isEmpty then
+          let (m, types) ← elabTypedTupleProjection [(.anonymous, combinedSchema)] colTerms.toList
+          let e' ← mkAppM ``TypedRelation.mapByList #[filteredExpr, toExpr nameStrs, m]
+          pure (e', names.zip types)
+        else
+          let liftedCols : List Syntax.Term := liftedRaw.map (⟨·⟩)
+          let (m, types) ← elabTypedTupleGroupProjection
+            [(.anonymous, combinedSchema)] liftedCols (fun _ => false) filteredExpr selAggs.toList
+          let e' ← mkAppM ``TypedRelation.mapByList #[filteredExpr, toExpr nameStrs, m]
+          pure (e', names.zip types)
       | _ => throwError "Unexpected syntax for SQL query"
     let rel ← if distinct?.isSome then mkAppM ``distinct #[rel] else pure rel
     let ordCols? := ord.map (fun ords => ords.getElems.toList.map (fun o => sqlColTerm (sqlOrderCol o)))
@@ -383,10 +392,51 @@ private partial def normalizeGo : List Char → String → String
   | '\'' :: rest, acc => let (acc, rest) := convSingleQuoted rest (acc.push '"'); normalizeGo rest acc
   | c :: rest, acc => normalizeGo rest (acc.push c)
 
+-- `::` cast rewriting (C3): `X::TYPE` → `CAST(X AS TYPE)`, reusing the sound CAST elaborator. Output
+-- is built as a *reversed* char list so the operand (already emitted) can be popped off its front.
+private def dropSp : List Char → List Char
+  | ' ' :: r => dropSp r
+  | l => l
+private def isOpChar (c : Char) : Bool := c.isAlphanum || c == '_' || c == '.' || c == '"'
+-- pop a plain operand (ident/dotted/number/quoted) off the reversed output
+private def takeRunBack : List Char → List Char → (List Char × List Char)
+  | c :: rest, acc => if isOpChar c then takeRunBack rest (c :: acc) else (acc, c :: rest)
+  | [], acc => (acc, [])
+-- pop a balanced `(…)` group off the reversed output (head is the closing `)`)
+private def takeBalancedBack : List Char → Nat → List Char → (List Char × List Char)
+  | c :: rest, depth, acc =>
+      let acc := c :: acc
+      let depth := if c == ')' then depth + 1 else if c == '(' then depth - 1 else depth
+      if c == '(' && depth == 0 then (acc, rest) else takeBalancedBack rest depth acc
+  | [], _, acc => (acc, [])
+-- extend an operand leftward over a preceding function name (`SUM(x)` not just `(x)`)
+private def takeFuncName : List Char → List Char → (List Char × List Char)
+  | c :: rest, acc => if c.isAlphanum || c == '_' then takeFuncName rest (c :: acc) else (acc, c :: rest)
+  | [], acc => (acc, [])
+-- read a bare type word, then discard an optional `(size)` the cast grammar doesn't take
+private def takeTypeWord : List Char → List Char → (String × List Char)
+  | c :: rest, acc => if c.isAlphanum || c == '_' then takeTypeWord rest (acc ++ [c]) else (acc.asString, c :: rest)
+  | [], acc => (acc.asString, [])
+private partial def dropParenSize : List Char → List Char
+  | '(' :: rest => (rest.dropWhile (· != ')')).drop 1
+  | l => l
+private partial def castGo : List Char → List Char → List Char
+  | [], out => out
+  | ':' :: ':' :: rest, out =>
+      let out := dropSp out
+      let (operand, out') := match out with
+        | ')' :: _ => let (p, rem) := takeBalancedBack out 0 []; takeFuncName rem p
+        | _ => takeRunBack out []
+      let (ty, rest2) := takeTypeWord (dropSp rest) []
+      let emit := "CAST(" ++ operand.asString ++ " AS " ++ ty ++ ")"
+      castGo (dropParenSize (dropSp rest2)) (emit.toList.reverse ++ out')
+  | c :: rest, out => castGo rest (c :: out)
+
 /-- Normalize SQL surface quoting to what the grammar accepts (C3): single-quoted string literals
-`'…'` → the grammar's `"…"` form, and double-quoted **identifiers** `"…"` → bare identifiers
-(`"A"."B"."C"` → `A.B.C`). This is the SQL-standard convention (single = string, double = identifier). -/
-def normalizeSqlLiterals (s : String) : String := normalizeGo s.toList ""
+`'…'` → the grammar's `"…"` form, double-quoted **identifiers** `"…"` → bare identifiers
+(`"A"."B"."C"` → `A.B.C`), and `X::TYPE` → `CAST(X AS TYPE)`. -/
+def normalizeSqlLiterals (s : String) : String :=
+  (castGo (normalizeGo s.toList "").toList []).reverse.asString
 
 def parseSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (str : String) : TermElabM (Expr × List (Name × SQLTypeProxy)) := do
   let str := normalizeSqlLiterals str

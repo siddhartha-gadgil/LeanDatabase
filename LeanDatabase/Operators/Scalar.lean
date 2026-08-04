@@ -46,6 +46,9 @@ opaque trimOf (x : String) : String := x
 opaque lengthOf (x : String) : Int := 0
 opaque concat (a : String) (b : String) : String := a
 opaque substr (x : String) (start : Int) (len : Int) : String := x
+opaque splitPart (x : String) (delim : String) (n : Int) : String := x
+opaque regexpSubstr (x : String) (pat : String) : String := x
+opaque replaceOf (x : String) (from_ : String) (to_ : String) : String := x
 
 /-! ## `CAST` — a *real* coercion, never opaque (ROADMAP 2.4)
 
