@@ -64,10 +64,12 @@ def sqlOrderCol : TSyntax `sql_order_item → TSyntax `sql_col
 syntax ident : sql_from                               -- 1. Standard table name
 syntax ident "AS" ident : sql_from                    -- 1b. Aliased table (`t AS x`)
 syntax ident ident : sql_from                         -- 1c. Bare alias (`t x`) — the corpus norm
-syntax "(" sql_query ")" "AS" ident : sql_from       -- 2. Subquery with mandatory alias
+syntax "(" sql_query ")" "AS" ident : sql_from       -- 2. Subquery with alias (AS)
+syntax "(" sql_query ")" ident : sql_from             -- 2b. Subquery with bare alias
 
 -- Recursive Cases (Chaining joins from left to right)
 syntax sql_from "JOIN" ident "ON" term : sql_from     -- 3. Explicit Inner Join
+syntax sql_from "JOIN" ident "USING" "(" ident,* ")" : sql_from   -- 3b. USING (shared columns)
 syntax sql_from "CROSS" "JOIN" ident : sql_from       -- 4. Cross Join
 syntax sql_from "," sql_from : sql_from              -- 5. Comma-separated (Cartesian Product)
 -- 6. Outer joins — elaborated directly to `leftOuterJoin`/`rightOuterJoin`/`fullOuterJoin`
@@ -100,7 +102,7 @@ syntax sql_from "RIGHT" "OUTER" "JOIN" ident ident "ON" term : sql_from
 syntax sql_from "FULL" "JOIN" ident ident "ON" term : sql_from
 syntax sql_from "FULL" "OUTER" "JOIN" ident ident "ON" term : sql_from
 
-syntax "SELECT " (" DISTINCT ")? sql_cols " FROM " sql_from (" WHERE " term)?  (" GROUP " " BY " ident,* (" HAVING " term)?)? (" ORDER " " BY " sql_order_item,*)? (" LIMIT " num)? (";")? : sql_query
+syntax "SELECT " (" DISTINCT ")? sql_cols " FROM " sql_from (" WHERE " term)?  (" GROUP " " BY " ident,* (" HAVING " term)?)? (" ORDER " " BY " sql_order_item,*)? (" LIMIT " num)? (" OFFSET " num)? (";")? : sql_query
 
 -- Binary set operators on whole queries, as one keyword-parameterised production. Our relations
 -- are `Finset`s (sets), so `UNION ALL` maps to set `union` too (no bag semantics).
@@ -226,6 +228,14 @@ macro:50 x:term:51 " NOT " " IN " "(" elems:term,+ ")" : term => do
 -- boolean `AND` macro (prec 30) from swallowing it.
 macro:50 x:term:51 " BETWEEN " a:term:51 " AND " b:term:51 : term =>
   `($a ≤ $x && $x ≤ $b)
+macro:50 x:term:51 " NOT " " BETWEEN " a:term:51 " AND " b:term:51 : term =>
+  `(!($a ≤ $x && $x ≤ $b))
+
+-- `x IS TRUE|FALSE` / `x IS NOT TRUE|FALSE` on a `Bool` column.
+macro:50 x:term:51 " IS " " TRUE " : term => `($x == true)
+macro:50 x:term:51 " IS " " FALSE " : term => `($x == false)
+macro:50 x:term:51 " IS " " NOT " " TRUE " : term => `($x != true)
+macro:50 x:term:51 " IS " " NOT " " FALSE " : term => `($x != false)
 
 -- SQL `x LIKE pat` — string match with `%`/`_` wildcards. `strLike` lives in `Operators/Like.lean`
 -- (not imported here, to keep `Syntax` pure), so emit a raw ident that resolves at the use-site.
@@ -248,15 +258,24 @@ NULL)` Kleene trap is impossible), and a raw nullable column in a comparison fai
 syntax:50 term:51 " IS " " NULL " : term
 syntax:50 term:51 " IS " " NOT " " NULL " : term
 -- `COALESCE(x, d)` / `IFNULL(x, d)` — first non-null; `NULLIF(a, b)` — NULL when equal, else `a`.
-syntax:max "COALESCE" "(" term "," term ")" : term
+-- `COALESCE`/`CONCAT` are variadic (folded to the 2-arg forms).
+syntax:max "COALESCE" "(" term,+ ")" : term
 syntax:max "IFNULL" "(" term "," term ")" : term
 syntax:max "NULLIF" "(" term "," term ")" : term
 macro_rules
   | `($x IS NULL)      => `(Option.isNone $x)
   | `($x IS NOT NULL)  => `(Option.isSome $x)
-  | `(COALESCE($x, $d)) => `(Option.getD $x $d)
+  | `(COALESCE($x))          => `($x)
+  | `(COALESCE($x, $xs,*))   => `(Option.getD $x (COALESCE($xs,*)))
   | `(IFNULL($x, $d))   => `(Option.getD $x $d)
   | `(NULLIF($a, $b))   => `(if $a == $b then none else some $a)
+
+-- `CONCAT(a, b, …)` — variadic, right-folded onto the binary `Scalar.concat`.
+syntax:max "CONCAT" "(" term,+ ")" : term
+open Lean in
+macro_rules
+  | `(CONCAT($a))        => `($a)
+  | `(CONCAT($a, $bs,*)) => `($(mkIdent `LeanDatabase.Scalar.concat) $a (CONCAT($bs,*)))
 
 -- SQL `EXISTS (subquery)` / `NOT EXISTS (subquery)` — correlated; intercepted as a `WHERE` form by
 -- `Parser.Query` (→ `semijoin` / `antijoin`), so this syntax is only ever matched, never elaborated.
@@ -354,6 +373,8 @@ scalar1 "RTRIM" "rtrimOf"
 scalar1 "INITCAP" "initcapOf"
 scalar1 "REVERSE" "reverseOf"
 scalar1 "LENGTH" "lengthOf"
+scalar1 "CHAR_LENGTH" "lengthOf"
+scalar1 "CHARACTER_LENGTH" "lengthOf"
 scalar1 "YEAR" "yearOf"
 scalar1 "MONTH" "monthOf"
 scalar1 "DAY" "dayOf"
@@ -372,13 +393,15 @@ scalar2 "POW" "powerOf"
 scalar2 "LOG" "logOf"
 scalar2 "GREATEST" "greatestOf"
 scalar2 "LEAST" "leastOf"
-scalar2 "CONCAT" "concat"
 scalar2 "REGEXP_SUBSTR" "regexpSubstr"
 scalar2 "STRPOS" "strposOf"
 scalar2 "POSITION" "strposOf"
 scalar2 "DATE_TRUNC" "dateTrunc"
 scalar2 "DATE_PART" "datePart"
 scalar3 "SUBSTR" "substr"
+scalar3 "SUBSTRING" "substr"
+scalar2 "SUBSTR" "substr2"
+scalar2 "SUBSTRING" "substr2"
 scalar3 "SPLIT_PART" "splitPart"
 scalar3 "REPLACE" "replaceOf"
 scalar3 "REGEXP_REPLACE" "regexpReplace"
@@ -425,7 +448,14 @@ syntax "DECIMAL" : sql_cast_type
 syntax "STRING" : sql_cast_type
 syntax "TEXT" : sql_cast_type
 syntax "VARCHAR" : sql_cast_type
+syntax "DATE" : sql_cast_type
+syntax "TIMESTAMP" : sql_cast_type
+syntax "DATETIME" : sql_cast_type
+syntax "BOOLEAN" : sql_cast_type
+syntax "VARIANT" : sql_cast_type
 syntax:max "CAST" "(" term "AS" sql_cast_type ")" : term
+-- `TRY_CAST(x AS ty)` — same coercion as `CAST` (failure semantics not modelled).
+macro:max "TRY_CAST" "(" x:term "AS" ty:sql_cast_type ")" : term => `(CAST($x AS $ty))
 
 /-!
 ## Aggregates (`SUM`/`COUNT`/`AVG`/`MIN`/`MAX`)

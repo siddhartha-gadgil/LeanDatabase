@@ -14,14 +14,14 @@ grammar's string form. This is what lets a raw corpus query parse at all.
 
 namespace Example29
 
-CREATE TABLE TIMESERIES (VARIABLE INT, val INT, DATE STRING)
+CREATE TABLE TIMESERIES (VARIABLE INT, val INT, «DATE» STRING)
 CREATE TABLE ATTRIBUTES (VARIABLE INT, name STRING)
 
 /-- Quoted column identifiers and a quoted keyword-name column (`"DATE"`), with a single-quoted
 string literal on both sides — the two quoting conventions side by side. -/
 theorem quoted_columns :
     sql%([TIMESERIES_schema]) "SELECT t.\"VARIABLE\" FROM TIMESERIES AS t WHERE t.\"DATE\" = 'x'"
-      = sql%([TIMESERIES_schema]) "SELECT VARIABLE FROM TIMESERIES WHERE DATE = 'x'" := by
+      = sql%([TIMESERIES_schema]) "SELECT VARIABLE FROM TIMESERIES WHERE \"DATE\" = 'x'" := by
   sql_equiv
 
 /-- Ungrouped whole-table aggregate (`COUNT(DISTINCT …)` with no `GROUP BY`) over a 3-part quoted

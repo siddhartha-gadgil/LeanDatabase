@@ -139,6 +139,7 @@ partial def liftAggExprs (stx : Syntax) :
     | `(BOOL_AND($e:term)) => record .boolAnd e
     | `(EVERY($e:term))    => record .boolAnd e
     | `(BOOL_OR($e:term))  => record .boolOr e
+    | `(COUNT_IF($c:term)) => do record .sum (← `(CASE WHEN $c THEN (1 : Int) ELSE (0 : Int) END))
     | `(SUM($e:term))   => record .sum e
     | `(MIN($e:term))   => record .min e
     | `(MAX($e:term))   => record .max e
@@ -209,7 +210,7 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
   -- FROM → WHERE → (project / group+aggregate + HAVING) → DISTINCT → ORDER BY / LIMIT.
   | `(sql_query| SELECT $[DISTINCT%$distinct?]? $sel:sql_cols FROM $dbs:sql_from $[WHERE $filter?]?
       $[GROUP BY $groups:ident,* $[HAVING $having?]?]? $[ORDER BY $ord:sql_order_item,*]?
-      $[LIMIT $lim:num]? $[;]?) => do
+      $[LIMIT $lim:num]? $[OFFSET $_off:num]? $[;]?) => do
     let (productExpr, combinedSchema) ← productPair dbs
     let filteredExpr ← match filter? with
       | some filter => elabWhere productExpr combinedSchema filter
@@ -273,7 +274,8 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       let (e, cols) ← productPair (← `(sql_from| $t:ident))
       let baseP := (t.getId.components.getLast?).getD t.getId
       return (e, cols.map (fun (n, ty) => (n.replacePrefix baseP x.getId, ty)))
-    | `(sql_from| ( $sub:sql_query ) AS $_alias:ident) => do
+    | `(sql_from| ( $sub:sql_query ) AS $_alias:ident)
+    | `(sql_from| ( $sub:sql_query ) $_alias:ident) => do
       let (lamSub, subSchema) ← elabSqlQueryCore tableVars ctes sub
       let vars := tableVars.map (fun (relVar, _, _) => relVar)
       return (lamSub.beta vars.toArray, subSchema)
@@ -318,6 +320,20 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       innerJoin f1 (← `(sql_from| $t:ident)) (some cond)
     | `(sql_from| $f1:sql_from CROSS JOIN $t:ident) =>
       innerJoin f1 (← `(sql_from| $t:ident)) none
+    -- `JOIN u USING (a, b)` — inner join equating each shared column (`f.a = u.a AND …`).
+    | `(sql_from| $f1:sql_from JOIN $t:ident USING ( $cols:ident,* )) => do
+      let (e1, s1) ← productPair f1
+      let (e2, s2) ← productPair (← `(sql_from| $t:ident))
+      let combined := s1 ++ s2
+      let lastOf : Name → Name := fun n => (n.components.getLast?).getD n
+      let conds ← cols.getElems.toList.mapM fun c => do
+        let cn := lastOf c.getId          -- `expandNames` may have qualified it to `t.id`
+        let some (n1, _) := s1.find? (fun (n, _) => lastOf n == cn) | throwError s!"USING column {cn} not in left table"
+        let some (n2, _) := s2.find? (fun (n, _) => lastOf n == cn) | throwError s!"USING column {cn} not in right table"
+        `($(mkIdent n1) == $(mkIdent n2))
+      let cond ← conds.foldlM (fun acc c => `($acc && $c)) (← `(true))
+      let condExpr ← elabTypedTupleFilter [(.anonymous, combined)] cond
+      return (← mkAppM ``restriction #[condExpr, ← mkAppM ``TypedRelationOfList.append #[e1, e2]], combined)
     | _ => throwError "Unsupported FROM clause: {← PrettyPrinter.ppCategory `sql_from dbs}"
   -- Inner / cross join: cross-product of `f1` and `rhs` (each elaborated by `productPair`, so an
   -- aliased RHS is already renamed), restricted by the `ON` predicate over the combined schema.

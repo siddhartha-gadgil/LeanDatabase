@@ -69,6 +69,7 @@ opaque trimOf (x : String) : String := x
 opaque lengthOf (x : String) : Int := 0
 opaque concat (a : String) (b : String) : String := a
 opaque substr (x : String) (start : Int) (len : Int) : String := x
+opaque substr2 (x : String) (start : Int) : String := x
 opaque splitPart (x : String) (delim : String) (n : Int) : String := x
 opaque regexpSubstr (x : String) (pat : String) : String := x
 opaque replaceOf (x : String) (from_ : String) (to_ : String) : String := x
@@ -103,6 +104,8 @@ opaque truncToInt (x : Rat) : Int := 0
 model; sound because it's opaque, never a real coercion that could launder division). -/
 opaque strToInt (x : String) : Int := 0
 opaque strToFloat (x : String) : Rat := 0
+/-- `CAST(x AS BOOLEAN)` from a non-Bool — opaque. -/
+opaque toBoolOpaque {α : Type} (x : α) : Bool := false
 /-- Casts to string — opaque, per source type. -/
 opaque intToStr (x : Int) : String := ""
 opaque floatToStr (x : Rat) : String := ""

@@ -57,12 +57,18 @@ elab_rules : term
       else if isInt then mkAppM ``LeanDatabase.Scalar.intToStr #[xe]
       else if isRat then mkAppM ``LeanDatabase.Scalar.floatToStr #[xe]
       else throwError s!"CAST(_ AS STRING): unsupported source type {← ppExpr xt}"
+    -- `DATE`/`TIMESTAMP`/`VARIANT` are `String`-valued in our model; `BOOLEAN` is opaque.
+    let toBool : TermElabM Expr := do
+      if xt.isConstOf ``Bool then pure xe else mkAppM ``LeanDatabase.Scalar.toBoolOpaque #[xe]
     match ty with
     | `(sql_cast_type| INT) | `(sql_cast_type| INTEGER) | `(sql_cast_type| BIGINT)
     | `(sql_cast_type| NUMBER) => toInt
     | `(sql_cast_type| FLOAT) | `(sql_cast_type| DOUBLE) | `(sql_cast_type| REAL)
     | `(sql_cast_type| NUMERIC) | `(sql_cast_type| DECIMAL) => toFloat
-    | `(sql_cast_type| STRING) | `(sql_cast_type| TEXT) | `(sql_cast_type| VARCHAR) => toStr
+    | `(sql_cast_type| STRING) | `(sql_cast_type| TEXT) | `(sql_cast_type| VARCHAR)
+    | `(sql_cast_type| DATE) | `(sql_cast_type| TIMESTAMP) | `(sql_cast_type| DATETIME)
+    | `(sql_cast_type| VARIANT) => toStr
+    | `(sql_cast_type| BOOLEAN) => toBool
     | _ => throwUnsupportedSyntax
 
 /-! ## Column-binding context -/
@@ -117,6 +123,7 @@ syntax "MAX" "(" term ")" : term
 syntax "BOOL_AND" "(" term ")" : term
 syntax "EVERY" "(" term ")" : term
 syntax "BOOL_OR" "(" term ")" : term
+syntax "COUNT_IF" "(" term ")" : term
 syntax "STDDEV" "(" term ")" : term
 syntax "STDDEV_POP" "(" term ")" : term
 syntax "STDDEV_SAMP" "(" term ")" : term
