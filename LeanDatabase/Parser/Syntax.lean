@@ -388,6 +388,7 @@ scalar3 "DATEDIFF" "dateDiff"
 scalar3 "TIMESTAMPDIFF" "dateDiff"
 scalar3 "DATE_ADD" "dateAdd"
 scalar2 "ARRAY_TO_STRING" "arrayToString"
+scalar2 "VARIANTGET" "variantGet"
 
 -- Non-uniform scalars (special emission), as `macro` one-liners.
 open Lean in

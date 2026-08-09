@@ -533,10 +533,56 @@ private partial def castGo : List Char → List Char → List Char
       castGo (dropParenSize (dropSp rest2)) (emit.toList.reverse ++ out')
   | c :: rest, out => castGo rest (c :: out)
 
-/-- Normalize SQL surface quoting to what the grammar accepts (C3): single-quoted string literals
-`'…'` → the grammar's `"…"` form, double-quoted **identifiers** `"…"` → bare identifiers
-(`"A"."B"."C"` → `A.B.C`), and `X::TYPE` → `CAST(X AS TYPE)`. -/
+-- Semi-structured path access `v:key` / `v['key']` → `VARIANTGET(v, 'key')`, at the string level so
+-- `:` doesn't clash with Lean's type ascription. Runs before quote/`::` normalization.
+private def takeToChar (q : Char) : List Char → String → String × List Char
+  | c :: rest, acc => if c == q then (acc, rest) else takeToChar q rest (acc.push c)
+  | [], acc => (acc, [])
+private def takeKeyWord : List Char → String → String × List Char
+  | c :: rest, acc =>
+      if c.isAlphanum || c == '_' || c == '.' then takeKeyWord rest (acc.push c) else (acc, c :: rest)
+  | [], acc => (acc, [])
+private def readKey : List Char → String × List Char
+  | '"' :: rest => takeToChar '"' rest ""
+  | '\'' :: rest => takeToChar '\'' rest ""
+  | l => takeKeyWord l ""
+private def copyStrTo (q : Char) : List Char → List Char → List Char × List Char
+  | c :: rest, out => if c == q then (c :: out, rest) else copyStrTo q rest (c :: out)
+  | [], out => (out, [])
+private partial def pathGo : List Char → List Char → List Char
+  | [], out => out
+  | '\'' :: rest, out => let (out, rest) := copyStrTo '\'' rest ('\'' :: out); pathGo rest out
+  | '"' :: rest, out => let (out, rest) := copyStrTo '"' rest ('"' :: out); pathGo rest out
+  | ':' :: ':' :: rest, out => pathGo rest (':' :: ':' :: out)          -- leave `::` for castGo
+  | ':' :: rest, out =>
+      let out := dropSp out
+      let (operand, out') := match out with
+        | ')' :: _ => let (p, rem) := takeBalancedBack out 0 []; takeFuncName rem p
+        | _ => takeRunBack out []
+      let (key, rest') := readKey (dropSp rest)
+      let emit := "VARIANTGET(" ++ operand.asString ++ ", '" ++ key ++ "')"
+      pathGo rest' (emit.toList.reverse ++ out')
+  | '[' :: rest, out =>
+      -- `operand['key']` access only — a *quoted* key must follow, so array literals `[1,2]` are left
+      -- alone.
+      match out, dropSp rest with
+      | h :: _, (q :: _) =>
+        if (isOpChar h || h == ')') && (q == '\'' || q == '"') then
+          let (operand, out') := match out with
+            | ')' :: _ => let (p, rem) := takeBalancedBack out 0 []; takeFuncName rem p
+            | _ => takeRunBack out []
+          let (key, rest0) := readKey (dropSp rest)
+          let rest' := (rest0.dropWhile (· != ']')).drop 1
+          let emit := "VARIANTGET(" ++ operand.asString ++ ", '" ++ key ++ "')"
+          pathGo rest' (emit.toList.reverse ++ out')
+        else pathGo rest ('[' :: out)
+      | _, _ => pathGo rest ('[' :: out)
+  | c :: rest, out => pathGo rest (c :: out)
+
+/-- Normalize SQL surface syntax to what the grammar accepts (C3): path access `v:key`/`v['key']` →
+`VARIANTGET`, `'…'` strings → `"…"`, double-quoted **identifiers** → bare idents, `X::TYPE` → `CAST`. -/
 def normalizeSqlLiterals (s : String) : String :=
+  let s := (pathGo s.toList []).reverse.asString
   (castGo (normalizeGo s.toList "").toList []).reverse.asString
 
 /-- Fold a `Name`'s string components to lowercase (case-insensitive identifiers, C3). -/

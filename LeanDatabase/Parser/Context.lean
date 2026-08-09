@@ -45,10 +45,12 @@ elab_rules : term
     let toFloat : TermElabM Expr := do
       if isRat then pure xe
       else if isInt then mkAppM ``LeanDatabase.Scalar.castIntToFloat #[xe]
+      else if isStr then mkAppM ``LeanDatabase.Scalar.strToFloat #[xe]
       else throwError s!"CAST(_ AS FLOAT): unsupported source type {← ppExpr xt}"
     let toInt : TermElabM Expr := do
       if isInt then pure xe
       else if isRat then mkAppM ``LeanDatabase.Scalar.truncToInt #[xe]
+      else if isStr then mkAppM ``LeanDatabase.Scalar.strToInt #[xe]
       else throwError s!"CAST(_ AS INT): unsupported source type {← ppExpr xt}"
     let toStr : TermElabM Expr := do
       if isStr then pure xe

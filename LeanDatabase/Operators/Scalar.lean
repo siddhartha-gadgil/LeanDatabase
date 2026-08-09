@@ -81,6 +81,10 @@ opaque lpadOf (x : String) (n : Int) (pad : String) : String := x
 opaque rpadOf (x : String) (n : Int) (pad : String) : String := x
 opaque strposOf (x : String) (sub : String) : Int := 0
 opaque arrayToString (a : String) (delim : String) : String := a
+/-- Snowflake semi-structured path access `v:key` / `v['key']` — an opaque sub-field of a VARIANT
+(modelled as `String`). Cancels identically on both sides; the following `::TYPE` cast (if any) is
+the real coercion. -/
+opaque variantGet (v : String) (key : String) : String := v
 
 /-! ## `CAST` — a *real* coercion, never opaque (ROADMAP 2.4)
 
@@ -95,6 +99,10 @@ def castIntToFloat (x : Int) : Rat := (x : Rat)
 
 /-- `CAST(x AS INT)` from a float: lossy truncation — opaque (no laundering hazard). -/
 opaque truncToInt (x : Rat) : Int := 0
+/-- `CAST(str AS INT/FLOAT)` — opaque (a string, e.g. a VARIANT sub-field, has no numeric value we
+model; sound because it's opaque, never a real coercion that could launder division). -/
+opaque strToInt (x : String) : Int := 0
+opaque strToFloat (x : String) : Rat := 0
 /-- Casts to string — opaque, per source type. -/
 opaque intToStr (x : Int) : String := ""
 opaque floatToStr (x : Rat) : String := ""
