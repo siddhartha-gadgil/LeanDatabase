@@ -64,8 +64,11 @@ elab_rules : term
     | `(sql_cast_type| INT) | `(sql_cast_type| INTEGER) | `(sql_cast_type| BIGINT)
     | `(sql_cast_type| NUMBER) => toInt
     | `(sql_cast_type| FLOAT) | `(sql_cast_type| DOUBLE) | `(sql_cast_type| REAL)
-    | `(sql_cast_type| NUMERIC) | `(sql_cast_type| DECIMAL) => toFloat
+    | `(sql_cast_type| NUMERIC) | `(sql_cast_type| DECIMAL)
+    | `(sql_cast_type| NUMBER($_,*)) | `(sql_cast_type| NUMERIC($_,*))
+    | `(sql_cast_type| DECIMAL($_,*)) => toFloat
     | `(sql_cast_type| STRING) | `(sql_cast_type| TEXT) | `(sql_cast_type| VARCHAR)
+    | `(sql_cast_type| CHAR) | `(sql_cast_type| VARCHAR($_)) | `(sql_cast_type| CHAR($_))
     | `(sql_cast_type| DATE) | `(sql_cast_type| TIMESTAMP) | `(sql_cast_type| DATETIME)
     | `(sql_cast_type| VARIANT) => toStr
     | `(sql_cast_type| BOOLEAN) => toBool
@@ -124,6 +127,7 @@ syntax "BOOL_AND" "(" term ")" : term
 syntax "EVERY" "(" term ")" : term
 syntax "BOOL_OR" "(" term ")" : term
 syntax "COUNT_IF" "(" term ")" : term
+syntax "APPROX_COUNT_DISTINCT" "(" term ")" : term
 syntax "STDDEV" "(" term ")" : term
 syntax "STDDEV_POP" "(" term ")" : term
 syntax "STDDEV_SAMP" "(" term ")" : term

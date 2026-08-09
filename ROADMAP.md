@@ -89,7 +89,11 @@ An external review (`report.md`) found soundness bugs, coverage gaps, and stale 
 - [x] **`::` casts + more scalars** — `X::TYPE → CAST(X AS TYPE)` (sound); `SPLIT_PART`/`REGEXP_SUBSTR`/`REPLACE`.
 - [x] **Case-insensitive identifiers** — schema + query idents fold to lowercase; ungrouped aggregates (`SELECT COUNT(*)`).
 - [x] **S3 (self-joins)** — aliased columns renamed per-alias; **3.4 correlated scalar subqueries** — deferred/stash elaboration in projection context.
-- [ ] **S4 (ambiguous-column diagnostic)**, **keyword-collision idents** — open (see table above).
+- [x] **Keyword-collision idents** — quoted `"YEAR"`/`"COUNT"`/`"END"` unquote into guillemet idents `«…»`, immune to keyword tokens (44% of records had such columns).
+- [x] **Many-column `CREATE TABLE`** — `colTypeOfList` + generic instances (30-70-col corpus tables no longer fail exhaustiveness).
+- [x] **Bare table aliases** `FROM t x`; **semi-structured path access** `v:key`/`v['key']` → opaque `VARIANTGET`.
+- [x] **Broad surface/function coverage** — `NOT BETWEEN`, `IS [NOT] TRUE/FALSE/DISTINCT FROM`, `LIMIT…OFFSET`, `NULLS FIRST/LAST`, `USING`, bare-alias derived tables, sized casts, `DECODE`, variadic `COALESCE`/`CONCAT`/`GREATEST`/`LEAST`, and ~40 more functions (see `Parser/Syntax.lean`).
+- [ ] **S4 (ambiguous-column diagnostic)** — open (needs scoped resolution).
 
 ---
 

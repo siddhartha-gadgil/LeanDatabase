@@ -134,6 +134,7 @@ partial def liftAggExprs (stx : Syntax) :
       return some (mkIdent name)
     match node with
     | `(COUNT(DISTINCT $e:term)) => record .countDistinct e
+    | `(APPROX_COUNT_DISTINCT($e:term)) => record .countDistinct e
     | `(SUM(DISTINCT $e:term))   => record .sumDistinct e
     | `(AVG(DISTINCT $e:term))   => record .avgDistinct e
     | `(BOOL_AND($e:term)) => record .boolAnd e

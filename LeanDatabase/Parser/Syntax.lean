@@ -52,12 +52,15 @@ def sqlColName : TSyntax `sql_col → Name
 declare_syntax_cat sql_order_dir
 syntax " ASC " : sql_order_dir
 syntax " DESC " : sql_order_dir
+declare_syntax_cat sql_nulls
+syntax "NULLS" "FIRST" : sql_nulls
+syntax "NULLS" "LAST" : sql_nulls
 declare_syntax_cat sql_order_item
-syntax sql_col (sql_order_dir)? : sql_order_item
+syntax sql_col (sql_order_dir)? (sql_nulls)? : sql_order_item
 
-/-- Strip the (ignored) `ASC`/`DESC` off an `ORDER BY` item, recovering the underlying column. -/
+/-- Strip the (ignored) `ASC`/`DESC`/`NULLS …` off an `ORDER BY` item, recovering the column. -/
 def sqlOrderCol : TSyntax `sql_order_item → TSyntax `sql_col
-  | `(sql_order_item| $c:sql_col $[$_dir:sql_order_dir]?) => c
+  | `(sql_order_item| $c:sql_col $[$_dir:sql_order_dir]? $[$_nulls:sql_nulls]?) => c
   | _ => unreachable!
 
 -- Base Cases (The atomic sources of data)
@@ -236,6 +239,9 @@ macro:50 x:term:51 " IS " " TRUE " : term => `($x == true)
 macro:50 x:term:51 " IS " " FALSE " : term => `($x == false)
 macro:50 x:term:51 " IS " " NOT " " TRUE " : term => `($x != true)
 macro:50 x:term:51 " IS " " NOT " " FALSE " : term => `($x != false)
+-- `a IS [NOT] DISTINCT FROM b` — null-safe (in)equality; approximated by `!=` / `==`.
+macro:50 a:term:51 " IS " " DISTINCT " " FROM " b:term:51 : term => `($a != $b)
+macro:50 a:term:51 " IS " " NOT " " DISTINCT " " FROM " b:term:51 : term => `($a == $b)
 
 -- SQL `x LIKE pat` — string match with `%`/`_` wildcards. `strLike` lives in `Operators/Like.lean`
 -- (not imported here, to keep `Syntax` pure), so emit a raw ident that resolves at the use-site.
@@ -276,6 +282,25 @@ open Lean in
 macro_rules
   | `(CONCAT($a))        => `($a)
   | `(CONCAT($a, $bs,*)) => `($(mkIdent `LeanDatabase.Scalar.concat) $a (CONCAT($bs,*)))
+
+-- No-arg "current time" functions (opaque), bool/typed literals, and a couple null helpers.
+open Lean in macro:max "NOW" "(" ")" : term => `($(mkIdent `LeanDatabase.Scalar.nowVal))
+open Lean in macro:max "GETDATE" "(" ")" : term => `($(mkIdent `LeanDatabase.Scalar.nowVal))
+open Lean in macro:max "UUID_STRING" "(" ")" : term => `($(mkIdent `LeanDatabase.Scalar.uuidString))
+open Lean in macro "CURRENT_DATE" : term => `($(mkIdent `LeanDatabase.Scalar.nowVal))
+open Lean in macro "CURRENT_TIMESTAMP" : term => `($(mkIdent `LeanDatabase.Scalar.nowVal))
+open Lean in macro "SYSDATE" : term => `($(mkIdent `LeanDatabase.Scalar.nowVal))
+macro "TRUE" : term => `(true)
+macro "FALSE" : term => `(false)
+-- Typed literals `DATE '…'` / `TIMESTAMP '…'` / `TIME '…'` — the (normalized) string value.
+macro "DATE" s:str : term => `($s)
+macro "TIMESTAMP" s:str : term => `($s)
+macro "TIME" s:str : term => `($s)
+syntax:max "NULLIFZERO" "(" term ")" : term
+syntax:max "ZEROIFNULL" "(" term ")" : term
+macro_rules
+  | `(NULLIFZERO($x)) => `(NULLIF($x, 0))
+  | `(ZEROIFNULL($x)) => `(COALESCE($x, 0))
 
 -- SQL `EXISTS (subquery)` / `NOT EXISTS (subquery)` — correlated; intercepted as a `WHERE` form by
 -- `Parser.Query` (→ `semijoin` / `antijoin`), so this syntax is only ever matched, never elaborated.
@@ -361,6 +386,35 @@ scalar1 "ABS" "abs"
 scalar1 "CEIL" "ceil"
 scalar1 "FLOOR" "floor"
 scalar1 "SIGN" "sign"
+scalar1 "CEILING" "ceil"
+scalar1 "TRY_TO_DATE" "toDate"
+scalar1 "TRY_TO_TIMESTAMP" "toTimestamp"
+scalar1 "TRY_TO_NUMBER" "toNumber"
+scalar1 "TRY_TO_DOUBLE" "toNumber"
+scalar1 "TRY_TO_DECIMAL" "toNumber"
+scalar2 "BITAND" "bitand"
+scalar2 "REGEXP_COUNT" "regexpCount"
+scalar2 "REGEXP_LIKE" "regexpLike"
+scalar2 "TRUNC" "truncTo"
+scalar3 "TRANSLATE" "translateOf"
+scalar3 "DATEADD" "dateAdd"
+scalar3 "TIMESTAMPADD" "dateAdd"
+scalar3 "DATE_DIFF" "dateDiff"
+scalar2 "SPLIT" "splitOf"
+scalar1 "OBJECT_KEYS" "objectKeys"
+scalar2 "GET_PATH" "getPath"
+scalar2 "ARRAY_CONSTRUCT" "arrayConstruct"
+scalar2 "LEFT" "leftOf"
+scalar2 "RIGHT" "rightOf"
+scalar2 "CONTAINS" "containsOf"
+scalar2 "STARTSWITH" "startsWithOf"
+scalar2 "ENDSWITH" "endsWithOf"
+scalar2 "CHARINDEX" "charIndexOf"
+scalar2 "INSTR" "instrOf"
+scalar2 "REPEAT" "repeatOf"
+scalar1 "SPACE" "spaceOf"
+scalar1 "HASH" "hashOf"
+scalar1 "MD5" "md5Of"
 scalar1 "SQRT" "sqrtOf"
 scalar1 "EXP" "expOf"
 scalar1 "LN" "lnOf"
@@ -386,6 +440,11 @@ scalar1 "SECOND" "secondOf"
 scalar1 "DAYOFWEEK" "dayOfWeek"
 scalar1 "TO_DATE" "toDate"
 scalar1 "TO_TIMESTAMP" "toTimestamp"
+scalar1 "TO_CHAR" "toChar"
+scalar1 "TO_VARCHAR" "toChar"
+scalar1 "TO_NUMBER" "toNumber"
+scalar1 "TO_DECIMAL" "toNumber"
+scalar1 "TO_DOUBLE" "toNumber"
 scalar1 "LAST_DAY" "lastDay"
 scalar2 "MOD" "modOf"
 scalar2 "POWER" "powerOf"
@@ -424,9 +483,38 @@ open Lean in
 macro:max "EXTRACT" "(" "MONTH" "FROM" x:term ")" : term => `($(mkIdent `LeanDatabase.Scalar.monthOf) $x)
 open Lean in
 macro:max "EXTRACT" "(" "DAY" "FROM" x:term ")" : term => `($(mkIdent `LeanDatabase.Scalar.dayOf) $x)
--- 3-arg GREATEST/LEAST fold to the 2-arg form; conditionals are genuine (not opaque).
+open Lean in
+macro:max "EXTRACT" "(" "QUARTER" "FROM" x:term ")" : term => `($(mkIdent `LeanDatabase.Scalar.quarterOf) $x)
+open Lean in
+macro:max "EXTRACT" "(" "WEEK" "FROM" x:term ")" : term => `($(mkIdent `LeanDatabase.Scalar.weekOf) $x)
+open Lean in
+macro:max "EXTRACT" "(" "HOUR" "FROM" x:term ")" : term => `($(mkIdent `LeanDatabase.Scalar.hourOf) $x)
+open Lean in
+macro:max "EXTRACT" "(" "MINUTE" "FROM" x:term ")" : term => `($(mkIdent `LeanDatabase.Scalar.minuteOf) $x)
+open Lean in
+macro:max "EXTRACT" "(" "SECOND" "FROM" x:term ")" : term => `($(mkIdent `LeanDatabase.Scalar.secondOf) $x)
+open Lean in
+macro:max "EXTRACT" "(" "DAYOFWEEK" "FROM" x:term ")" : term => `($(mkIdent `LeanDatabase.Scalar.dayOfWeek) $x)
+-- 3-/4-arg GREATEST/LEAST fold to the 2-arg form; conditionals are genuine (not opaque).
 macro:max "GREATEST" "(" a:term "," b:term "," c:term ")" : term => `(GREATEST(GREATEST($a, $b), $c))
+macro:max "GREATEST" "(" a:term "," b:term "," c:term "," d:term ")" : term => `(GREATEST(GREATEST($a, $b, $c), $d))
 macro:max "LEAST" "(" a:term "," b:term "," c:term ")" : term => `(LEAST(LEAST($a, $b), $c))
+macro:max "LEAST" "(" a:term "," b:term "," c:term "," d:term ")" : term => `(LEAST(LEAST($a, $b, $c), $d))
+
+-- `DECODE(e, k1, v1, …[, default])` → the searched `CASE WHEN e = kᵢ THEN vᵢ … [ELSE default] END`.
+syntax:max "DECODE" "(" term,+ ")" : term
+macro_rules
+  | `(DECODE($e:term, $rest,*)) => do
+      let a := rest.getElems
+      let mut cs : Array Term := #[]
+      let mut vs : Array Term := #[]
+      let mut i := 0
+      while i + 1 < a.size do
+        cs := cs.push (← `($e == $(a[i]!)))
+        vs := vs.push a[i+1]!
+        i := i + 2
+      if i < a.size then `(CASE $[WHEN $cs THEN $vs]* ELSE $(a[i]!) END)
+      else `(CASE $[WHEN $cs THEN $vs]* ELSE NULL END)
 macro:max "NVL" "(" x:term "," d:term ")" : term => `(Option.getD $x $d)
 macro:max "NVL2" "(" x:term "," a:term "," b:term ")" : term => `(bif Option.isSome $x then $a else $b)
 macro:max "IFF" "(" c:term "," a:term "," b:term ")" : term => `(bif ($c : Bool) then $a else $b)
@@ -453,6 +541,14 @@ syntax "TIMESTAMP" : sql_cast_type
 syntax "DATETIME" : sql_cast_type
 syntax "BOOLEAN" : sql_cast_type
 syntax "VARIANT" : sql_cast_type
+syntax "CHAR" : sql_cast_type
+-- Sized variants `VARCHAR(n)` / `NUMBER(p,s)` / … (the size is discarded). Higher priority so the
+-- bare forms don't win and leave `(n)` dangling.
+syntax (priority := high) "VARCHAR(" num ")" : sql_cast_type   -- `VARCHAR(` is a glued DDL token
+syntax (priority := high) "CHAR" "(" num ")" : sql_cast_type
+syntax (priority := high) "NUMBER" "(" num,+ ")" : sql_cast_type
+syntax (priority := high) "NUMERIC" "(" num,+ ")" : sql_cast_type
+syntax (priority := high) "DECIMAL" "(" num,+ ")" : sql_cast_type
 syntax:max "CAST" "(" term "AS" sql_cast_type ")" : term
 -- `TRY_CAST(x AS ty)` — same coercion as `CAST` (failure semantics not modelled).
 macro:max "TRY_CAST" "(" x:term "AS" ty:sql_cast_type ")" : term => `(CAST($x AS $ty))

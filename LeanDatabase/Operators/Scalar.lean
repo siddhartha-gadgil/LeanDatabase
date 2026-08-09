@@ -60,6 +60,9 @@ opaque lastDay (d : String) : String := d
 /-- Date/timestamp construction and truncation — dates are `String`s, so these are `String`-valued. -/
 opaque toDate (x : String) : String := x
 opaque toTimestamp (x : String) : String := x
+opaque nowVal : String := ""
+opaque toChar {α : Type} (x : α) : String := ""
+opaque toNumber {α : Type} (x : α) : Rat := 0
 opaque dateTrunc (unit : String) (x : String) : String := x
 
 /-- String functions. -/
@@ -74,6 +77,27 @@ opaque splitPart (x : String) (delim : String) (n : Int) : String := x
 opaque regexpSubstr (x : String) (pat : String) : String := x
 opaque replaceOf (x : String) (from_ : String) (to_ : String) : String := x
 opaque regexpReplace (x pat rep : String) : String := x
+opaque translateOf (s from_ to_ : String) : String := s
+opaque regexpCount (s pat : String) : Int := 0
+opaque regexpLike (s pat : String) : Bool := false
+opaque bitand {α : Type} (a b : α) : α := a
+opaque truncTo {α : Type} (x : α) (n : Int) : α := x
+opaque splitOf (x : String) (delim : String) : String := x
+opaque objectKeys (x : String) : String := x
+opaque getPath (x : String) (path : String) : String := x
+opaque arrayConstruct {α : Type} (a b : α) : String := ""
+opaque leftOf (s : String) (n : Int) : String := s
+opaque rightOf (s : String) (n : Int) : String := s
+opaque containsOf (s sub : String) : Bool := false
+opaque startsWithOf (s p : String) : Bool := false
+opaque endsWithOf (s p : String) : Bool := false
+opaque charIndexOf (sub s : String) : Int := 0
+opaque instrOf (s sub : String) : Int := 0
+opaque repeatOf (s : String) (n : Int) : String := s
+opaque spaceOf (n : Int) : String := ""
+opaque hashOf {α : Type} (x : α) : Int := 0
+opaque md5Of (x : String) : String := x
+opaque uuidString : String := ""
 opaque ltrimOf (x : String) : String := x
 opaque rtrimOf (x : String) : String := x
 opaque initcapOf (x : String) : String := x
