@@ -51,6 +51,7 @@ opaque hourOf (x : String) : Int := 0
 opaque minuteOf (x : String) : Int := 0
 opaque secondOf (x : String) : Int := 0
 opaque dayOfWeek (x : String) : Int := 0
+opaque epochOf (x : String) : Int := 0
 /-- `DATEDIFF(unit, a, b)` / `DATE_PART(part, d)` / `DATE_ADD`/`LAST_DAY` — dates are `String`s. -/
 opaque dateDiff (unit a b : String) : Int := 0
 opaque datePart (part d : String) : Int := 0
@@ -107,6 +108,88 @@ opaque toGeography (x : String) : String := x
 opaque toTimestamp2 {α : Type} (x : α) (scale : Int) : String := ""
 opaque dateFromParts {α : Type} (y m d : α) : String := ""
 opaque stIntersects {α : Type} (a b : α) : Bool := false
+opaque toDate2 {α : Type} (x : α) (fmt : String) : String := ""
+opaque stArea {α : Type} (x : α) : Rat := 0
+opaque stIntersection {α : Type} (a b : α) : String := ""
+opaque stWithin {α : Type} (a b : α) : Bool := false
+opaque convertTimezone {α : Type} (a b c : α) : String := ""
+opaque arraySort (x : String) : String := x
+opaque regexpSubstrAll (s pat : String) : String := s
+opaque parseJson (x : String) : String := x
+opaque stDwithin {α : Type} (a b c : α) : Bool := false
+opaque arraysOverlap (a b : String) : Bool := false
+opaque dayOfYear (x : String) : Int := 0
+opaque difference (a b : String) : Int := 0
+opaque log10Of {α : Type} (x : α) : α := x
+
+/-! ## Broad common-function coverage — each its own opaque so distinct functions never equate. -/
+
+-- Numeric endomorphisms / trig (uninterpreted).
+opaque cbrtOf {α : Type} (x : α) : α := x
+opaque squareOf {α : Type} (x : α) : α := x
+opaque factorialOf {α : Type} (x : α) : α := x
+opaque acosOf {α : Type} (x : α) : α := x
+opaque asinOf {α : Type} (x : α) : α := x
+opaque atanOf {α : Type} (x : α) : α := x
+opaque cosOf {α : Type} (x : α) : α := x
+opaque sinOf {α : Type} (x : α) : α := x
+opaque tanOf {α : Type} (x : α) : α := x
+opaque cotOf {α : Type} (x : α) : α := x
+opaque degreesOf {α : Type} (x : α) : α := x
+opaque radiansOf {α : Type} (x : α) : α := x
+opaque atan2Of {α : Type} (a b : α) : α := a
+
+-- String functions.
+opaque soundexOf (x : String) : String := x
+opaque asciiOf (x : String) : Int := 0
+opaque lenOf (x : String) : Int := 0
+opaque octetLength (x : String) : Int := 0
+opaque editDistance (a b : String) : Int := 0
+opaque regexpInstr (s pat : String) : Int := 0
+opaque chrOf (n : Int) : String := ""
+opaque substringIndex (s d : String) (n : Int) : String := s
+opaque nvlOf {α : Type} (a b : α) : α := a
+opaque nvl2Of {α : Type} (a b c : α) : α := b
+opaque sha1Of (x : String) : String := x
+opaque sha2Of (x : String) : String := x
+opaque base64Encode (x : String) : String := x
+opaque hexEncode (x : String) : String := x
+
+-- Date/time (dates modelled as `String`).
+opaque addMonths (d : String) (n : Int) : String := d
+opaque monthsBetween (a b : String) : Rat := 0
+opaque nextDay (d wd : String) : String := d
+opaque weekOfYear (x : String) : Int := 0
+opaque weekIso (x : String) : Int := 0
+opaque dayOfMonth (x : String) : Int := 0
+opaque yearOfWeek (x : String) : Int := 0
+opaque monthName (x : String) : String := x
+opaque dayName (x : String) : String := x
+opaque toTime (x : String) : String := x
+
+-- Array/variant (arrays/objects modelled as `String`).
+opaque arrayContains {α : Type} (a : α) (arr : String) : Bool := false
+opaque arrayPosition {α : Type} (a : α) (arr : String) : Int := 0
+opaque arraySlice (arr : String) (a b : Int) : String := arr
+opaque arrayCat (a b : String) : String := a
+opaque arrayAppend (arr x : String) : String := arr
+opaque arrayDistinct (x : String) : String := x
+opaque arrayCompact (x : String) : String := x
+opaque getOf (v k : String) : String := v
+
+-- Conversions.
+opaque toBoolean {α : Type} (x : α) : Bool := false
+opaque toArray {α : Type} (x : α) : String := ""
+opaque toObject {α : Type} (x : α) : String := ""
+opaque toVariant {α : Type} (x : α) : String := ""
+opaque toBinary (x : String) : String := x
+
+-- Geospatial.
+opaque stX {α : Type} (x : α) : Rat := 0
+opaque stY {α : Type} (x : α) : Rat := 0
+opaque stLength {α : Type} (x : α) : Rat := 0
+opaque stContains {α : Type} (a b : α) : Bool := false
+opaque stCentroid {α : Type} (x : α) : String := ""
 opaque ltrimOf (x : String) : String := x
 opaque rtrimOf (x : String) : String := x
 opaque initcapOf (x : String) : String := x
