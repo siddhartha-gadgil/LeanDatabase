@@ -637,15 +637,32 @@ private def copyQuotedRun (q : Char) : List Char → String → String × List C
   | c :: rest, acc => if c == q then (acc.push c, rest) else copyQuotedRun q rest (acc.push c)
   | [], acc => (acc, [])
 
+-- `LEFT(`/`RIGHT(` (the string functions) collide with the `LEFT`/`RIGHT` JOIN keywords, which breaks
+-- join chains (an `ON` term greedily tries `LEFT(…)` as an application). Rename the *function* form to
+-- a distinct token so `LEFT`/`RIGHT` are join-only. Only fires when a `(` follows.
+private def matchFnRename (l : List Char) : Option (String × List Char) :=
+  let tryKW (kw : List Char) (repl : String) : Option (String × List Char) :=
+    match ciTake kw l [] with
+    | some (_, rem) =>
+        match rem.dropWhile (fun c => c == ' ' || c == '\n' || c == '\t') with
+        | '(' :: _ => some (repl, rem)
+        | _ => none
+    | none => none
+  (tryKW ['l','e','f','t'] "LEFTSTR").orElse fun _ => tryKW ['r','i','g','h','t'] "RIGHTSTR"
+
 private partial def wrapAliasGo : List Char → String → String
   | [], acc => acc
   | '\'' :: rest, acc => let (s, r) := copyQuotedRun '\'' rest (String.singleton '\''); wrapAliasGo r (acc ++ s)
   | '"'  :: rest, acc => let (s, r) := copyQuotedRun '"'  rest (String.singleton '"');  wrapAliasGo r (acc ++ s)
   | c :: rest, acc =>
       let boundary := acc.isEmpty || !(isWordChar acc.back)
-      match (if boundary && (c == 'a' || c == 'A') then matchAsAlias (c :: rest) else none) with
-      | some (kw, rest') => wrapAliasGo rest' (acc ++ "AS «" ++ kw.asString ++ "»")
-      | none => wrapAliasGo rest (acc.push c)
+      let fn := if boundary && (c == 'l' || c == 'L' || c == 'r' || c == 'R') then matchFnRename (c :: rest) else none
+      match fn with
+      | some (repl, rest') => wrapAliasGo rest' (acc ++ repl)
+      | none =>
+        match (if boundary && (c == 'a' || c == 'A') then matchAsAlias (c :: rest) else none) with
+        | some (kw, rest') => wrapAliasGo rest' (acc ++ "AS «" ++ kw.asString ++ "»")
+        | none => wrapAliasGo rest (acc.push c)
 
 -- Semi-structured path access `v:key` / `v['key']` → `VARIANTGET(v, 'key')`, at the string level so
 -- `:` doesn't clash with Lean's type ascription. Runs before quote/`::` normalization.
