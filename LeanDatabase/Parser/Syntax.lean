@@ -283,6 +283,14 @@ macro_rules
   | `(CONCAT($a))        => `($a)
   | `(CONCAT($a, $bs,*)) => `($(mkIdent `LeanDatabase.Scalar.concat) $a (CONCAT($bs,*)))
 
+-- `REGEXP_SUBSTR`/`REGEXP_REPLACE` accept extra positional args (position, occurrence, flags) — drop.
+syntax:max "REGEXP_SUBSTR" "(" term "," term "," term,+ ")" : term
+syntax:max "REGEXP_REPLACE" "(" term "," term "," term "," term,+ ")" : term
+open Lean in
+macro_rules
+  | `(REGEXP_SUBSTR($s, $p, $_rest,*))       => `($(mkIdent `LeanDatabase.Scalar.regexpSubstr) $s $p)
+  | `(REGEXP_REPLACE($s, $p, $r, $_rest,*))  => `($(mkIdent `LeanDatabase.Scalar.regexpReplace) $s $p $r)
+
 -- No-arg "current time" functions (opaque), bool/typed literals, and a couple null helpers.
 open Lean in macro:max "NOW" "(" ")" : term => `($(mkIdent `LeanDatabase.Scalar.nowVal))
 open Lean in macro:max "GETDATE" "(" ")" : term => `($(mkIdent `LeanDatabase.Scalar.nowVal))
@@ -380,6 +388,10 @@ macro "scalar3" kw:str fn:str : command => do
   let nm : Name := `LeanDatabase.Scalar ++ fn.getString.toName
   `(macro:max $kw:str "(" a:term "," b:term "," c:term ")" : term =>
       `($$(mkIdent $(quote nm)) $$a $$b $$c))
+macro "scalar4" kw:str fn:str : command => do
+  let nm : Name := `LeanDatabase.Scalar ++ fn.getString.toName
+  `(macro:max $kw:str "(" a:term "," b:term "," c:term "," d:term ")" : term =>
+      `($$(mkIdent $(quote nm)) $$a $$b $$c $$d))
 
 -- The scalar table — one line each (numeric, string, date). All opaque, cancel by congruence.
 scalar1 "ABS" "abs"
@@ -415,6 +427,11 @@ scalar2 "REPEAT" "repeatOf"
 scalar1 "SPACE" "spaceOf"
 scalar1 "HASH" "hashOf"
 scalar1 "MD5" "md5Of"
+scalar2 "TO_CHAR" "toChar2"
+scalar2 "TO_VARCHAR" "toChar2"
+scalar2 "ST_MAKEPOINT" "stMakePoint"
+scalar2 "ST_DISTANCE" "stDistance"
+scalar4 "HAVERSINE" "haversine"
 scalar1 "SQRT" "sqrtOf"
 scalar1 "EXP" "expOf"
 scalar1 "LN" "lnOf"

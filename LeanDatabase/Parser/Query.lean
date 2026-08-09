@@ -515,7 +515,8 @@ private partial def normalizeGo : List Char → String → String
 private def dropSp : List Char → List Char
   | ' ' :: r => dropSp r
   | l => l
-private def isOpChar (c : Char) : Bool := c.isAlphanum || c == '_' || c == '.' || c == '"'
+private def isOpChar (c : Char) : Bool :=
+  c.isAlphanum || c == '_' || c == '.' || c == '"' || c == '«' || c == '»'
 -- pop a plain operand (ident/dotted/number/quoted) off the reversed output
 private def takeRunBack : List Char → List Char → (List Char × List Char)
   | c :: rest, acc => if isOpChar c then takeRunBack rest (c :: acc) else (acc, c :: rest)
@@ -549,6 +550,102 @@ private partial def castGo : List Char → List Char → List Char
       let emit := "CAST(" ++ operand.asString ++ " AS " ++ ty ++ ")"
       castGo (dropParenSize (dropSp rest2)) (emit.toList.reverse ++ out')
   | c :: rest, out => castGo rest (c :: out)
+
+-- Strip SQL comments (`-- …` to end of line, `/* … */`), skipping over string literals so a `--` or
+-- `/*` inside a string is preserved. Runs first, before any other normalization.
+private partial def dropBlockComment : List Char → List Char
+  | '*' :: '/' :: rest => rest
+  | _ :: rest => dropBlockComment rest
+  | [] => []
+-- Case-insensitive prefix match; returns the remaining chars after `kw` on success.
+private def ciPrefix : List Char → List Char → Option (List Char)
+  | [], rest => some rest
+  | k :: ks, c :: cs => if k == c.toLower then ciPrefix ks cs else none
+  | _ :: _, [] => none
+
+-- At a word boundary, `INNER JOIN` → ` JOIN` (the redundant qualifier reuses the plain-`JOIN` grammar).
+private def dropInnerKW : List Char → Option (List Char)
+  | l =>
+    match ciPrefix ['i','n','n','e','r'] l with
+    | some (w :: after) =>
+        if w == ' ' || w == '\n' || w == '\t' then
+          match ciPrefix ['j','o','i','n'] ((w :: after).dropWhile fun c => c == ' ' || c == '\n' || c == '\t') with
+          | some _ => some (' ' :: (w :: after).dropWhile fun c => c == ' ' || c == '\n' || c == '\t')
+          | none => none
+        else none
+    | _ => none
+
+mutual
+private partial def stripComments : List Char → String → String
+  | [], acc => acc
+  | '-' :: '-' :: rest, acc => stripComments (rest.dropWhile (· != '\n')) acc
+  | '/' :: '*' :: rest, acc => stripComments (dropBlockComment rest) acc
+  | '\'' :: rest, acc => copyQuotedFwd '\'' rest (acc.push '\'')
+  | '"' :: rest, acc => copyQuotedFwd '"' rest (acc.push '"')
+  | c :: rest, acc =>
+      let boundary := acc.isEmpty || !(acc.back.isAlphanum || acc.back == '_')
+      match (if boundary && (c == 'I' || c == 'i') then dropInnerKW (c :: rest) else none) with
+      | some rest' => stripComments rest' acc
+      | none => stripComments rest (acc.push c)
+private partial def copyQuotedFwd (q : Char) : List Char → String → String
+  | c :: rest, acc => if c == q then stripComments rest (acc.push c) else copyQuotedFwd q rest (acc.push c)
+  | [], acc => acc
+end
+
+-- `AS <keyword>` alias support: keywords like `YEAR`/`MONTH`/`DATE`/`COUNT` are reserved tokens, so a
+-- column/table alias that reuses one won't parse. Guillemet-wrap it (`AS «YEAR»`). A cast type
+-- (`CAST(x AS DATE)`) is left alone — it is always followed by `)`/`(`, which the rule excludes.
+private def isWordChar (c : Char) : Bool := c.isAlphanum || c == '_'
+
+private def ciTake : List Char → List Char → List Char → Option (List Char × List Char)
+  | [], rest, acc => some (acc.reverse, rest)
+  | k :: ks, c :: cs, acc => if k == c.toLower then ciTake ks cs (c :: acc) else none
+  | _ :: _, [], _ => none
+
+-- Longest-first so `dayofweek`/`timestamp` win over their `day`/`time` prefixes.
+private def aliasKWList : List (List Char) :=
+  ["dayofweek","timestamp","quarter","second","minute","month","count","week","hour","year","date","time","day"].map (·.toList)
+
+private def tryAliasKW : List (List Char) → List Char → Option (List Char × List Char)
+  | [], _ => none
+  | kw :: rest, l =>
+    match ciTake kw l [] with
+    | some (orig, rem) =>
+        match rem with
+        | c :: _ => if isWordChar c then tryAliasKW rest l else some (orig, rem)
+        | []     => some (orig, rem)
+    | none => tryAliasKW rest l
+
+-- On seeing `AS`, if a collision keyword follows (not a cast type), return the matched keyword chars
+-- and the remainder after it; else none.
+private def matchAsAlias (l : List Char) : Option (List Char × List Char) :=
+  match ciTake ['a','s'] l [] with
+  | some (_, sp :: r1) =>
+      if sp == ' ' || sp == '\n' || sp == '\t' then
+        let r1 := (sp :: r1).dropWhile fun c => c == ' ' || c == '\n' || c == '\t'
+        match tryAliasKW aliasKWList r1 with
+        | some (kw, r2) =>
+            match r2.dropWhile (fun c => c == ' ' || c == '\n' || c == '\t') with
+            | c :: _ => if c == '(' || c == ')' then none else some (kw, r2)
+            | []     => some (kw, r2)
+        | none => none
+      else none
+  | _ => none
+
+-- Copy a quoted run (up to and including the closing `q`) verbatim.
+private def copyQuotedRun (q : Char) : List Char → String → String × List Char
+  | c :: rest, acc => if c == q then (acc.push c, rest) else copyQuotedRun q rest (acc.push c)
+  | [], acc => (acc, [])
+
+private partial def wrapAliasGo : List Char → String → String
+  | [], acc => acc
+  | '\'' :: rest, acc => let (s, r) := copyQuotedRun '\'' rest (String.singleton '\''); wrapAliasGo r (acc ++ s)
+  | '"'  :: rest, acc => let (s, r) := copyQuotedRun '"'  rest (String.singleton '"');  wrapAliasGo r (acc ++ s)
+  | c :: rest, acc =>
+      let boundary := acc.isEmpty || !(isWordChar acc.back)
+      match (if boundary && (c == 'a' || c == 'A') then matchAsAlias (c :: rest) else none) with
+      | some (kw, rest') => wrapAliasGo rest' (acc ++ "AS «" ++ kw.asString ++ "»")
+      | none => wrapAliasGo rest (acc.push c)
 
 -- Semi-structured path access `v:key` / `v['key']` → `VARIANTGET(v, 'key')`, at the string level so
 -- `:` doesn't clash with Lean's type ascription. Runs before quote/`::` normalization.
@@ -599,6 +696,8 @@ private partial def pathGo : List Char → List Char → List Char
 /-- Normalize SQL surface syntax to what the grammar accepts (C3): path access `v:key`/`v['key']` →
 `VARIANTGET`, `'…'` strings → `"…"`, double-quoted **identifiers** → bare idents, `X::TYPE` → `CAST`. -/
 def normalizeSqlLiterals (s : String) : String :=
+  let s := stripComments s.toList ""
+  let s := wrapAliasGo s.toList ""
   let s := (pathGo s.toList []).reverse.asString
   (castGo (normalizeGo s.toList "").toList []).reverse.asString
 
