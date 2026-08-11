@@ -6,3 +6,5 @@ Examples/CrossSkill/crossskill_equivalent_sql.jsonl
 
 # Auto-generated per-record proof files (experimental, run individually via lake env lean)
 **/CrossSkill/generated/
+
+/.gen/

@@ -81,6 +81,12 @@ def withLetColumnVars  (columns : List ((Name × SQLTypeProxy) × Expr)) (typedT
   match columns with
   | [] => k #[]
   | ((name, colType), projExpr) :: rest => do
+    -- Only bind columns the query actually references; skipping the unused ones keeps the term (and
+    -- the goal `grind` sees) narrow. The tuple lambda arg is bound regardless (in `mkLambdaLetsFVars`),
+    -- so the relation type is unchanged — this is a pure dead-`let` elimination.
+    if !usedName name then
+      withLetColumnVars rest typedTupleVar usedName k
+    else
     let colTypeExpr := typeExpr colType
     let funcName := name ++ `proj
     let tupleType ← inferType typedTupleVar
@@ -217,6 +223,9 @@ def withLetAggregateColumnVars  (columns : List ((Name × SQLTypeProxy) × Expr)
   match columns with
   | [] => k #[]
   | ((name, colType), projExpr) :: rest => do
+    if !usedName name then
+      withLetAggregateColumnVars rest typedTupleVar usedName k
+    else
     let colTypeExpr := typeExpr colType
     let funcName := name ++ `proj
     let tupleType ← inferType typedTupleVar

@@ -115,7 +115,8 @@ for j, (i, k, q, tables, iid) in enumerate(jobs):
     lines.append(f'end R{i}_{k}')
 
 src = '\n'.join(lines) + '\n'
-path = os.path.join(HERE, '_elabcheck_gen.lean')
+gendir = os.path.join(ROOT, '.gen'); os.makedirs(gendir, exist_ok=True)  # outside the lake glob
+path = os.path.join(gendir, '_elabcheck_gen.lean')
 open(path, 'w').write(src)
 
 # ---- run lean ----

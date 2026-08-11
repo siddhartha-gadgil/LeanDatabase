@@ -15,7 +15,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
-GEN  = os.path.join(HERE, "generated")
+# Repo-root, OUTSIDE the `Examples.+` lake glob — so `lake build` never tries to compile these
+# experimental (often-failing) files. Run them individually via `lake env lean`.
+GEN  = os.path.join(ROOT, ".gen")
 recs = [json.loads(l) for l in open(os.path.join(HERE, "crossskill_equivalent_sql.jsonl")) if l.strip()]
 
 def maptype(t):

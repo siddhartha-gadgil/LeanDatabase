@@ -121,7 +121,7 @@ syntax:max "(" sql_query ")" : sql_query
 
 -- Common table expressions: `WITH x AS (q), y AS (q) SELECT …` (non-recursive). Each CTE is a local
 -- relation binding, inlined at every reference (`Parser/Query.lean`). `WITH RECURSIVE` is out of
--- scope (ROADMAP 3.5) — it is not accepted by this grammar.
+-- scope — it is not accepted by this grammar.
 declare_syntax_cat sql_cte
 syntax ident "AS" "(" sql_query ")" : sql_cte
 syntax:max "WITH" sql_cte,+ sql_query : sql_query
@@ -253,7 +253,7 @@ macro:50 x:term:51 " NOT " " LIKE " p:term:51 : term =>
 macro:50 x:term:51 " ILIKE " p:term:51 : term =>
   `($(Lean.mkIdent (`LeanDatabase ++ `strILike)) $p $x)
 
-/-! ## `NULL` — the sound 2-valued gates (ROADMAP Phase 4, restricted slice)
+/-! ## `NULL` — the sound 2-valued gates
 
 We model nullable columns as `Option _` but expose NULL only through constructs that reduce to a
 `Bool` or a non-null value, so no 3-valued logic is needed and no unsoundness can arise. There is
@@ -339,7 +339,7 @@ macro_rules
 
 -- `CASE WHEN … THEN … END` with an explicit `ELSE NULL` — the result is `Option`-typed
 -- (`some v` on a match, `none` otherwise). `NULL` appears *only* bound here, never as a standalone
--- term, so `col = NULL` still cannot be written (the 3VL trap stays unwriteable). ROADMAP 4.7.
+-- term, so `col = NULL` still cannot be written (the 3VL trap stays unwriteable).
 syntax:90 "CASE" ( "WHEN" term "THEN" term ) + "ELSE" "NULL" "END" : term
 macro_rules
   | `(CASE $[WHEN $cs THEN $vs]* ELSE NULL END) => do
@@ -373,7 +373,7 @@ macro_rules
 Uninterpreted-by-default: each SQL scalar becomes an `opaque` constant from `Operators/Scalar.lean`
 (emitted as a fully-qualified ident so this file stays dependency-free, as with `LIKE`). Identical
 calls cancel by congruence. Adding a scalar = one `opaque` there + one syntax/macro line here.
-`CAST` is intentionally *not* here — it needs a real coercion (ROADMAP 2.4). -/
+`CAST` is intentionally *not* here — it needs a real coercion. -/
 open Lean in
 /-- `scalarN "SQLNAME" "constName"` declares a 1/2/3-arg SQL scalar in one line: the syntax **and**
 the rewrite to `LeanDatabase.Scalar.constName` (emitted hygiene-free, since this file doesn't import
@@ -622,7 +622,7 @@ macro:max "IF" "(" c:term "," a:term "," b:term ")" : term => `(bif ($c : Bool) 
 
 -- `CAST(x AS <type>)`. The `::` cast form is intentionally unsupported — overriding `::` would
 -- clobber `List.cons` globally. Elaborated (type-directed) in `Parser/Context.lean`, NOT as a macro:
--- the coercion depends on the *source* type (int→float is a real coercion, ROADMAP 2.4).
+-- the coercion depends on the *source* type (int→float is a real coercion.
 declare_syntax_cat sql_cast_type
 syntax "INT" : sql_cast_type
 syntax "INTEGER" : sql_cast_type
