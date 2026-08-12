@@ -1,5 +1,6 @@
 import LeanDatabase.Parser.Context
 import LeanDatabase.Parser.Alias
+import LeanDatabase.Parser.GroupBy
 import LeanDatabase.Operators.CrossProduct
 import LeanDatabase.Operators.Select
 import LeanDatabase.Operators.OrderLimit
@@ -197,15 +198,15 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
   -- single place and applies to grouped and ungrouped queries alike. The pipeline is:
   -- FROM → WHERE → (project / group+aggregate + HAVING) → DISTINCT → ORDER BY / LIMIT.
   | `(sql_query| SELECT $[DISTINCT%$distinct?]? $sel:sql_cols FROM $dbs:sql_from $[WHERE $filter?]?
-      $[GROUP BY $groups:ident,* $[HAVING $having?]?]? $[ORDER BY $ord:sql_order_item,*]?
+      $[GROUP BY $groups:term,* $[HAVING $having?]?]? $[ORDER BY $ord:sql_order_item,*]?
       $[LIMIT $lim:num]? $[OFFSET $_off:num]? $[;]?) => do
     let (productExpr, combinedSchema) ← productPair dbs
     let filteredExpr ← match filter? with
       | some filter => elabWhere productExpr combinedSchema filter
       | none => pure productExpr
-    let groupNames := (groups.map (fun g => g.getElems.map (·.getId))).getD #[]
+    let groupItems := (groups.map (·.getElems)).getD #[]
     let aliasMap := collectAliases dbs
-    let (rel, outSchema) ← elabSelect sel combinedSchema filteredExpr groupNames groups.isSome
+    let (rel, outSchema) ← elabSelect sel combinedSchema filteredExpr groupItems groups.isSome
       having?.join aliasMap
     let rel ← if distinct?.isSome then mkAppM ``distinct #[rel] else pure rel
     -- ORDER BY resolves against the (base-qualified) output labels, so baseify its column refs too.
@@ -431,7 +432,7 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
   -- aggregate in the list — an ungrouped aggregate is just a group over the empty key. Otherwise it
   -- is a plain positional projection. Returns `(relation, output schema)`.
   elabSelect (sel : TSyntax `sql_cols) (combinedSchema : List (Name × SQLTypeProxy))
-      (filteredExpr : Expr) (groupNames : Array Name) (hasGroupBy : Bool) (having? : Option Term)
+      (filteredExpr : Expr) (groupItems : Array Term) (hasGroupBy : Bool) (having? : Option Term)
       (aliasMap : List (Name × Name)) :
       TermElabM (Expr × List (Name × SQLTypeProxy)) := do
     match sel with
@@ -455,15 +456,17 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
         let (m, types) ← elabTypedTupleProjection [(.anonymous, combinedSchema)] colTerms.toList
         pure (← mkAppM ``TypedRelation.mapByList #[filteredExpr, toExpr nameStrs, m], names.zip types)
       else
-        let inGroup := fun name => groupNames.any (· == name)
+        -- The group *key* is the list of GROUP BY terms (a bare column is just `term = col`);
+        -- positional `GROUP BY 1` resolves to the nth SELECT term. See `Parser/GroupBy.lean`.
+        let groupTerms := (groupItems.map (resolveGroupItem colTerms)).toList
         let liftedCols : List Syntax.Term := liftedRaw.map (⟨·⟩)
         let (m, types) ← elabTypedTupleGroupProjection
-          [(.anonymous, combinedSchema)] liftedCols inGroup filteredExpr selAggs.toList
+          [(.anonymous, combinedSchema)] liftedCols groupTerms filteredExpr selAggs.toList
         let havingFilteredExpr ← match having? with
           | some having => do
             let (having, havAggs) ← (liftAggExprs having).run #[]
             let h ← elabTypedTupleGroupFilter
-              [(.anonymous, combinedSchema)] having inGroup filteredExpr havAggs.toList
+              [(.anonymous, combinedSchema)] having groupTerms filteredExpr havAggs.toList
             mkAppM ``restriction #[h, filteredExpr]
           | none => pure filteredExpr
         pure (← mkAppM ``TypedRelation.mapByList #[havingFilteredExpr, toExpr nameStrs, m],
@@ -950,9 +953,9 @@ info: fun table ↦
     let __agg0 :=
       (fun k ↦
           Int.ofNat
-            (groupCount (fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.int (typedTuple 0) TypedTupleOfList.nil) k
+            (groupCount (fun coords ↦ TypedTupleOfList.cons SQLTypeProxy.int (coords 0) TypedTupleOfList.nil) k
               (restriction (fun coords ↦ decide (coords 0 > 30) && coords 1 && decide (coords 2 < 180)) table)))
-        ((fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.int (typedTuple 0) TypedTupleOfList.nil) coords);
+        ((fun coords ↦ TypedTupleOfList.cons SQLTypeProxy.int (coords 0) TypedTupleOfList.nil) coords);
     TypedTupleOfList.cons SQLTypeProxy.int __agg0
       TypedTupleOfList.nil : TypedRelationOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float] →
   TypedRelationOfList [SQLTypeProxy.int]
@@ -973,10 +976,10 @@ info: fun table ↦
     ["count"] fun coords ↦
     let __agg0 :=
       (fun k ↦
-          groupSum (fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.bool (typedTuple 1) TypedTupleOfList.nil) k
+          groupSum (fun coords ↦ TypedTupleOfList.cons SQLTypeProxy.bool (coords 1) TypedTupleOfList.nil) k
             (restriction (fun coords ↦ decide (coords 0 > 30) && coords 1 && decide (coords 2 < 180)) table)
             fun coords ↦ coords 0)
-        ((fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.bool (typedTuple 1) TypedTupleOfList.nil) coords);
+        ((fun coords ↦ TypedTupleOfList.cons SQLTypeProxy.bool (coords 1) TypedTupleOfList.nil) coords);
     TypedTupleOfList.cons SQLTypeProxy.int __agg0
       TypedTupleOfList.nil : TypedRelationOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float] →
   TypedRelationOfList [SQLTypeProxy.int]
@@ -990,10 +993,10 @@ info: fun table ↦
         (fun coords ↦
           let __agg0 :=
             (fun k ↦
-                groupSum (fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.bool (typedTuple 1) TypedTupleOfList.nil)
-                  k (restriction (fun coords ↦ decide (coords 0 > 30) && coords 1 && decide (coords 2 < 180)) table)
+                groupSum (fun coords ↦ TypedTupleOfList.cons SQLTypeProxy.bool (coords 1) TypedTupleOfList.nil) k
+                  (restriction (fun coords ↦ decide (coords 0 > 30) && coords 1 && decide (coords 2 < 180)) table)
                   fun coords ↦ coords 0)
-              ((fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.bool (typedTuple 1) TypedTupleOfList.nil) coords);
+              ((fun coords ↦ TypedTupleOfList.cons SQLTypeProxy.bool (coords 1) TypedTupleOfList.nil) coords);
           decide (__agg0 < 100))
         (restriction
           (fun coords ↦
@@ -1005,10 +1008,10 @@ info: fun table ↦
     ["sum"] fun coords ↦
     let __agg0 :=
       (fun k ↦
-          groupSum (fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.bool (typedTuple 1) TypedTupleOfList.nil) k
+          groupSum (fun coords ↦ TypedTupleOfList.cons SQLTypeProxy.bool (coords 1) TypedTupleOfList.nil) k
             (restriction (fun coords ↦ decide (coords 0 > 30) && coords 1 && decide (coords 2 < 180)) table)
             fun coords ↦ coords 0)
-        ((fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.bool (typedTuple 1) TypedTupleOfList.nil) coords);
+        ((fun coords ↦ TypedTupleOfList.cons SQLTypeProxy.bool (coords 1) TypedTupleOfList.nil) coords);
     TypedTupleOfList.cons SQLTypeProxy.int __agg0
       TypedTupleOfList.nil : TypedRelationOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float] →
   TypedRelationOfList [SQLTypeProxy.int]

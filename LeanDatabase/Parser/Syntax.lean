@@ -105,7 +105,9 @@ syntax sql_from "RIGHT" "OUTER" "JOIN" ident ident "ON" term : sql_from
 syntax sql_from "FULL" "JOIN" ident ident "ON" term : sql_from
 syntax sql_from "FULL" "OUTER" "JOIN" ident ident "ON" term : sql_from
 
-syntax "SELECT " (" DISTINCT ")? sql_cols " FROM " sql_from (" WHERE " term)?  (" GROUP " " BY " ident,* (" HAVING " term)?)? (" ORDER " " BY " sql_order_item,*)? (" LIMIT " num)? (" OFFSET " num)? (";")? : sql_query
+-- `GROUP BY` items are full terms: a bare column, an expression (`UPPER(col)`, `ROUND(lat, 2)`), or a
+-- positional `1` (nth SELECT column). See `Parser/GroupBy.lean` for how the group *key* is built.
+syntax "SELECT " (" DISTINCT ")? sql_cols " FROM " sql_from (" WHERE " term)?  (" GROUP " " BY " term,* (" HAVING " term)?)? (" ORDER " " BY " sql_order_item,*)? (" LIMIT " num)? (" OFFSET " num)? (";")? : sql_query
 
 -- Binary set operators on whole queries, as one keyword-parameterised production. Our relations
 -- are `Finset`s (sets), so `UNION ALL` maps to set `union` too (no bag semantics).

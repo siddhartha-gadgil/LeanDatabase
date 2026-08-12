@@ -279,11 +279,19 @@ def AggKind.resultType : AggKind → SQLTypeProxy
 /-- Builds one grouped aggregate per lifted `(freshName, kind, expr)`: each `expr` is elaborated
 against a fresh tuple of `schema` into a `TypedTuple → Int` summand and fed to the operator named by
 `kind.op`. `COUNT` ignores the summand and counts rows. -/
-def groupAggExprsE (schema : List (Name × SQLTypeProxy)) (columnInGroup : Name → Bool)
+def groupAggExprsE (schema : List (Name × SQLTypeProxy)) (groupTerms : List Syntax.Term)
     (typedTupleVar relE : Expr) (aggs : List (Name × AggKind × Syntax.Term)) :
     TermElabM (List ((Name × SQLTypeProxy) × Expr)) := do
   if aggs.isEmpty then return []
-  let (keyMapE, _, codomainE) ← subcolumsProjectionsE schema columnInGroup
+  -- The group key `fun row => (term₁ row, …, termₖ row)` and its tuple type. Each item is elaborated
+  -- as a projection exactly like a SELECT column, so the key can be any expression, not just a column
+  -- (see Parser/GroupBy.lean); bare-column GROUP BY is the special case `term = col`, an empty
+  -- `GROUP BY` (whole-table aggregate) the empty tuple.
+  let (keyMapE, keyTypes) ← withSchemasTupleVars [(.anonymous, schema)] (fun _ => true) fun vars => do
+    let keyExprsTypes ← groupTerms.mapM elabAsSql
+    let e ← mkLambdaLetsFVars vars (exprTypeListTuple keyExprsTypes)
+    pure (e, keyExprsTypes.map (·.1))
+  let codomainE ← mkAppM ``TypedTupleOfList #[← sqlTypeListExpr keyTypes]
   let keyValue ← mkAppM' keyMapE #[typedTupleVar]
   aggs.mapM fun (name, kind, exprStx) => do
     -- summand `fun (t : TypedTuple schema) => (exprStx : <summand type>)`, absent for COUNT(*)
@@ -308,23 +316,23 @@ def groupAggExprsE (schema : List (Name × SQLTypeProxy)) (columnInGroup : Name 
     pure ((name, kind.resultType), aggValue)
 
 def withSchemasGroupedTupleVars (schemas : List (Name × List (Name × SQLTypeProxy))) (usedName : Name → Bool)
-    (inGroup : Name → Bool) (relE : Expr) (aggs : List (Name × AggKind × Syntax.Term))
+    (groupTerms : List Syntax.Term) (relE : Expr) (aggs : List (Name × AggKind × Syntax.Term))
     (k : List (Expr × Array Expr) → TermElabM α) : TermElabM α := do
   match schemas with
   | [] => k []
   | (schemaName, schema) :: rest => do
     let schema := schemaWithFullNames schemaName schema
     let (type, _, columnExprs) ← columnProjectionsE schema
-    let columnExprs := columnExprs.filter fun ((name, _), _) =>
-        inGroup name
     withLocalDeclD (schemaName ++ `coords) type fun typedTupleE => do
-      -- Group-key columns stay bound as plain columns; every aggregate (over a column or an
-      -- arbitrary expression) is lifted by `liftAggExprs` and built here via `groupAggExprsE`.
-      let groupAggExprsExprs ← groupAggExprsE schema inGroup typedTupleE relE aggs
+      -- Columns the projection references stay bound as plain columns (filtered by `usedName` in
+      -- `withLetColumnVars`); every aggregate is lifted by `liftAggExprs` and built via `groupAggExprsE`,
+      -- which also forms the group key from `groupTerms`. In a legal `GROUP BY` the only plain columns
+      -- referenced are the group keys (or columns inside a group expression), so this binds exactly them.
+      let groupAggExprsExprs ← groupAggExprsE schema groupTerms typedTupleE relE aggs
       let columnExprs := columnExprs ++ groupAggExprsExprs
       withLetColumnVars  columnExprs typedTupleE usedName
         fun letVars => do
-          withSchemasGroupedTupleVars rest usedName inGroup relE [] fun rest =>
+          withSchemasGroupedTupleVars rest usedName groupTerms relE [] fun rest =>
           k ((typedTupleE, letVars) :: rest)
 
 def withTableVars (schemas : List (Name × List (Name × SQLTypeProxy)))  (k : List (Expr × Name × List (Name × SQLTypeProxy)) →  TermElabM α)  : TermElabM α := do
@@ -418,8 +426,8 @@ def elabTypedTupleFilter (schemas : List (Name × List (Name × SQLTypeProxy))) 
   withSchemasTupleVars schemas (stx.hasIdent) (fun vars =>
     mkLambdaLetsFVars vars (elabTermEnsuringType stx (mkConst ``Bool)))
 
-def elabTypedTupleGroupFilter (schemas : List (Name × List (Name × SQLTypeProxy))) (stx: Syntax) (inGroup : Name → Bool) (relE: Expr) (aggs : List (Name × AggKind × Syntax.Term)) : TermElabM Expr := do
-  withSchemasGroupedTupleVars schemas (stx.hasIdent) inGroup relE aggs (fun vars =>
+def elabTypedTupleGroupFilter (schemas : List (Name × List (Name × SQLTypeProxy))) (stx: Syntax) (groupTerms : List Syntax.Term) (relE: Expr) (aggs : List (Name × AggKind × Syntax.Term)) : TermElabM Expr := do
+  withSchemasGroupedTupleVars schemas (stx.hasIdent) groupTerms relE aggs (fun vars =>
     mkLambdaLetsFVars vars (elabTermEnsuringType stx (mkConst ``Bool)))
 
 def elabTypedRelFilter (schemas : List (Name × List (Name × SQLTypeProxy))) (stx: Syntax) (combineRels : List Name → List Expr → TermElabM Expr) : TermElabM Expr := do
@@ -449,9 +457,9 @@ def elabTypedTupleProjection (schemas : List (Name × List (Name × SQLTypeProxy
     return (e, types)
   )
 
-def elabTypedTupleGroupProjection (schemas : List (Name × List (Name × SQLTypeProxy))) (cols: List Syntax.Term) (inGroup : Name → Bool) (relE : Expr) (aggs : List (Name × AggKind × Syntax.Term)) :
+def elabTypedTupleGroupProjection (schemas : List (Name × List (Name × SQLTypeProxy))) (cols: List Syntax.Term) (groupTerms : List Syntax.Term) (relE : Expr) (aggs : List (Name × AggKind × Syntax.Term)) :
   TermElabM (Expr × List SQLTypeProxy) := do
-  withSchemasGroupedTupleVars schemas (fun name => cols.any (fun col => col.raw.hasIdent name)) inGroup relE aggs (fun vars => do
+  withSchemasGroupedTupleVars schemas (fun name => cols.any (fun col => col.raw.hasIdent name)) groupTerms relE aggs (fun vars => do
     let colExprsTypes ← cols.mapM elabAsSql
     -- let colExprs := colExprsTypes.map (fun (_, e) => e)
     let types := colExprsTypes.map (fun (t, _) => t)
