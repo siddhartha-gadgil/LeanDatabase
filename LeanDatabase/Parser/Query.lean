@@ -1,4 +1,5 @@
 import LeanDatabase.Parser.Context
+import LeanDatabase.Parser.Alias
 import LeanDatabase.Operators.CrossProduct
 import LeanDatabase.Operators.Select
 import LeanDatabase.Operators.OrderLimit
@@ -28,20 +29,6 @@ These reindexers convert the operator result back to the canonical list form by 
 with `TypedTupleOfList.append` + `splitTuple` (the inner join gets this for free via
 `TypedRelationOfList.append`). `ofOption` turns the `Option`-family right/left part into the
 `.nullable`-list form; recursion on the list avoids `Fin.cast` gymnastics. -/
-
-/-- Map an alias prefix back to its base table (`e1.col → emp.col`), so a projected column's *output*
-label is base-qualified regardless of aliasing — an aliased and non-aliased query then agree, and CTE
-column resolution (which relies on base-qualified names) keeps working. -/
-def baseifyName (aliasMap : List (Name × Name)) (n : Name) : Name :=
-  aliasMap.foldl (fun acc (al, base) =>
-    if al != acc && al.isPrefixOf acc then acc.replacePrefix al base else acc) n
-
-/-- Rewrite every `ident` in a syntax tree by `baseifyName` — used to point `ORDER BY` refs at the
-base-qualified output labels. -/
-def baseifyIdents (aliasMap : List (Name × Name)) (stx : Syntax) : Syntax :=
-  stx.replaceM (m := Id) fun s => match s with
-    | .ident info raw val pre => some (.ident info raw (baseifyName aliasMap val) pre)
-    | _ => none
 
 /-- A scalar subquery deferred to *projection-context* elaboration. Building the aggregate there —
 rather than up front as a constant — lets a **correlated** inner `WHERE` (referencing outer columns)
@@ -532,6 +519,12 @@ private def takeBalancedBack : List Char → Nat → List Char → (List Char ×
 private def takeFuncName : List Char → List Char → (List Char × List Char)
   | c :: rest, acc => if c.isAlphanum || c == '_' then takeFuncName rest (c :: acc) else (acc, c :: rest)
   | [], acc => (acc, [])
+-- Pop the operand ending at the head of the reversed output `out`: a balanced `(…)` call (with its
+-- function name) if it ends in `)`, else a plain column run. Shared by `castGo`/`pathGo`.
+private def popOperand (out : List Char) : List Char × List Char :=
+  match out with
+  | ')' :: _ => let (p, rem) := takeBalancedBack out 0 []; takeFuncName rem p
+  | _ => takeRunBack out []
 -- read a bare type word, then discard an optional `(size)` the cast grammar doesn't take
 private def takeTypeWord : List Char → List Char → (String × List Char)
   | c :: rest, acc => if c.isAlphanum || c == '_' then takeTypeWord rest (acc ++ [c]) else (acc.asString, c :: rest)
@@ -543,9 +536,7 @@ private partial def castGo : List Char → List Char → List Char
   | [], out => out
   | ':' :: ':' :: rest, out =>
       let out := dropSp out
-      let (operand, out') := match out with
-        | ')' :: _ => let (p, rem) := takeBalancedBack out 0 []; takeFuncName rem p
-        | _ => takeRunBack out []
+      let (operand, out') := popOperand out
       let (ty, rest2) := takeTypeWord (dropSp rest) []
       let emit := "CAST(" ++ operand.asString ++ " AS " ++ ty ++ ")"
       castGo (dropParenSize (dropSp rest2)) (emit.toList.reverse ++ out')
@@ -687,9 +678,7 @@ private partial def pathGo : List Char → List Char → List Char
   | ':' :: ':' :: rest, out => pathGo rest (':' :: ':' :: out)          -- leave `::` for castGo
   | ':' :: rest, out =>
       let out := dropSp out
-      let (operand, out') := match out with
-        | ')' :: _ => let (p, rem) := takeBalancedBack out 0 []; takeFuncName rem p
-        | _ => takeRunBack out []
+      let (operand, out') := popOperand out
       let (key, rest') := readKey (dropSp rest)
       let emit := "VARIANTGET(" ++ operand.asString ++ ", '" ++ key ++ "')"
       pathGo rest' (emit.toList.reverse ++ out')
@@ -699,9 +688,7 @@ private partial def pathGo : List Char → List Char → List Char
       match out, dropSp rest with
       | h :: _, (q :: _) =>
         if (isOpChar h || h == ')') && (q == '\'' || q == '"') then
-          let (operand, out') := match out with
-            | ')' :: _ => let (p, rem) := takeBalancedBack out 0 []; takeFuncName rem p
-            | _ => takeRunBack out []
+          let (operand, out') := popOperand out
           let (key, rest0) := readKey (dropSp rest)
           let rest' := (rest0.dropWhile (· != ']')).drop 1
           let emit := "VARIANTGET(" ++ operand.asString ++ ", '" ++ key ++ "')"

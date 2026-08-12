@@ -173,33 +173,7 @@ partial def getIdents (stx : TSyntax `sql_from) : List Name :=
   | `(sql_from| $f1:sql_from , $f2:sql_from) => getIdents f1 ++ getIdents f2
   | _ => []
 
-/-- Collect `(alias, baseTable)` pairs from every `t AS x` anywhere in a query, so `expandNames` can
-rewrite `x.col → base.col`. A dotted base (`"DB"."SC"."T"` → `DB.SC.T`) is reduced to its last
-component `T`, since that is the declared table its columns are qualified under. -/
-partial def collectAliases : Syntax → List (Name × Name) :=
-  let baseOf : Syntax → Name := fun t => let n := t.getId; (n.components.getLast?).getD n
-  fun stx =>
-    let here := match stx with
-      | `(sql_from| $t:ident AS $x:ident) => [(x.getId, baseOf t)]
-      | `(sql_from| $_:sql_from JOIN $t:ident AS $x:ident ON $_) => [(x.getId, baseOf t)]
-      | `(sql_from| $_:sql_from CROSS JOIN $t:ident AS $x:ident) => [(x.getId, baseOf t)]
-      | `(sql_from| $_:sql_from LEFT JOIN $t:ident AS $x:ident ON $_) => [(x.getId, baseOf t)]
-      | `(sql_from| $_:sql_from LEFT OUTER JOIN $t:ident AS $x:ident ON $_) => [(x.getId, baseOf t)]
-      | `(sql_from| $_:sql_from RIGHT JOIN $t:ident AS $x:ident ON $_) => [(x.getId, baseOf t)]
-      | `(sql_from| $_:sql_from RIGHT OUTER JOIN $t:ident AS $x:ident ON $_) => [(x.getId, baseOf t)]
-      | `(sql_from| $_:sql_from FULL JOIN $t:ident AS $x:ident ON $_) => [(x.getId, baseOf t)]
-      | `(sql_from| $_:sql_from FULL OUTER JOIN $t:ident AS $x:ident ON $_) => [(x.getId, baseOf t)]
-      | `(sql_from| $t:ident $x:ident) => [(x.getId, baseOf t)]
-      | `(sql_from| $_:sql_from JOIN $t:ident $x:ident ON $_) => [(x.getId, baseOf t)]
-      | `(sql_from| $_:sql_from CROSS JOIN $t:ident $x:ident) => [(x.getId, baseOf t)]
-      | `(sql_from| $_:sql_from LEFT JOIN $t:ident $x:ident ON $_) => [(x.getId, baseOf t)]
-      | `(sql_from| $_:sql_from LEFT OUTER JOIN $t:ident $x:ident ON $_) => [(x.getId, baseOf t)]
-      | `(sql_from| $_:sql_from RIGHT JOIN $t:ident $x:ident ON $_) => [(x.getId, baseOf t)]
-      | `(sql_from| $_:sql_from RIGHT OUTER JOIN $t:ident $x:ident ON $_) => [(x.getId, baseOf t)]
-      | `(sql_from| $_:sql_from FULL JOIN $t:ident $x:ident ON $_) => [(x.getId, baseOf t)]
-      | `(sql_from| $_:sql_from FULL OUTER JOIN $t:ident $x:ident ON $_) => [(x.getId, baseOf t)]
-      | _ => []
-    stx.getArgs.foldl (fun acc s => acc ++ collectAliases s) here
+-- Table-alias handling (`collectAliases`, `baseifyName`, `baseifyIdents`) lives in `Parser/Alias.lean`.
 
 /-! ## Term-level `WHERE`-predicate combinators -/
 

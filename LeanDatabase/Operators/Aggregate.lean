@@ -54,6 +54,19 @@ theorem groupCount_restrict_of_forall (key : TypedTuple colType → K) (k : K)
     groupCount key k (restriction p rel) = groupCount key k rel := by
   simp only [groupCount, group_restrict_of_forall key k rel p hp]
 
+/-- The set-builder filter `{x ∈ rel.rows | P x}` (as a relation) is exactly `restriction` by the
+`Bool`-ified predicate — the bridge every `*_filter_restrict_of_forall` lemma rewrites through. -/
+theorem setOf_filter_eq_restriction {P : TypedTuple colType → Prop} [DecidablePred P]
+    (rel : TypedRelation colType) :
+    ({ labels := rel.labels, rows := {x ∈ rel.rows | P x} } : TypedRelation colType)
+      = restriction (fun t => decide (P t)) rel := by
+  apply TypedRelation.ext
+  · rfl
+  · simp only [restriction]
+    apply Finset.filter_congr
+    intro x _
+    simp
+
 /-- `simp`-facing restatement of `groupCount_restrict_of_forall`, over a `Prop` predicate `P`
 instead of a `Bool` one — see `groupAvg_filter_restrict_of_forall` for why this shape (rather than
 the `Bool` one above) is what `sql_equiv` actually needs to find. -/
@@ -63,14 +76,7 @@ theorem groupCount_filter_restrict_of_forall {P : TypedTuple colType → Prop} [
     (hp : ∀ t, key t = k → P t) :
     groupCount key k { labels := rel.labels, rows := {x ∈ rel.rows | P x} }
       = groupCount key k rel := by
-  have hfilter : { labels := rel.labels, rows := {x ∈ rel.rows | P x} } = restriction (fun t => decide (P t)) rel := by
-    apply TypedRelation.ext
-    · rfl
-    · simp only [restriction]
-      apply Finset.filter_congr
-      intro x _
-      simp
-  rw [hfilter]
+  rw [setOf_filter_eq_restriction]
   exact groupCount_restrict_of_forall key k rel (fun t => decide (P t)) (fun t ht => by simp [hp t ht])
 
 /-- `SUM(f)` over the group of key `k`. -/
@@ -94,14 +100,7 @@ theorem groupSum_filter_restrict_of_forall {P : TypedTuple colType → Prop} [De
     (hp : ∀ t, key t = k → P t) :
     groupSum key k { labels := rel.labels, rows := {x ∈ rel.rows | P x} } f
       = groupSum key k rel f := by
-  have hfilter : { labels := rel.labels, rows := {x ∈ rel.rows | P x} } = restriction (fun t => decide (P t)) rel := by
-    apply TypedRelation.ext
-    · rfl
-    · simp only [restriction]
-      apply Finset.filter_congr
-      intro x _
-      simp
-  rw [hfilter]
+  rw [setOf_filter_eq_restriction]
   exact groupSum_restrict_of_forall key k rel f (fun t => decide (P t)) (fun t ht => by simp [hp t ht])
 
 /-- `SELECT DISTINCT key FROM rel` — the group keys present. -/
@@ -321,14 +320,7 @@ theorem groupAvg_filter_restrict_of_forall {P : TypedTuple colType → Prop} [De
     (hp : ∀ t, key t = k → P t) :
     groupAvg key k { labels := rel.labels, rows := {x ∈ rel.rows | P x} } f
       = groupAvg key k rel f := by
-  have hfilter : { labels := rel.labels, rows := {x ∈ rel.rows | P x} } = restriction (fun t => decide (P t)) rel := by
-    apply TypedRelation.ext
-    · rfl
-    · simp only [restriction]
-      apply Finset.filter_congr
-      intro x _
-      simp
-  rw [hfilter]
+  rw [setOf_filter_eq_restriction]
   exact groupAvg_restrict_of_forall key k rel f (fun t => decide (P t)) (fun t ht => by simp [hp t ht])
 
 /-- `SUM(DISTINCT f)` over the group of key `k` — sum of the *distinct* `f`-values. -/

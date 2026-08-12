@@ -217,26 +217,6 @@ info: LeanDatabase.TypedAgg.groupCount {n : ℕ} {colType : Fin n → Type} [(i 
 #check groupCount
 
 
--- Looks like exactly the same code as `withLetColumnVars`, but with projections replaced by aggregate functions. Could be refactored to share code.
-def withLetAggregateColumnVars  (columns : List ((Name × SQLTypeProxy) × Expr)) (typedTupleVar : Expr) (usedName : Name → Bool)
-    (k : Array Expr → TermElabM α )  : TermElabM α := do
-  match columns with
-  | [] => k #[]
-  | ((name, colType), projExpr) :: rest => do
-    if !usedName name then
-      withLetAggregateColumnVars rest typedTupleVar usedName k
-    else
-    let colTypeExpr := typeExpr colType
-    let funcName := name ++ `proj
-    let tupleType ← inferType typedTupleVar
-    let funcType ← mkArrow tupleType colTypeExpr
-    withLetDecl funcName funcType projExpr fun funcVar => do
-      let colExpr ← mkAppM' funcVar #[typedTupleVar]
-      let colExpr ← reduce colExpr
-      withLetDecl name colTypeExpr colExpr fun localVar => do
-        let letVars := #[funcVar, localVar]
-        withLetAggregateColumnVars rest typedTupleVar usedName (fun restExpr => k (letVars ++ restExpr))
-
 def withSchemasTupleVars (schemas : List (Name × List (Name × SQLTypeProxy))) (usedName : Name → Bool)
     (k : List (Expr × Array Expr) → TermElabM α) : TermElabM α := do
   match schemas with
