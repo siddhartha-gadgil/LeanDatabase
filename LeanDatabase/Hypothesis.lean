@@ -73,6 +73,7 @@ elab "HYPOTHESIS" name:ident ":" tbl:ident pred:str : command => do
     let schemaExpr ← elabTermEnsuringType (← `([$sch])) (some schemaTy)
     let schema ← unsafe evalExpr (List (Name × List (Name × SQLTypeProxy))) schemaTy
       (← instantiateMVars schemaExpr)
+ 
     let (e, _) ← parseSqlQuery schema s!"SELECT * FROM {t} WHERE {pred.getString}"
     let .lam _ relTy body _ := (← instantiateMVars e) | throwError "HYPOTHESIS: unexpected query shape"
     let (fn, args) := body.getAppFnArgs
@@ -85,5 +86,8 @@ elab "HYPOTHESIS" name:ident ":" tbl:ident pred:str : command => do
     addDecl (Declaration.defnDecl {
       name := name.getId, levelParams := [], type := typ, value := val,
       hints := ReducibilityHints.abbrev, safety := DefinitionSafety.safe })
+    -- Mark `@[reducible]` so `grind`/`simp`/`dsimp` unfold `name t` to the `∀`-fact and can use it;
+    -- `addDecl` alone sets only the unfolding *hint*, not the attribute.
+    setReducibilityStatus name.getId .reducible
 
 end LeanDatabase

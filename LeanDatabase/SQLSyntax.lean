@@ -1,5 +1,6 @@
 import LeanDatabase.TypedRelation
 import LeanDatabase.Parser.Types
+import LeanDatabase.Hypothesis
 
 open Lean Elab Term Meta
 open Lean
@@ -66,4 +67,3 @@ def elabCreateTableCmd : CommandElab := fun stx => do
     elabCommand schemaCmd
 
   | _ => throwUnsupportedSyntax
-
