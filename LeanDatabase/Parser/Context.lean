@@ -283,15 +283,25 @@ def groupAggExprsE (schema : List (Name × SQLTypeProxy)) (groupTerms : List Syn
     (typedTupleVar relE : Expr) (aggs : List (Name × AggKind × Syntax.Term)) :
     TermElabM (List ((Name × SQLTypeProxy) × Expr)) := do
   if aggs.isEmpty then return []
-  -- The group key `fun row => (term₁ row, …, termₖ row)` and its tuple type. Each item is elaborated
-  -- as a projection exactly like a SELECT column, so the key can be any expression, not just a column
-  -- (see Parser/GroupBy.lean); bare-column GROUP BY is the special case `term = col`, an empty
-  -- `GROUP BY` (whole-table aggregate) the empty tuple.
-  let (keyMapE, keyTypes) ← withSchemasTupleVars [(.anonymous, schema)] (fun _ => true) fun vars => do
-    let keyExprsTypes ← groupTerms.mapM elabAsSql
-    let e ← mkLambdaLetsFVars vars (exprTypeListTuple keyExprsTypes)
-    pure (e, keyExprsTypes.map (·.1))
-  let codomainE ← mkAppM ``TypedTupleOfList #[← sqlTypeListExpr keyTypes]
+  -- The group key `fun row => (key₁ row, …, keyₖ row)` and its tuple type (see Parser/GroupBy.lean).
+  -- Two paths, deliberately: if every GROUP BY item is a bare column of the schema we use the robust
+  -- index projection `subcolumsProjectionsE` (no term elaboration — matches the pre-expression
+  -- behaviour exactly, so plain-column GROUP BY over joins keeps working); only a genuine *expression*
+  -- key (`UPPER(col)`, `ROUND(lat,2)`, positional) needs the elaboration path. An empty `GROUP BY`
+  -- (whole-table aggregate) is the empty tuple either way.
+  let colNames := schema.map (·.1)
+  let bareCols? : Option (List Name) := groupTerms.mapM fun t =>
+    if t.raw.isIdent && colNames.contains t.raw.getId then some t.raw.getId else none
+  let (keyMapE, codomainE) ← match bareCols? with
+    | some names =>
+        let (km, _, cod) ← subcolumsProjectionsE schema (fun n => names.contains n)
+        pure (km, cod)
+    | none =>
+        withSchemasTupleVars [(.anonymous, schema)] (fun _ => true) fun vars => do
+          let keyExprsTypes ← groupTerms.mapM elabAsSql
+          let e ← mkLambdaLetsFVars vars (exprTypeListTuple keyExprsTypes)
+          let cod ← mkAppM ``TypedTupleOfList #[← sqlTypeListExpr (keyExprsTypes.map (·.1))]
+          pure (e, cod)
   let keyValue ← mkAppM' keyMapE #[typedTupleVar]
   aggs.mapM fun (name, kind, exprStx) => do
     -- summand `fun (t : TypedTuple schema) => (exprStx : <summand type>)`, absent for COUNT(*)

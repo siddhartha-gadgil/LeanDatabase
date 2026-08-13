@@ -60,6 +60,17 @@ def parse_ddl(ddl):
     return out
 
 def esc(q): return q.replace('\\','\\\\').replace('"','\\"').replace('\n','\\n')
+
+def used_cols(sqltext, cols):
+    """Keep only columns the query text references (by name, as a word). Dropping the ~50 unused columns
+    of a wide table shrinks the TypedRelation `grind` reasons over, so wide GROUP BY pairs stop timing
+    out. Sound: neither variant references the dropped columns. `SELECT *`/`t.*` forces keeping all."""
+    s = re.sub(r'count\s*\(\s*\*\s*\)', '', sqltext, flags=re.I)   # COUNT(*) doesn't expand columns
+    if '*' in s: return cols
+    low = s.lower()
+    kept = [(c, t) for (c, t) in cols if re.search(r'\b'+re.escape(c.lower())+r'\b', low)]
+    return kept or cols
+
 def is_window(q):
     u = q.upper().replace(' ','')
     return 'OVER(' in u or 'ROW_NUMBER' in u or 'RANK()' in u or 'WITHRECURSIVE' in u
@@ -102,17 +113,24 @@ for i, r, tables in selected:
     refd = {n: c for n, c in seen.items() if re.search(r'\b'+re.escape(n.lower())+r'\b', allsql)}
     if not refd: refd = seen
     schemas = ', '.join(f'{name}_schema' for name in refd)
-    L = ['import LeanDatabase.Parser', 'import LeanDatabase.SQLSyntax',
-         'open LeanDatabase Lean', 'set_option maxHeartbeats 1000000', 'set_option maxRecDepth 8000',
-         f'namespace R{i}']
-    for name, cols in refd.items():
-        L.append(f'CREATE TABLE {name} ({", ".join(f"«{c}» {t}" for c,t in cols)})')
+    def header(sqltext):
+        # per-pair CREATE TABLEs, columns pruned to those the pair's queries touch (grind speedup)
+        L = ['import LeanDatabase.Parser', 'import LeanDatabase.SQLSyntax',
+             'open LeanDatabase Lean', 'set_option maxHeartbeats 1000000', 'set_option maxRecDepth 8000',
+             f'namespace R{i}']
+        for name, cols in refd.items():
+            pruned = used_cols(sqltext, cols)
+            L.append(f'CREATE TABLE {name} ({", ".join(f"«{c}» {t}" for c,t in pruned)})')
+        return L
+    L = header(' '.join(variants))
     pairs = [(a, b) for a, b in itertools.combinations(range(len(variants)), 2)
              if variants[a] != variants[b]]
     if split:
-        # one file per pair — the file's exit code IS that pair's verdict (no attribution guessing)
+        # one file per pair — the file's exit code IS that pair's verdict (no attribution guessing).
+        # Prune columns to just this pair's two variants for a smaller relation type.
         for a, b in pairs:
-            body = L + [f'theorem eq_{a}_{b} : sql%([{schemas}]) "{esc(variants[a])}" '
+            body = header(variants[a] + ' ' + variants[b]) + [
+                        f'theorem eq_{a}_{b} : sql%([{schemas}]) "{esc(variants[a])}" '
                         f'= sql%([{schemas}]) "{esc(variants[b])}" := by sql_equiv', f'end R{i}']
             path = os.path.join(GEN, f'R{i}_eq_{a}_{b}.lean')
             open(path, 'w').write('\n'.join(body) + '\n')
@@ -138,6 +156,7 @@ ELAB_MARK = ('Failed to parse','unexpected token','Type mismatch','Invalid field
 # ---- run each file; classify the file AND each pair-theorem ----
 def run(item):
     i, path, thm_lines, iid = item
+    base = os.path.basename(path)[:-5]   # strip .lean; in --split this is R{i}_eq_{a}_{b}
     npairs = len(thm_lines)
     try:
         p = subprocess.run(['lake','env','lean',path], cwd=ROOT, capture_output=True,
@@ -157,9 +176,9 @@ def run(item):
                                and ln > 0)
             is_elab = any(m in out for m in ELAB_MARK)
             file_status = 'ELAB_FAIL' if is_elab else 'PROOF_FAIL'
-        return (i, iid, npairs, proven_pairs, file_status)
+        return (i, iid, base, npairs, proven_pairs, file_status)
     except subprocess.TimeoutExpired:
-        return (i, iid, npairs, 0, 'TIMEOUT')
+        return (i, iid, base, npairs, 0, 'TIMEOUT')
 
 print(f"running {len(files)} files (jobs={jobs}, timeout={timeout}s)...", file=sys.stderr)
 results = []
@@ -172,10 +191,10 @@ with ThreadPoolExecutor(max_workers=jobs) as ex:
 
 # ---- report ----
 from collections import Counter
-by = Counter(r[4] for r in results)
+by = Counter(r[5] for r in results)
 proven_files = by['PROVEN']
 elaborated   = proven_files + by['PROOF_FAIL'] + by['TIMEOUT']
-proven_pairs = sum(r[3] for r in results)
+proven_pairs = sum(r[4] for r in results)
 print(f"\n{'='*64}")
 print(f"FILES:          {len(results)}   (one per record)")
 print(f"ELABORATE:      {elaborated}/{len(results)}  (file has no parse/elab error)")
@@ -183,7 +202,7 @@ print(f"FULLY PROVEN:   {proven_files}/{len(results)}  (every pair-theorem in th
 print(f"PAIRS PROVEN:   {proven_pairs}/{total_pairs}  (individual equivalence theorems closed)")
 print(f"file breakdown: {dict(by)}")
 with open(os.path.join(GEN, '_results.tsv'), 'w') as f:
-    f.write("record\tinstance\tpairs\tproven_pairs\tstatus\n")
-    for i, iid, np_, pp, st in sorted(results):
-        f.write(f"R{i}\t{iid}\t{np_}\t{pp}\t{st}\n")
+    f.write("file\tinstance\tpairs\tproven_pairs\tstatus\n")
+    for i, iid, base, np_, pp, st in sorted(results):
+        f.write(f"{base}\t{iid}\t{np_}\t{pp}\t{st}\n")
 print(f"per-file results -> {os.path.join(GEN,'_results.tsv')}")

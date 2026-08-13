@@ -953,9 +953,9 @@ info: fun table ↦
     let __agg0 :=
       (fun k ↦
           Int.ofNat
-            (groupCount (fun coords ↦ TypedTupleOfList.cons SQLTypeProxy.int (coords 0) TypedTupleOfList.nil) k
+            (groupCount (fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.int (typedTuple 0) TypedTupleOfList.nil) k
               (restriction (fun coords ↦ decide (coords 0 > 30) && coords 1 && decide (coords 2 < 180)) table)))
-        ((fun coords ↦ TypedTupleOfList.cons SQLTypeProxy.int (coords 0) TypedTupleOfList.nil) coords);
+        ((fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.int (typedTuple 0) TypedTupleOfList.nil) coords);
     TypedTupleOfList.cons SQLTypeProxy.int __agg0
       TypedTupleOfList.nil : TypedRelationOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float] →
   TypedRelationOfList [SQLTypeProxy.int]
@@ -976,10 +976,10 @@ info: fun table ↦
     ["count"] fun coords ↦
     let __agg0 :=
       (fun k ↦
-          groupSum (fun coords ↦ TypedTupleOfList.cons SQLTypeProxy.bool (coords 1) TypedTupleOfList.nil) k
+          groupSum (fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.bool (typedTuple 1) TypedTupleOfList.nil) k
             (restriction (fun coords ↦ decide (coords 0 > 30) && coords 1 && decide (coords 2 < 180)) table)
             fun coords ↦ coords 0)
-        ((fun coords ↦ TypedTupleOfList.cons SQLTypeProxy.bool (coords 1) TypedTupleOfList.nil) coords);
+        ((fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.bool (typedTuple 1) TypedTupleOfList.nil) coords);
     TypedTupleOfList.cons SQLTypeProxy.int __agg0
       TypedTupleOfList.nil : TypedRelationOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float] →
   TypedRelationOfList [SQLTypeProxy.int]
@@ -993,10 +993,10 @@ info: fun table ↦
         (fun coords ↦
           let __agg0 :=
             (fun k ↦
-                groupSum (fun coords ↦ TypedTupleOfList.cons SQLTypeProxy.bool (coords 1) TypedTupleOfList.nil) k
-                  (restriction (fun coords ↦ decide (coords 0 > 30) && coords 1 && decide (coords 2 < 180)) table)
+                groupSum (fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.bool (typedTuple 1) TypedTupleOfList.nil)
+                  k (restriction (fun coords ↦ decide (coords 0 > 30) && coords 1 && decide (coords 2 < 180)) table)
                   fun coords ↦ coords 0)
-              ((fun coords ↦ TypedTupleOfList.cons SQLTypeProxy.bool (coords 1) TypedTupleOfList.nil) coords);
+              ((fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.bool (typedTuple 1) TypedTupleOfList.nil) coords);
           decide (__agg0 < 100))
         (restriction
           (fun coords ↦
@@ -1008,10 +1008,10 @@ info: fun table ↦
     ["sum"] fun coords ↦
     let __agg0 :=
       (fun k ↦
-          groupSum (fun coords ↦ TypedTupleOfList.cons SQLTypeProxy.bool (coords 1) TypedTupleOfList.nil) k
+          groupSum (fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.bool (typedTuple 1) TypedTupleOfList.nil) k
             (restriction (fun coords ↦ decide (coords 0 > 30) && coords 1 && decide (coords 2 < 180)) table)
             fun coords ↦ coords 0)
-        ((fun coords ↦ TypedTupleOfList.cons SQLTypeProxy.bool (coords 1) TypedTupleOfList.nil) coords);
+        ((fun typedTuple ↦ TypedTupleOfList.cons SQLTypeProxy.bool (typedTuple 1) TypedTupleOfList.nil) coords);
     TypedTupleOfList.cons SQLTypeProxy.int __agg0
       TypedTupleOfList.nil : TypedRelationOfList [SQLTypeProxy.int, SQLTypeProxy.bool, SQLTypeProxy.float] →
   TypedRelationOfList [SQLTypeProxy.int]
