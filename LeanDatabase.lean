@@ -10,3 +10,4 @@ import LeanDatabase.Operators.Join
 import LeanDatabase.Schema
 import LeanDatabase.Operators
 import LeanDatabase.Parser
+import LeanDatabase.Hypothesis

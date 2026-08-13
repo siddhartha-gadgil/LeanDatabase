@@ -419,6 +419,8 @@ def TypedRelation.mapByList {colType : Fin n → Type} [∀ i, DecidableEq (colT
     (f : TypedTuple colType → TypedTupleOfList types) : TypedRelationOfList types :=
   { labels := fun i => names.getD i.val "", rows := r.rows.image f }
 
+-- (`HYPOTHESIS` handling and its enabler lemmas live in `LeanDatabase/Hypothesis.lean`.)
+
 /-- **Projection fusion.** Two stacked `mapByList`s (e.g. `SELECT … FROM (CTE that projects)`)
 collapse to a single projection composing the row maps — `Finset.image_image` on the rows. This is
 what lets `sql_equiv` see through a projecting CTE (ROADMAP 3.3). -/
