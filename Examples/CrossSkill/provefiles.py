@@ -66,7 +66,7 @@ def used_cols(sqltext, cols):
     of a wide table shrinks the TypedRelation `grind` reasons over, so wide GROUP BY pairs stop timing
     out. Sound: neither variant references the dropped columns. `SELECT *`/`t.*` forces keeping all."""
     s = re.sub(r'count\s*\(\s*\*\s*\)', '', sqltext, flags=re.I)   # COUNT(*) doesn't expand columns
-    if '*' in s: return cols
+    if re.search(r'(?:select|,)\s*\*', s, re.I) or '.*' in s: return cols  # real SELECT */t.* only
     low = s.lower()
     kept = [(c, t) for (c, t) in cols if re.search(r'\b'+re.escape(c.lower())+r'\b', low)]
     return kept or cols

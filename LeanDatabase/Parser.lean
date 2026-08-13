@@ -22,6 +22,15 @@ open Lean Meta Elab Term
 
 namespace LeanDatabase
 
+/-- The relation type of a declared table, from its `_schema`. Lets a theorem bind a concrete table
+`(t : TableRel T_schema)` without spelling out the column proxies — needed when stating **hypotheses**
+about the data. A data assumption is then just another `sql%` equation applied to `t`, e.g.
+`(sql%([T_schema]) "SELECT * FROM T WHERE a <= b") t = (sql%([T_schema]) "SELECT * FROM T") t`
+("the `a ≤ b` filter drops no rows"), which `sql_equiv` uses to discharge conditionally-equivalent
+queries — soundly, since the assumption is an explicit hypothesis. -/
+abbrev TableRel (s : Lean.Name × List (Lean.Name × SQLTypeProxy)) : Type :=
+  TypedRelationOfList (s.2.map (·.2))
+
 /-- `sql%(schema) "SELECT … FROM … WHERE …"` — a term-level elaborator that parses a **raw SQL
 string** against `schema` and splices in the resulting `TypedRelation` term.
 

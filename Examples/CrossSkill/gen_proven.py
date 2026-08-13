@@ -53,7 +53,7 @@ def parse_ddl(ddl):
 def esc(q): return q.replace('\\','\\\\').replace('"','\\"').replace('\n','\\n')
 def used_cols(sqltext, cols):
     s = re.sub(r'count\s*\(\s*\*\s*\)', '', sqltext, flags=re.I)
-    if '*' in s: return cols
+    if re.search(r'(?:select|,)\s*\*', s, re.I) or '.*' in s: return cols  # real SELECT */t.* only
     low = s.lower()
     return [(c, t) for (c, t) in cols if re.search(r'\b'+re.escape(c.lower())+r'\b', low)] or cols
 
