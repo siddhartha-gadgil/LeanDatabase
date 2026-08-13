@@ -68,6 +68,20 @@ theorem cast_int_identity :
       = sql%([sc_schema]) "SELECT g AS x FROM sc" := by
   sql_equiv
 
+/-- The widening cast is a ring hom (`castIntToFloat_eq` exposes it as `Int.cast`), so it distributes
+    over `+`/`*` — a general property, no hypothesis needed. -/
+theorem cast_distributes :
+    sql%([sc_schema]) "SELECT CAST(g + v AS FLOAT) AS x, CAST(g * v AS FLOAT) AS y FROM sc"
+      = sql%([sc_schema])
+        "SELECT CAST(g AS FLOAT) + CAST(v AS FLOAT) AS x, CAST(g AS FLOAT) * CAST(v AS FLOAT) AS y FROM sc" := by
+  sql_equiv
+
+/-- …and it is injective, so a cast comparison in `WHERE` is the underlying `Int` comparison. -/
+theorem cast_injective_filter :
+    sql%([sc_schema]) "SELECT g FROM sc WHERE CAST(g AS FLOAT) = CAST(v AS FLOAT)"
+      = sql%([sc_schema]) "SELECT g FROM sc WHERE g = v" := by
+  sql_equiv
+
 /-! ## Common table expressions (`WITH`) -/
 CREATE TABLE ct (a INT, b INT)
 

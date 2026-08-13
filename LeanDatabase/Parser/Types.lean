@@ -175,6 +175,29 @@ theorem TypedTupleOfList.cons_nil_inj {t : SQLTypeProxy} {x y : t.type} :
   · rintro rfl
     rfl
 
+/-- The tail entry of a `cons` at a successor index — definitionally the tail (`rfl`). -/
+theorem TypedTupleOfList.cons_succ {t : SQLTypeProxy} {rest : List SQLTypeProxy}
+    (x : t.type) (xs : TypedTupleOfList rest) (i : Fin rest.length) :
+    TypedTupleOfList.cons t x xs i.succ = xs i := rfl
+
+/-- **General `cons` injectivity** — a multi-column `GROUP BY`/projection key equality splits into its
+component equalities. Generalises `cons_nil_inj` past the single-column case, so `simp` reduces a
+wrapped multi-key equality (`(a,b) = (a',b')`) to `a = a' ∧ b = b'` — what the `GROUP BY`-under-FD and
+multi-column projection proofs are stated in. -/
+@[simp]
+theorem TypedTupleOfList.cons_inj {t : SQLTypeProxy} {rest : List SQLTypeProxy}
+    {x y : t.type} {xs ys : TypedTupleOfList rest} :
+    (TypedTupleOfList.cons t x xs = TypedTupleOfList.cons t y ys) ↔ (x = y ∧ xs = ys) := by
+  constructor
+  · intro h
+    refine ⟨?_, ?_⟩
+    · have := congrFun h (0 : Fin (rest.length + 1))
+      simpa [TypedTupleOfList.cons, colTypeOfList] using this
+    · funext i
+      have := congrFun h i.succ
+      rwa [TypedTupleOfList.cons_succ, TypedTupleOfList.cons_succ] at this
+  · rintro ⟨rfl, rfl⟩; rfl
+
 @[reducible]
 def TypedTupleOfList.append (ts1 : TypedTupleOfList l1) (ts2 : TypedTupleOfList l2) :
   TypedTupleOfList (l1 ++ l2) := match l1 with

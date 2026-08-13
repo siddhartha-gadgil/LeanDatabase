@@ -214,6 +214,12 @@ string) carry no such hazard and are left opaque; they only ever need to cancel 
 /-- `CAST(x AS FLOAT)` from an integer: the genuine `Int → Rat` coercion (NOT opaque). -/
 def castIntToFloat (x : Int) : Rat := (x : Rat)
 
+/-- Expose the widening cast *as* `Int → Rat` coercion, so the whole `Int.cast` ring-hom toolbox
+(`push_cast`: `Int.cast_add`/`_mul`/`_inj`/…) fires under `simp`/`grind`. This makes cast a general
+property, not a per-query fact: `CAST(a+b AS FLOAT) = CAST(a AS FLOAT) + CAST(b AS FLOAT)`,
+`CAST(a AS FLOAT) = CAST(b AS FLOAT) ↔ a = b`, etc. all close automatically. -/
+@[simp, grind =] theorem castIntToFloat_eq (x : Int) : castIntToFloat x = (x : Rat) := rfl
+
 /-- `CAST(x AS INT)` from a float: lossy truncation — opaque (no laundering hazard). -/
 opaque truncToInt (x : Rat) : Int := 0
 /-- `CAST(str AS INT/FLOAT)` — opaque (a string, e.g. a VARIANT sub-field, has no numeric value we

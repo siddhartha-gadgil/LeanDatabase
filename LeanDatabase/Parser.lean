@@ -44,40 +44,6 @@ elab "sql%" "(" schemaStx:term ")" queryStr:str : term => do
   let (e, _) ← parseSqlQuery schema queryStr.getString
   return e
 
-/-- Data-hypothesis reduction: an equivalence that holds only *given* `HYPOTHESIS` facts (each a
-reducible `∀ row ∈ t.rows, p row`, so `grind +locals` e-matches it at the row on its own). We expose
-the underlying `Finset.image`/`Finset.filter`, drop any `WHERE` that a hypothesis makes redundant,
-then finish the projection per-row — deliberately *not* `funext`-ing the output tuple (that explodes
-it into `match`-on-`Fin` goals `grind` can't close). Guarded by `done`: it backtracks whenever it does
-not fully close, so it is harmless to every hypothesis-free proof.
-
-Lives here (not `SQLEquiv.lean`) because it must name `TypedRelation.mapByList` from `Parser/Context`. -/
-macro "sql_hypothesis" : tactic => `(tactic|
-  (apply TypedRelation.ext (by rfl)
-   simp only [TypedRelation.mapByList, restriction]
-   try (rw [Finset.filter_true_of_mem (fun _ _ => by grind +locals)])
-   first
-     | (apply Finset.image_congr; intro _ _; grind +locals)
-     | (sql_simp; grind +locals)
-   done))
-
-/-- The equivalence tactic (see `SQLEquiv.lean` for what it proves). The `sql_hypothesis` branch
-handles conditionally-equivalent queries stated with `HYPOTHESIS` antecedents. -/
-macro "sql_equiv" : tactic => `(tactic|
-  (
-   repeat (first
-     | refine limit_congr ?_
-     | sql_outer_join
-     | sql_hypothesis
-     | (apply TypedRelation.ext <;> try rfl)
-     | refine Finset.filter_congr (fun _ _ => ?_)
-     | refine Finset.image_congr (fun _ _ => ?_)
-     | sql_simp
-     | (apply funext; intro _))
-   all_goals (first
-     | grind +locals
-     | (apply Finset.ext; sql_simp; grind +locals))))
-
 
 /-- Parse the `first`/`second` filter strings from a JSON record (with its `schema`) and report
 whether `sql_equiv` proves them equal. -/

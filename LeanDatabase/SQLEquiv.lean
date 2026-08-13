@@ -4,6 +4,7 @@ import LeanDatabase.CurriedPredicates
 import LeanDatabase.SQLToolbox
 import LeanDatabase.Operators
 import LeanDatabase.Constraints
+import LeanDatabase.Parser.Context
 
 open LeanDatabase LeanDatabase.TypedAgg
 
@@ -35,8 +36,34 @@ macro "sql_outer_join" : tactic => `(tactic|
    simp only [restriction, isNull, leftOuterJoin_filter_isNull_eq_antijoin_pad]
    done))
 
--- `sql_hypothesis` (the data-hypothesis reduction branch) and the `sql_equiv` tactic itself live in
--- `LeanDatabase/Parser.lean` — `sql_hypothesis` must name `TypedRelation.mapByList`, which is defined
--- in `Parser/Context.lean` (downstream of this file), so a macro here could not resolve it.
+-- Data-hypothesis reduction: an equivalence that holds only *given* `HYPOTHESIS` facts (each a
+-- reducible `∀ row ∈ t.rows, p row`, so `grind +locals` e-matches it at the row on its own). We expose
+-- the underlying `Finset.image`/`Finset.filter`, drop any `WHERE` that a hypothesis makes redundant,
+-- then finish the projection per-row — deliberately *not* `funext`-ing the output tuple (that explodes
+-- it into `match`-on-`Fin` goals `grind` can't close). Guarded by `done`: it backtracks whenever it
+-- does not fully close, so it is harmless to every hypothesis-free proof.
+macro "sql_hypothesis" : tactic => `(tactic|
+  (apply TypedRelation.ext (by rfl)
+   simp only [TypedRelation.mapByList, restriction]
+   try (rw [Finset.filter_true_of_mem (fun _ _ => by grind +locals)])
+   first
+     | (apply Finset.image_congr; intro _ _; grind +locals)
+     | (sql_simp; grind +locals)
+   done))
+
+macro "sql_equiv" : tactic => `(tactic|
+  (
+   repeat (first
+     | refine limit_congr ?_
+     | sql_outer_join
+     | sql_hypothesis
+     | (apply TypedRelation.ext <;> try rfl)
+     | refine Finset.filter_congr (fun _ _ => ?_)
+     | refine Finset.image_congr (fun _ _ => ?_)
+     | sql_simp
+     | (apply funext; intro _))
+   all_goals (first
+     | grind +locals
+     | (apply Finset.ext; sql_simp; grind +locals))))
 
 end LeanDatabase.SQLEquiv
