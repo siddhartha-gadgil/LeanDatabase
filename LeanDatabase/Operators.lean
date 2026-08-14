@@ -7,3 +7,4 @@ import LeanDatabase.Operators.GroupBy
 import LeanDatabase.Operators.OrderLimit
 import LeanDatabase.Operators.Like
 import LeanDatabase.Operators.Scalar
+import LeanDatabase.Operators.Window
