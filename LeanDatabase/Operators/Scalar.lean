@@ -232,4 +232,10 @@ opaque toBoolOpaque {α : Type} (x : α) : Bool := false
 opaque intToStr (x : Int) : String := ""
 opaque floatToStr (x : Rat) : String := ""
 
+/-- Order-dependent window functions (`ROW_NUMBER`/`RANK`/`LAG`/… ) — opaque, since a `Finset` has no
+row order to define them. `spec` bundles a per-function marker plus the args and PARTITION BY/ORDER BY
+key values, so identical windows cancel by congruence while different specs stay unprovable (sound).
+Result type is fixed by context (the AS-clause type discovery). -/
+opaque winOf {α : Type} [Inhabited α] {σ : Type} (spec : σ) : α
+
 end LeanDatabase.Scalar

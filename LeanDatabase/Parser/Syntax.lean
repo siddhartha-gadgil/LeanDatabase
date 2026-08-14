@@ -571,6 +571,43 @@ scalar3 "DATE_ADD" "dateAdd"
 scalar2 "ARRAY_TO_STRING" "arrayToString"
 scalar2 "VARIANTGET" "variantGet"
 
+/-! ## Window functions (order-dependent ⇒ opaque)
+
+`ROW_NUMBER`/`RANK`/`DENSE_RANK`/`LAG`/`LEAD` over `(PARTITION BY … ORDER BY …)` elaborate to the opaque
+`Scalar.winOf spec`, where `spec` is a tuple of a per-function marker plus the args and PARTITION/ORDER
+key values. Identical windows cancel; different specs stay unprovable (sound — a `Finset` has no order). -/
+declare_syntax_cat win_ord_item
+syntax term (&"ASC" <|> &"DESC")? ("NULLS" ("FIRST" <|> "LAST"))? : win_ord_item
+declare_syntax_cat win_spec
+syntax ("PARTITION" &"BY" term,+)? (&"ORDER" &"BY" win_ord_item,*)? : win_spec
+
+syntax:max "ROW_NUMBER" "(" ")" &"OVER" "(" win_spec ")" : term
+syntax:max "RANK" "(" ")" &"OVER" "(" win_spec ")" : term
+syntax:max "DENSE_RANK" "(" ")" &"OVER" "(" win_spec ")" : term
+syntax:max "LAG" "(" term,+ ")" &"OVER" "(" win_spec ")" : term
+syntax:max "LEAD" "(" term,+ ")" &"OVER" "(" win_spec ")" : term
+
+open Lean Elab Term in
+/-- Build `Scalar.winOf (marker, k₁, k₂, …)` — the marker string tags the function, the rest are the
+arg/PARTITION/ORDER key terms folded into a right-nested tuple (empty ⇒ just the marker). -/
+def elabWindow (marker : String) (args : Array Syntax) (spec : Syntax) : TermElabM Expr := do
+  let sa := spec.getArgs
+  let keys := if sa.size < 1 || sa[0]!.getArgs.isEmpty then #[] else sa[0]!.getArgs[2]!.getSepArgs
+  let ordKeys := if sa.size < 2 || sa[1]!.getArgs.isEmpty then #[]
+                 else sa[1]!.getArgs[2]!.getSepArgs.map (·[0])
+  let terms := args ++ keys ++ ordKeys
+  let mut tup : Term ← `(term| $(Syntax.mkStrLit marker))
+  for t in terms.reverse do
+    tup ← `(term| ($(⟨t⟩), $tup))
+  elabTerm (← `($(mkIdent `LeanDatabase.Scalar.winOf) $tup)) none
+
+elab_rules : term
+  | `(ROW_NUMBER() OVER ($s:win_spec))   => elabWindow "row_number" #[] s
+  | `(RANK() OVER ($s:win_spec))         => elabWindow "rank" #[] s
+  | `(DENSE_RANK() OVER ($s:win_spec))   => elabWindow "dense_rank" #[] s
+  | `(LAG($as,*) OVER ($s:win_spec))     => elabWindow "lag" as.getElems.raw s
+  | `(LEAD($as,*) OVER ($s:win_spec))    => elabWindow "lead" as.getElems.raw s
+
 -- Non-uniform scalars (special emission), as `macro` one-liners.
 open Lean in
 macro:max "ROUND" "(" x:term ")" : term => `($(mkIdent `LeanDatabase.Scalar.round) $x 0)
