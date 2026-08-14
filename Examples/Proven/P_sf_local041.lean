@@ -5,13 +5,12 @@ set_option maxHeartbeats 1000000
 set_option maxRecDepth 8000
 
 /-!
-# sf_local041 — proven cross-skill equivalence(s), hypothesis-conditioned
+# sf_local041 — proven cross-skill equivalence(s)
 
 Question: What percentage of trees in the Bronx have a health status of Good?
 
-Independently-written SQL variants proved equal for all table contents by `sql_equiv`.
-Where the variants differ by a `WHERE` conjunct, that data assumption is stated as a
-`HYPOTHESIS` antecedent (so the equivalence is explicit and sound).
+Independently-written SQL variants proved equal for all table contents by `sql_equiv`; where
+they differ by a `WHERE`/`SELECT` expression, that data fact is an explicit `HYPOTHESIS` antecedent.
 -/
 
 namespace P_sf_local041

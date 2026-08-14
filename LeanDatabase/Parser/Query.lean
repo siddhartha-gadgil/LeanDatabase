@@ -221,22 +221,18 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
   -- LIMIT gets a canonical Unit key (the empty projection).
   applyOrderLimit (rel : Expr) (outSchema : List (Name × SQLTypeProxy))
       (ordCols? : Option (List Syntax.Term)) (limK? : Option Nat) : TermElabM Expr := do
-    let keyExpr? ← match ordCols? with
-      | none => pure none
-      | some cols => do
-        let (key, _) ← elabTypedTupleProjection [(.anonymous, outSchema)] cols
-        pure (some key)
     match limK? with
     | none =>
-      match keyExpr? with
-      | some key => mkAppM ``orderBy #[key, rel]
-      | none => pure rel
+      -- No LIMIT: `ORDER BY` is the identity on a `Finset` (row order unobservable), so the sort key is
+      -- irrelevant and we do NOT elaborate it — this lets `ORDER BY MAX(x)`/`SUM(x)` (an aggregate the
+      -- output schema can't type) parse instead of failing in `elabAsSql`. The result is just `rel`.
+      pure rel
     | some k => do
-      let key ← match keyExpr? with
-        | some key => pure key
-        | none => do
-          let (key, _) ← elabTypedTupleProjection [(.anonymous, outSchema)] []
-          pure key
+      -- Under a LIMIT the sort key IS observable (it picks *which* k rows), so it must be elaborated
+      -- faithfully — never defaulted, which would unsoundly equate different `ORDER BY … LIMIT k`.
+      let key ← match ordCols? with
+        | some cols => Prod.fst <$> elabTypedTupleProjection [(.anonymous, outSchema)] cols
+        | none => Prod.fst <$> elabTypedTupleProjection [(.anonymous, outSchema)] []
       mkAppM ``limit #[toExpr k, key, rel]
   -- The FROM relation + its schema
   productPair (dbs: TSyntax `sql_from) : TermElabM (Expr × List (Name × SQLTypeProxy)) := do

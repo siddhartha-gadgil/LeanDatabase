@@ -80,6 +80,21 @@ def where_of(q):
     if not m: return []
     return split_and(m.group(1))
 
+def select_items(q):
+    """(output_alias -> expr) for each SELECT-list item (alias lower-cased, quotes stripped)."""
+    m = re.search(r'\bselect\b\s+(?:distinct\s+)?(.*?)\bfrom\b', q, re.I|re.S)
+    if not m: return {}
+    out = {}
+    for it in split_top(m.group(1)):
+        it = ' '.join(it.split())
+        am = re.search(r'\s+as\s+"?([A-Za-z_][A-Za-z0-9_]*)"?\s*$', it, re.I)
+        if am:
+            alias = am.group(1); expr = it[:am.start()].strip()
+        else:
+            expr = it; alias = re.sub(r'[^A-Za-z0-9_]', '', it.split('.')[-1])
+        out[alias.lower()] = expr
+    return out
+
 # ---- args ----
 args = sys.argv[1:]
 def popval(flag, default):
@@ -108,11 +123,10 @@ for i, r in enumerate(recs):
         if name not in seen: seen[name] = cols
     allsql = ' '.join(variants).lower()
     refd = {n: c for n, c in seen.items() if re.search(r'\b'+re.escape(n.lower())+r'\b', allsql)} or seen
-    # INJECTION scope: single referenced table (clean applied form + unambiguous hypotheses)
-    if len(refd) != 1:
-        skipped_multi += 1; continue
-    tname = next(iter(refd)); tcols = refd[tname]
+    single_table = len(refd) == 1
+    tname = next(iter(refd)); tcols = refd[tname]     # first (only, when single) table
     schema = f'{tname}_schema'
+    schemas_all = ', '.join(f'{n}_schema' for n in refd)
     pairs = [(a, b) for a, b in itertools.combinations(range(len(variants)), 2) if variants[a] != variants[b]]
     for a, b in pairs:
         A, B = variants[a], variants[b]
@@ -134,20 +148,44 @@ for i, r in enumerate(recs):
             if usable(c):
                 cc = clean(c)
                 if cc and cc not in hyps: hyps.append(cc)   # dedup
+        # SELECT-list expression differences: same output column projected as `exprA` in one variant and
+        # `exprB` in the other (e.g. `col` vs `REPLACE(col, …)`, `col` vs `ROUND(col, n)`). Inject the
+        # per-row bridge `exprA = exprB` (sound: an explicit assumption). Only scalar exprs over base
+        # columns — no aggregates/arrays/opaque the per-row predicate can't state.
+        sa, sb = select_items(A), select_items(B)
+        AGG = ('sum(', 'count(', 'max(', 'min(', 'avg(', 'split(', 'array')
+        for alias in sa.keys() & sb.keys():
+            ea, eb = clean(sa[alias]), clean(sb[alias])
+            if ea == eb: continue
+            both = (ea + ' ' + eb).lower()
+            if any(x in both for x in AGG): continue
+            if not usable(ea) or not usable(eb): continue
+            h = f'{ea} = {eb}'
+            if h not in hyps and f'{eb} = {ea}' not in hyps: hyps.append(h)
         # FULL schema — NO column pruning. Pruning collapses rows that differ only in a dropped column,
         # which changes COUNT(*)/aggregate/set semantics and would prove a narrower (or false) theorem.
+        # Hypotheses need the applied form `(sql% …) t` over a single table. A multi-table pair can only
+        # be attempted when it needs NO hypothesis (a pure structural equivalence) — then the unapplied
+        # `sql% A = sql% B` form works over any number of tables.
+        if hyps and not single_table:
+            skipped_multi += 1; continue
         L = ['import LeanDatabase.Hypothesis', 'import LeanDatabase.SQLSyntax',
              'open LeanDatabase Lean', 'set_option maxHeartbeats 1000000', 'set_option maxRecDepth 8000',
-             f'namespace R{i}',
-             f'CREATE TABLE {tname} ({", ".join(f"«{c}» {t}" for c,t in tcols)})']
+             f'namespace R{i}']
+        for nm, cs in refd.items():
+            L.append(f'CREATE TABLE {nm} ({", ".join(f"«{c}» {t}" for c,t in cs)})')
         hnames = []
-        for k, conj in enumerate(hyps):
-            hn = f'hyp{a}_{b}_{k}'
-            L.append(f'HYPOTHESIS {hn} : {tname} "{esc(conj)}"')
-            hnames.append(hn)
-        binders = ' '.join([f'(t : TableRel {schema})'] + [f'(h{k} : {hn} t)' for k,hn in enumerate(hnames)])
-        L.append(f'theorem eq_{a}_{b} {binders} :')
-        L.append(f'    (sql%([{schema}]) "{esc(A)}") t = (sql%([{schema}]) "{esc(B)}") t := by sql_equiv')
+        if single_table:
+            for k, conj in enumerate(hyps):
+                hn = f'hyp{a}_{b}_{k}'
+                L.append(f'HYPOTHESIS {hn} : {tname} "{esc(conj)}"')
+                hnames.append(hn)
+            binders = ' '.join([f'(t : TableRel {schema})'] + [f'(h{k} : {hn} t)' for k,hn in enumerate(hnames)])
+            L.append(f'theorem eq_{a}_{b} {binders} :')
+            L.append(f'    (sql%([{schemas_all}]) "{esc(A)}") t = (sql%([{schemas_all}]) "{esc(B)}") t := by sql_equiv')
+        else:
+            L.append(f'theorem eq_{a}_{b} :')
+            L.append(f'    sql%([{schemas_all}]) "{esc(A)}" = sql%([{schemas_all}]) "{esc(B)}" := by sql_equiv')
         L.append(f'end R{i}')
         path = os.path.join(GEN, f'R{i}_eq_{a}_{b}.lean')
         open(path, 'w').write('\n'.join(L) + '\n')

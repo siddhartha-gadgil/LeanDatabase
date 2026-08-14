@@ -61,7 +61,6 @@ theorem chained (t : TableRel Orders_schema)
     (h1 : total_calc t) (h2 : total_nonneg t) :
     (sql%([Orders_schema]) "SELECT qty * price AS amount FROM Orders WHERE total >= 0") t
       = (sql%([Orders_schema]) "SELECT total AS amount FROM Orders") t := by
-  
   sql_equiv
 
 end HypothesesDemo

@@ -39,9 +39,8 @@ macro "sql_outer_join" : tactic => `(tactic|
 -- Data-hypothesis reduction: an equivalence that holds only *given* `HYPOTHESIS` facts (each a
 -- reducible `∀ row ∈ t.rows, p row`, so `grind +locals` e-matches it at the row on its own). We expose
 -- the underlying `Finset.image`/`Finset.filter`, drop any `WHERE` that a hypothesis makes redundant,
--- then finish the projection per-row — deliberately *not* `funext`-ing the output tuple (that explodes
--- it into `match`-on-`Fin` goals `grind` can't close). Guarded by `done`: it backtracks whenever it
--- does not fully close, so it is harmless to every hypothesis-free proof.
+-- then finish the projection per-row. Guarded by `done`: it backtracks whenever it does not fully
+-- close, so it is harmless to every hypothesis-free proof.
 macro "sql_hypothesis" : tactic => `(tactic|
   (apply TypedRelation.ext (by rfl)
    simp only [TypedRelation.mapByList, restriction]
@@ -51,12 +50,26 @@ macro "sql_hypothesis" : tactic => `(tactic|
      | (sql_simp; grind +locals)
    done))
 
+-- Projection reduction: a `SELECT`-projection equality whose two sides agree column-by-column but
+-- where a projected expression differs by ring-equal arithmetic (`round (S*100/C) = round (100*S/C)`,
+-- operand reordering, …). Unfold `mapByList`/`restriction` to expose the `Finset.image`, reduce to one
+-- output row, split the tuple into its columns (`cons_inj`), and close each by `grind`. Guarded by
+-- `done` so it backtracks and stays harmless to proofs it does not fully close.
+macro "sql_project" : tactic => `(tactic|
+  (apply TypedRelation.ext (by rfl)
+   simp only [TypedRelation.mapByList, restriction]
+   apply Finset.image_congr; intro _ _
+   simp only [TypedTupleOfList.cons_inj, TypedTupleOfList.cons_nil_inj, true_and, and_true]
+   grind +locals
+   done))
+
 macro "sql_equiv" : tactic => `(tactic|
   (
    repeat (first
      | refine limit_congr ?_
      | sql_outer_join
      | sql_hypothesis
+     | sql_project
      | (apply TypedRelation.ext <;> try rfl)
      | refine Finset.filter_congr (fun _ _ => ?_)
      | refine Finset.image_congr (fun _ _ => ?_)
