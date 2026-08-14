@@ -63,12 +63,50 @@ macro "sql_project" : tactic => `(tactic|
    grind +locals
    done))
 
+-- Functional-dependency reduction: `GROUP BY a, b ≡ GROUP BY a` on the per-group `COUNT(*)`, given a
+-- `FuncDepEq`/`FUNCDEP a -> b`/`UNIQUE` hypothesis. Reduce to the group-count equality, then close via
+-- `cnt_eq_of_partition_eq` — the finer and coarse keys induce the same partition, discharged by
+-- specialising the (name-free) FD hypothesis at the two rows. `done`-guarded; harmless otherwise.
+macro "sql_funcdep" : tactic => `(tactic|
+  (apply TypedRelation.ext (by rfl)
+   simp only [TypedRelation.mapByList]
+   apply Finset.image_congr; intro x hx
+   simp only [TypedTupleOfList.cons_inj, TypedTupleOfList.cons_nil_inj, true_and, and_true,
+     Int.ofNat.injEq]
+   apply cnt_eq_of_partition_eq (t := x)
+   intro s hs
+   simp only [TypedTupleOfList.cons_inj, TypedTupleOfList.cons_nil_inj]
+   have := (‹FuncDepEq _ _ _› : FuncDepEq _ _ _) s hs x hx
+   constructor <;> intro h <;> grind
+   done))
+
+-- Bijection reduction: `COUNT(DISTINCT a) = COUNT(DISTINCT b)` given a `BIJECTION a b` hypothesis (the
+-- columns induce the same partition). Reduce to `card (image …) = card (image …)`, then
+-- `card_image_eq_of_fiber` with the partition discharged from the (name-free) bijection hypothesis. Self-
+-- gates: `card_image_eq_of_fiber` only unifies with a distinct-count goal. `done`-guarded, harmless else.
+macro "sql_bijection" : tactic => `(tactic|
+  (apply TypedRelation.ext (by rfl)
+   simp only [TypedRelation.mapByList, restriction]
+   apply Finset.image_congr; intro x hx
+   simp only [TypedTupleOfList.cons_inj, TypedTupleOfList.cons_nil_inj, true_and, and_true,
+     relCountDistinct, Int.ofNat.injEq]
+   apply card_image_eq_of_fiber
+   intro a ha b hb
+   simp only [TypedAgg.group, restriction, Finset.mem_filter] at ha hb
+   first
+     | exact (‹SamePartition _ _ _› : SamePartition _ _ _) a ha.1.1 b hb.1.1
+     | exact (‹SamePartition _ _ _› : SamePartition _ _ _) a ha.1 b hb.1
+     | exact (‹SamePartition _ _ _› : SamePartition _ _ _) a ha b hb
+   done))
+
 macro "sql_equiv" : tactic => `(tactic|
   (
    repeat (first
      | refine limit_congr ?_
      | sql_outer_join
      | sql_hypothesis
+     | sql_bijection
+     | sql_funcdep
      | sql_project
      | (apply TypedRelation.ext <;> try rfl)
      | refine Finset.filter_congr (fun _ _ => ?_)

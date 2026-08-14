@@ -58,8 +58,10 @@ def used_cols(sqltext, cols):
     low = s.lower()
     return [(c, t) for (c, t) in cols if re.search(r'\b'+re.escape(c.lower())+r'\b', low)] or cols
 def is_window(q):
-    u = q.upper().replace(' ','')
-    return 'OVER(' in u or 'ROW_NUMBER' in u or 'RANK()' in u or 'WITHRECURSIVE' in u
+    # Only RECURSIVE CTE / LATERAL / FLATTEN are still unsupported; plain window functions and non-recursive
+    # CTEs now elaborate, so they are no longer skipped.
+    u = q.upper()
+    return 'WITH RECURSIVE' in u or 'LATERAL' in u or 'FLATTEN' in u
 
 def split_and(s):
     # split on top-level `AND`, ignoring `AND` inside string literals ('...') or parentheses

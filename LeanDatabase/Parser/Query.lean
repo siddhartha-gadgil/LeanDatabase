@@ -170,8 +170,14 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
     let mut ctes := ctes
     for c in cs.getElems do
       match c with
-      | `(sql_cte| $name:ident AS ( $q:sql_query )) => do
+      | `(sql_cte| $name:ident AS ( $q:sql_query ))
+      | `(sql_cte| $name:ident ( $_cols,* ) AS ( $q:sql_query )) => do
         let (lamQ, schemaQ) ← elabSqlQueryCore tableVars ctes q
+        -- Explicit column list `c (a, b) AS (…)`: relabel the body's output columns to the given names.
+        let schemaQ ← match c with
+          | `(sql_cte| $_:ident ( $cols,* ) AS ( $_ )) =>
+            pure <| (cols.getElems.toList.map (·.getId)).zip (schemaQ.map (·.2))
+          | _ => pure schemaQ
         let cteExpr := lamQ.beta vars.toArray
         -- Keep the CTE body's original column names: `expandNames` only rewrites bare refs against
         -- base-table labels, so retaining those names lets `SELECT … FROM cte WHERE col …` resolve

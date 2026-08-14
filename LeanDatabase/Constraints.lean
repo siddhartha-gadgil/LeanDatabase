@@ -80,4 +80,12 @@ theorem card_image_eq_of_fiber {α γ δ : Type} [DecidableEq γ] [DecidableEq �
   apply Finset.card_bij (fun v hv => g (Finset.mem_image.mp hv).choose)
   repeat grind [Finset.mem_image_of_mem]
 
+/-- Columns `f` and `g` induce the **same partition** on `R`: any two rows agree on `f` iff on `g`
+(a value-level `f ↔ g` bijection) — the honest fact behind `COUNT(DISTINCT f) = COUNT(DISTINCT g)`.
+Named (like `FuncDepEq`) and upstream so `sql_equiv`'s bijection branch can find it via
+`‹SamePartition _ _ _›` and feed it to `card_image_eq_of_fiber`. -/
+def SamePartition {α β : Type} (f : TypedTuple colType → α) (g : TypedTuple colType → β)
+    (R : TypedRelation colType) : Prop :=
+  ∀ a ∈ R.rows, ∀ b ∈ R.rows, (f a = f b) ↔ (g a = g b)
+
 end LeanDatabase

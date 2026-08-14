@@ -10,7 +10,7 @@ set_option maxRecDepth 8000
 Question: What percentage of trees in the Bronx have a health status of Good?
 
 Independently-written SQL variants proved equal for all table contents by `sql_equiv`; where
-they differ by a `WHERE`/`SELECT` expression, that data fact is an explicit `HYPOTHESIS` antecedent.
+they differ by a `WHERE`/`SELECT` fact, that data assumption is an explicit `HYPOTHESIS` antecedent.
 -/
 
 namespace P_sf_local041

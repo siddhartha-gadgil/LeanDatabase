@@ -126,6 +126,7 @@ syntax:max "(" sql_query ")" : sql_query
 -- scope — it is not accepted by this grammar.
 declare_syntax_cat sql_cte
 syntax ident "AS" "(" sql_query ")" : sql_cte
+syntax ident "(" ident,+ ")" "AS" "(" sql_query ")" : sql_cte   -- explicit column list `c (a, b) AS (…)`
 syntax:max "WITH" sql_cte,+ sql_query : sql_query
 
 -- macro_rules -- Gemini generated (then fixed) rules for desugaring JOINs and CROSS JOINs into comma-separated FROM clauses with WHERE conditions; GROUP BY omitted for now.

@@ -10,7 +10,7 @@ set_option maxRecDepth 8000
 Question: Among employees who have more than 50 total orders, which three have the highest percentage of late orders, where an order is considered late if the shipped date is on or after its required date? Please list each employee's ID, the number of late orders, and the corresponding late-order percentage.
 
 Independently-written SQL variants proved equal for all table contents by `sql_equiv`; where
-they differ by a `WHERE`/`SELECT` expression, that data fact is an explicit `HYPOTHESIS` antecedent.
+they differ by a `WHERE`/`SELECT` fact, that data assumption is an explicit `HYPOTHESIS` antecedent.
 -/
 
 namespace P_sf_local085

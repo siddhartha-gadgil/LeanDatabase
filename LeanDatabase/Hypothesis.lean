@@ -90,4 +90,54 @@ elab "HYPOTHESIS" name:ident ":" tbl:ident pred:str : command => do
     -- `addDecl` alone sets only the unfolding *hint*, not the attribute.
     setReducibilityStatus name.getId .reducible
 
+/-- Resolve a table's `_schema` to its column-name list and its arity, by name — shared by the
+cross-row hypothesis sugars below. -/
+def schemaColumns (tbl : Ident) : Elab.Command.CommandElabM (List Name × Nat) :=
+  Elab.Command.liftTermElabM do
+    let sch := Lean.mkIdent (Name.mkSimple (tbl.getId.toString ++ "_schema"))
+    let ty ← elabType (← `(List (Name × List (Name × SQLTypeProxy))))
+    let e ← elabTermEnsuringType (← `([$sch])) (some ty)
+    let schema ← unsafe evalExpr (List (Name × List (Name × SQLTypeProxy))) ty (← instantiateMVars e)
+    let some (_, cols) := schema.find? (·.1 == tbl.getId) | throwError "unknown table {tbl.getId}"
+    pure (cols.map (·.1), cols.length)
+
+/-- `HYPOTHESIS fd : Table FUNCDEP a -> b` — a **functional dependency** `a → b`, the cross-row fact
+that any two rows agreeing on `a` agree on `b`. Sugar for `FuncDepEq (·.a) (·.b)` (in `Constraints`),
+so `GROUP BY … , b` collapses to `GROUP BY …` under it. Not a per-row `∀`, so it needs its own form. -/
+elab "HYPOTHESIS" name:ident ":" tbl:ident "FUNCDEP" c1:ident "->" c2:ident : command => do
+  let (cols, n) ← schemaColumns tbl
+  let idx (c : Ident) : Elab.Command.CommandElabM Nat := do
+    match cols.findIdx? (· == c.getId) with
+    | some i => pure i | none => throwError "FUNCDEP: unknown column {c.getId}"
+  let sch := Lean.mkIdent (Name.mkSimple (tbl.getId.toString ++ "_schema"))
+  let l1 := Syntax.mkNatLit (← idx c1); let l2 := Syntax.mkNatLit (← idx c2); let nl := Syntax.mkNatLit n
+  Elab.Command.elabCommand (← `(command|
+    abbrev $name : LeanDatabase.TableRel $sch → Prop :=
+      fun t => LeanDatabase.FuncDepEq (fun r => r (($l1 : Fin $nl))) (fun r => r (($l2 : Fin $nl))) t))
+
+/-- `HYPOTHESIS u : Table UNIQUE k` — `k` is a **key**: two rows agreeing on `k` are the whole-row
+equal. Sugar for `FuncDepEq (·.k) id` (`k` determines every column), so `COUNT(DISTINCT k) = COUNT(*)`
+and a `DISTINCT` keyed by `k` collapse under it. -/
+elab "HYPOTHESIS" name:ident ":" tbl:ident "UNIQUE" k:ident : command => do
+  let (cols, n) ← schemaColumns tbl
+  let some i := cols.findIdx? (· == k.getId) | throwError "UNIQUE: unknown column {k.getId}"
+  let sch := Lean.mkIdent (Name.mkSimple (tbl.getId.toString ++ "_schema"))
+  let lk := Syntax.mkNatLit i; let nl := Syntax.mkNatLit n
+  Elab.Command.elabCommand (← `(command|
+    abbrev $name : LeanDatabase.TableRel $sch → Prop :=
+      fun t => LeanDatabase.FuncDepEq (fun r => r (($lk : Fin $nl))) (fun r => r) t))
+
+/-- `HYPOTHESIS h : Table BIJECTION a b` — columns `a` and `b` induce the same partition (a ↔ b value
+bijection). The honest fact behind `COUNT(DISTINCT a) = COUNT(DISTINCT b)` (e.g. a name↔code map). -/
+elab "HYPOTHESIS" name:ident ":" tbl:ident "BIJECTION" c1:ident c2:ident : command => do
+  let (cols, n) ← schemaColumns tbl
+  let idx (c : Ident) : Elab.Command.CommandElabM Nat := do
+    match cols.findIdx? (· == c.getId) with
+    | some i => pure i | none => throwError "BIJECTION: unknown column {c.getId}"
+  let sch := Lean.mkIdent (Name.mkSimple (tbl.getId.toString ++ "_schema"))
+  let l1 := Syntax.mkNatLit (← idx c1); let l2 := Syntax.mkNatLit (← idx c2); let nl := Syntax.mkNatLit n
+  Elab.Command.elabCommand (← `(command|
+    abbrev $name : LeanDatabase.TableRel $sch → Prop :=
+      fun t => LeanDatabase.SamePartition (fun r => r (($l1 : Fin $nl))) (fun r => r (($l2 : Fin $nl))) t))
+
 end LeanDatabase

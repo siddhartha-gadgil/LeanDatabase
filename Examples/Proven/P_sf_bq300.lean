@@ -10,7 +10,7 @@ set_option maxRecDepth 8000
 Question: What is the highest number of answers received for a single Python 2 specific question on Stack Overflow, excluding any discussions that involve Python 3?
 
 Independently-written SQL variants proved equal for all table contents by `sql_equiv`; where
-they differ by a `WHERE`/`SELECT` expression, that data fact is an explicit `HYPOTHESIS` antecedent.
+they differ by a `WHERE`/`SELECT` fact, that data assumption is an explicit `HYPOTHESIS` antecedent.
 -/
 
 namespace P_sf_bq300

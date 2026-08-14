@@ -10,7 +10,7 @@ set_option maxRecDepth 8000
 Question: Could you provide the total number of 'Other Theft' incidents within the 'Theft and Handling' category for each year in the Westminster borough?
 
 Independently-written SQL variants proved equal for all table contents by `sql_equiv`; where
-they differ by a `WHERE`/`SELECT` expression, that data fact is an explicit `HYPOTHESIS` antecedent.
+they differ by a `WHERE`/`SELECT` fact, that data assumption is an explicit `HYPOTHESIS` antecedent.
 -/
 
 namespace P_sf_bq232

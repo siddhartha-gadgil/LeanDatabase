@@ -10,7 +10,7 @@ set_option maxRecDepth 8000
 Question: Can you provide a breakdown of the total number of articles into different categories and the percentage of those articles that mention "education" within each category from the BBC News?
 
 Independently-written SQL variants proved equal for all table contents by `sql_equiv`; where
-they differ by a `WHERE`/`SELECT` expression, that data fact is an explicit `HYPOTHESIS` antecedent.
+they differ by a `WHERE`/`SELECT` fact, that data assumption is an explicit `HYPOTHESIS` antecedent.
 -/
 
 namespace P_sf_bq284
