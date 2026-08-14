@@ -147,6 +147,10 @@ def expandNames (labels : List Name) (stx: Syntax) (aliases : List (Name × Name
     let shorter? := label.components.getLast?
     pure <| shorter?.map fun shorter => (shorter, label.getPrefix)
   stx.replaceM fun id => do
+    -- Decimal literal (`1.5`) → `(1.5 : Rat)`. SQL promotes an `INT`-vs-decimal comparison to real, so
+    -- ascribing the literal to `Rat` lets the `Int` column coerce (else `OfScientific ℤ` fails to synth).
+    if id.getKind == `scientific then
+      return some (← `(($(⟨id⟩) : Rat)))
     let idName := id.getId
     -- alias-qualified `o.col` → `base.col` (the table's canonical prefix)
     match aliases.find? (fun (a, _) => a != idName && a.isPrefixOf idName) with

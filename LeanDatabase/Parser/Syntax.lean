@@ -236,7 +236,32 @@ We model nullable columns as `Option _` but expose NULL only through constructs 
 **deliberately no bare `NULL` term**: `col = NULL` cannot be written (so the classic `WHERE NOT(x =
 NULL)` Kleene trap is impossible), and a raw nullable column in a comparison fails to typecheck
 (`Option τ` vs `τ`) rather than silently mis-evaluating. Full 3-valued predicates are future work. -/
--- `x IS NULL` / `x IS NOT NULL` — 2-valued even on NULL input (`Option.isNone`/`isSome`).
+/-- `x IS NULL` / `x IS NOT NULL` dispatched on whether the column is nullable: a real `Option` uses
+`isNone`/`isSome`; a non-nullable base column (a bare `τ`) can never be NULL, so it is `false`/`true`.
+The non-`Option` fallback is low-priority so the `Option` instance always wins. -/
+class SqlNullable (α : Type) where
+  isNull : α → Bool
+  isNotNull : α → Bool
+instance : SqlNullable (Option α) where
+  isNull := Option.isNone
+  isNotNull := Option.isSome
+/-- A non-nullable base column can never be NULL. Low priority so the `Option` instance always wins;
+named so the simp lemmas below can rewrite the class method through it. -/
+instance (priority := low) instSqlNullableBase {α : Type} : SqlNullable α where
+  isNull _ := false
+  isNotNull _ := true
+-- Reduce the `Option` dispatch back to raw `isNone`/`isSome` so the outer-join `IS NULL` lemma still fires.
+@[simp, grind =] theorem SqlNullable.isNull_option (x : Option α) :
+    SqlNullable.isNull x = x.isNone := rfl
+@[simp, grind =] theorem SqlNullable.isNotNull_option (x : Option α) :
+    SqlNullable.isNotNull x = x.isSome := rfl
+-- A base (non-`Option`) column never satisfies `IS NULL`, so such a filter is a no-op (drops nothing).
+@[simp, grind =] theorem SqlNullable.isNull_base {α : Type} (x : α) :
+    @SqlNullable.isNull α instSqlNullableBase x = false := rfl
+@[simp, grind =] theorem SqlNullable.isNotNull_base {α : Type} (x : α) :
+    @SqlNullable.isNotNull α instSqlNullableBase x = true := rfl
+
+-- `x IS NULL` / `x IS NOT NULL` — 2-valued (`SqlNullable`), works on nullable and base columns alike.
 syntax:50 term:51 " IS " " NULL " : term
 syntax:50 term:51 " IS " " NOT " " NULL " : term
 -- `COALESCE(x, d)` / `IFNULL(x, d)` — first non-null; `NULLIF(a, b)` — NULL when equal, else `a`.
@@ -245,8 +270,8 @@ syntax:max "COALESCE" "(" term,+ ")" : term
 syntax:max "IFNULL" "(" term "," term ")" : term
 syntax:max "NULLIF" "(" term "," term ")" : term
 macro_rules
-  | `($x IS NULL)      => `(Option.isNone $x)
-  | `($x IS NOT NULL)  => `(Option.isSome $x)
+  | `($x IS NULL)      => `(LeanDatabase.SqlNullable.isNull $x)
+  | `($x IS NOT NULL)  => `(LeanDatabase.SqlNullable.isNotNull $x)
   | `(COALESCE($x))          => `($x)
   | `(COALESCE($x, $xs,*))   => `(Option.getD $x (COALESCE($xs,*)))
   | `(IFNULL($x, $d))   => `(Option.getD $x $d)

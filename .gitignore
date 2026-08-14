@@ -8,3 +8,8 @@ Examples/CrossSkill/crossskill_equivalent_sql.jsonl
 **/CrossSkill/generated/
 
 /.gen/
+/.genhyp/
+/.gen9/
+/overnight_results.log
+/run9.log
+/Examples/CrossSkill/run9.py
