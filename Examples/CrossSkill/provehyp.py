@@ -164,12 +164,24 @@ for i, r in enumerate(recs):
             if not usable(ea) or not usable(eb): continue
             h = f'{ea} = {eb}'
             if h not in hyps and f'{eb} = {ea}' not in hyps: hyps.append(h)
+        # BIJECTION: `COUNT(DISTINCT a)` in one variant vs `COUNT(DISTINCT b)` in the other ⇒ assume `a`,`b`
+        # induce the same partition (a value bijection, e.g. name↔code). Alias-independent: pair the
+        # distinct-counted columns that each variant has and the other lacks.
+        colset = {c.lower() for c in colnames}
+        def distinct_cols(q):
+            return [m for m in re.findall(r'count\(\s*distinct\s+"?(\w+)', q, re.I) if m.lower() in colset]
+        da = [c for c in distinct_cols(A) if c.lower() not in {x.lower() for x in distinct_cols(B)}]
+        db = [c for c in distinct_cols(B) if c.lower() not in {x.lower() for x in distinct_cols(A)}]
+        bijs = []
+        for ca, cb in zip(da, db):
+            pair = (ca, cb)
+            if pair not in bijs and pair[::-1] not in bijs: bijs.append(pair)
         # FULL schema — NO column pruning. Pruning collapses rows that differ only in a dropped column,
         # which changes COUNT(*)/aggregate/set semantics and would prove a narrower (or false) theorem.
         # Hypotheses need the applied form `(sql% …) t` over a single table. A multi-table pair can only
         # be attempted when it needs NO hypothesis (a pure structural equivalence) — then the unapplied
         # `sql% A = sql% B` form works over any number of tables.
-        if hyps and not single_table:
+        if (hyps or bijs) and not single_table:
             skipped_multi += 1; continue
         L = ['import LeanDatabase.Hypothesis', 'import LeanDatabase.SQLSyntax',
              'open LeanDatabase Lean', 'set_option maxHeartbeats 1000000', 'set_option maxRecDepth 8000',
@@ -182,9 +194,16 @@ for i, r in enumerate(recs):
                 hn = f'hyp{a}_{b}_{k}'
                 L.append(f'HYPOTHESIS {hn} : {tname} "{esc(conj)}"')
                 hnames.append(hn)
+            for k, (ca, cb) in enumerate(bijs):
+                hn = f'bij{a}_{b}_{k}'
+                L.append(f'HYPOTHESIS {hn} : {tname} BIJECTION «{ca}» «{cb}»')
+                hnames.append(hn)
             binders = ' '.join([f'(t : TableRel {schema})'] + [f'(h{k} : {hn} t)' for k,hn in enumerate(hnames)])
+            # Output aliases differ but the data is the same ⇒ full `=` is false (labels differ); use
+            # data-equivalence `~=` (rows equal, labels erased). Same aliases ⇒ keep the stronger `=`.
+            rel = '~=' if set(sa.keys()) != set(sb.keys()) else '='
             L.append(f'theorem eq_{a}_{b} {binders} :')
-            L.append(f'    (sql%([{schemas_all}]) "{esc(A)}") t = (sql%([{schemas_all}]) "{esc(B)}") t := by sql_equiv')
+            L.append(f'    (sql%([{schemas_all}]) "{esc(A)}") t {rel} (sql%([{schemas_all}]) "{esc(B)}") t := by sql_equiv')
         else:
             L.append(f'theorem eq_{a}_{b} :')
             L.append(f'    sql%([{schemas_all}]) "{esc(A)}" = sql%([{schemas_all}]) "{esc(B)}" := by sql_equiv')

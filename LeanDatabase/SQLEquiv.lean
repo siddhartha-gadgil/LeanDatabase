@@ -5,6 +5,7 @@ import LeanDatabase.SQLToolbox
 import LeanDatabase.Operators
 import LeanDatabase.Constraints
 import LeanDatabase.Parser.Context
+import LeanDatabase.DataEquiv
 
 open LeanDatabase LeanDatabase.TypedAgg
 
@@ -101,6 +102,8 @@ macro "sql_bijection" : tactic => `(tactic|
 
 macro "sql_equiv" : tactic => `(tactic|
   (
+   -- data-equivalence goal (`A ~= B`): unfold to `A.rows = B.rows` (labels/aliases erased), then reduce.
+   try (simp only [LeanDatabase.dataEq])
    repeat (first
      | refine limit_congr ?_
      | sql_outer_join
