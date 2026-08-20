@@ -3,6 +3,7 @@ import LeanDatabase.Parser.Syntax
 import LeanDatabase.Parser.Context
 import LeanDatabase.Parser.Query
 import LeanDatabase.SQLEquiv
+import LeanDatabase.LlmTactic.SQLEquivLLM
 
 /-!
 # SQL → `TypedRelation` parser

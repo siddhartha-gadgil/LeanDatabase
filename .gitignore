@@ -13,3 +13,4 @@ Examples/CrossSkill/crossskill_equivalent_sql.jsonl
 /overnight_results.log
 /run9.log
 /Examples/CrossSkill/run9.py
+.env
