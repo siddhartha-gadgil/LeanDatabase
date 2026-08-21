@@ -5,136 +5,31 @@ import Lean.Meta.Tactic.TryThis
 /-!
 # `sql_equiv_llm` — LLM-assisted fallback (Gemini / Claude / OpenAI)
 
-Not imported by the `LeanDatabase` umbrella; lives under `LeanDatabase/LlmTactic/` (gitignored).
-Runs an iterative AI↔elaborator loop: ask the model for a tactic, try it, and on failure feed the
-elaboration error back for up to `maxRounds` rounds. Reports round-by-round status to the infoview.
-On success applies the tactic; otherwise falls back to `sql_equiv`, and failing that leaves a `sorry`.
-No axiom check — a `sorry`-writing candidate is accepted; treat results as provisional.
+Not imported by the `LeanDatabase` umbrella; lives under `LeanDatabase/LlmTactic/`.
+Order: try the deterministic `sql_equiv` first; if it fails, run an iterative AI↔elaborator loop —
+ask the model for a tactic, try it, and on failure feed the elaboration error back for up to
+`maxRounds` rounds; if none closes it, try the model's last code with `sql_equiv` appended; else leave
+a `sorry`. Reports round-by-round status to the infoview. Candidates that close the goal via
+`sorry` are **rejected** (that would "prove" anything), so an accepted proof is real.
 -/
 
 open Lean Meta Elab Tactic Parser
 
+/-- Provider for `sql_equiv_llm`, settable per-file: `set_option sqlEquivLlm.provider "anthropic"`.
+Accepts `gemini` | `anthropic` (`claude`) | `openai` (`gpt`); empty ⇒ the built-in default. -/
+register_option sqlEquivLlm.provider : String := {
+  defValue := ""
+  descr := "LLM provider for sql_equiv_llm: gemini | anthropic | openai (empty = default)"
+}
+
+/-- Model for `sql_equiv_llm`, settable per-file: `set_option sqlEquivLlm.model "gemini-3.0-pro"`.
+Empty ⇒ the chosen provider's default model. -/
+register_option sqlEquivLlm.model : String := {
+  defValue := ""
+  descr := "Model name for sql_equiv_llm (empty = the provider's default)"
+}
+
 namespace LeanDatabase.SQLEquivLLM
-
-/-! ## Repo context -/
-
-def coreModules : Array Name := #[
-  `LeanDatabase.TypedRelation, `LeanDatabase.RelationalAlgebra, `LeanDatabase.SQLToolbox,
-  `LeanDatabase.CurriedPredicates, `LeanDatabase.Constraints, `LeanDatabase.Operators]
-
-def inCoreScope (mod : Name) : Bool := coreModules.any (fun m => m == mod || m.isPrefixOf mod)
-
-/-- Auto-generated equation/congruence lemmas (`foo.eq_def`, `foo.eq_1`, `foo.congr_simp`, `foo.match_1`)
-— noise for premise selection; the model has the def itself. -/
-def isNoiseLemma (n : Name) : Bool :=
-  match n.components.getLast? with
-  | some c => let s := c.toString
-    s == "eq_def" || s == "congr_simp" || s.startsWith "eq_" || s.startsWith "match_" ||
-      s.startsWith "proof_"
-  | none => false
-
-def isAuxDecl (declName : Name) : CoreM Bool := do
-  let env ← getEnv
-  pure <| declName.isInternalDetail || isNoiseLemma declName || isAuxRecursor env declName
-    || isNoConfusion env declName <||> isRec declName <||> isMatcher declName
-
-/-- In-scope declaration names, scanned via the imported-module list (fast; avoids walking all consts). -/
-def coreDeclsByModule : CoreM (Std.HashMap Name (Array Name)) := do
-  let env ← getEnv
-  let mut acc : Std.HashMap Name (Array Name) := {}
-  for i in [0:env.header.moduleNames.size] do
-    let modName := env.header.moduleNames[i]!
-    if inCoreScope modName then
-      let names ← env.header.moduleData[i]!.constNames.filterM (fun n => return !(← isAuxDecl n))
-      acc := acc.insert modName names
-  pure acc
-
-def ppDeclEntry (n : Name) : MetaM String := do
-  let env ← getEnv
-  let some info := env.find? n | return ""
-  let kind := if info.isTheorem then "theorem" else "def"
-  let ty ← ppExpr info.type
-  match ← findDocString? env n with
-  | some doc =>
-    -- first line of the docstring only (the gist), capped — full multi-line rationale is just bulk
-    let line := ((doc.replace "\n" " ").take 140).toString
-    pure s!"{kind} {n} : {ty}  -- {line}"
-  | none => pure s!"{kind} {n} : {ty}"
-
-/-- Modules whose `def`s are dropped: the opaque, uninterpreted scalar/string functions (~160). Their
-theorems are still kept; opaque values are reasoned about by congruence, and the concrete scalar terms
-appear in the goal anyway. -/
-def noisyDefModules : Array Name := #[`LeanDatabase.Operators.Scalar, `LeanDatabase.Operators.Like]
-
-/-- Essential relational decls that live in `Parser` (excluded as a module) but drive the standard
-proof shape, plus structural lemmas — always kept regardless of goal relevance. -/
-def alwaysInclude : Array Name := #[
-  `LeanDatabase.TypedRelation.mapByList, `LeanDatabase.restriction, `LeanDatabase.dataEq,
-  `LeanDatabase.TypedTupleOfList.cons_inj, `LeanDatabase.TypedTupleOfList.cons_nil_inj,
-  `LeanDatabase.TypedTupleOfList.cons_succ]
-
-/-- Whole modules always kept regardless of goal relevance: the cross-cutting proof-lemma library
-`Constraints` (FD / partition / bijection lemmas). These connect to a goal only through definitional
-unfolding (e.g. `COUNT(DISTINCT)` ⇝ `card (image …)`), which surface name-overlap can't see, so
-premise selection would wrongly drop them. It is small, so always including it is cheap. -/
-def alwaysIncludeModules : Array Name := #[`LeanDatabase.Constraints]
-
-/-- Candidate decls (with the constants their type mentions) and the always-keep name set, cached
-once. Candidates: all in-scope theorems + relational `def`s (opaque scalar/string `def`s excluded).
-Always-keep: `alwaysInclude` names plus every decl in `alwaysIncludeModules`. -/
-initialize candCache : IO.Ref (Option (Array (Name × Array Name) × Std.HashSet Name)) ← IO.mkRef none
-
-def candidateDecls : MetaM (Array (Name × Array Name) × Std.HashSet Name) := do
-  if let some c := ← candCache.get then return c
-  let byModule ← coreDeclsByModule
-  let env ← getEnv
-  let mut cands : Array Name := alwaysInclude
-  let mut always : Std.HashSet Name := Std.HashSet.ofArray alwaysInclude
-  for (m, ns) in byModule.toList do
-    for n in ns do
-      if (env.find? n).any (·.isTheorem) || !noisyDefModules.contains m then cands := cands.push n
-      if alwaysIncludeModules.contains m then always := always.insert n
-  let out ← cands.filterMapM fun n => do
-    match env.find? n with
-    | some info => pure (some (n, info.type.getUsedConstants))
-    | none => pure none
-  candCache.set (some (out, always))
-  pure (out, always)
-
-/-- Constants that appear in more than a third of candidate types (`TypedRelation`, `TypedTupleOfList`,
-`SQLTypeProxy`, `Finset`, …): ubiquitous, so they carry no relevance signal — matching on them would
-select almost everything. Computed from the candidate set, not hard-coded. Cached. -/
-initialize ubiqCache : IO.Ref (Option (Std.HashSet Name)) ← IO.mkRef none
-
-def ubiquitousConsts : MetaM (Std.HashSet Name) := do
-  if let some c := ← ubiqCache.get then return c
-  let (cands, _) ← candidateDecls
-  let mut df : Std.HashMap Name Nat := {}
-  for (_, tc) in cands do
-    for c in tc do df := df.insert c (df.getD c 0 + 1)
-  let thresh := cands.size / 5
-  let ubiq := Std.HashSet.ofArray (df.toArray.filterMap (fun (c, k) => if k > thresh then some c else none))
-  ubiqCache.set (some ubiq)
-  pure ubiq
-
-/-- **Premise selection.** Repo-context filtered to what's relevant to THIS goal (like the harness's
-column pruning, but for lemmas): keep a decl if it is named in the goal, if its type shares a
-*discriminative* (non-ubiquitous) constant with the goal — a lemma about an operator the goal actually
-uses — or if it is structurally essential (`alwaysInclude`). Sound (the candidate proof is still
-elaborator-checked) and far leaner than dumping every decl. Theorems first, then defs. -/
-def buildRepoContextFor (goalExpr : Expr) : MetaM String := do
-  let (cands, always) ← candidateDecls
-  let ubiq ← ubiquitousConsts
-  let env ← getEnv
-  let goalKeys := Std.HashSet.ofArray
-    (goalExpr.getUsedConstants.filter (fun c => !ubiq.contains c))
-  let goalConsts := Std.HashSet.ofArray goalExpr.getUsedConstants
-  let relevant := cands.filter fun (n, tc) =>
-    always.contains n || goalConsts.contains n || tc.any goalKeys.contains
-  let isThm (n : Name) : Bool := (env.find? n).any (·.isTheorem)
-  let names := (relevant.map (·.1)).qsort (fun a b => isThm a && !isThm b)
-  let entries ← names.mapM ppDeclEntry
-  pure (String.intercalate "\n" entries.toList)
 
 /-! ## Providers -/
 
@@ -148,18 +43,33 @@ def Provider.keyName : Provider → String
   | .gemini => "GEMINI_API_KEY" | .anthropic => "ANTHROPIC_API_KEY" | .openai => "OPENAI_API_KEY"
 
 def Provider.defaultModel : Provider → String
-  | .gemini => "gemini-3.0-pro"
+  | .gemini => "gemini-pro-latest"
   | .anthropic => "claude-5-sonnet"
   | .openai => "gpt-5.4"
 
-/-- `KEY=value` lookup in a `.env` file at the project root. -/
+/-- Parse the `sqlEquivLlm.provider` option string; unknown/empty ⇒ `dflt`. -/
+def Provider.ofString? (s : String) (dflt : Provider) : Provider :=
+  match s.trimAscii.toString.toLower with
+  | "gemini" | "google" => .gemini
+  | "anthropic" | "claude" => .anthropic
+  | "openai" | "gpt" => .openai
+  | _ => dflt
+
+/-- Strip one layer of matching surrounding `"`/`'` quotes (as `.env` values are often written). -/
+def unquote (s : String) : String :=
+  if s.length ≥ 2 && ((s.startsWith "\"" && s.endsWith "\"") || (s.startsWith "'" && s.endsWith "'"))
+  then (s.drop 1 |>.dropRight 1).toString else s
+
+/-- `KEY=value` lookup in a `.env` file at the project root. Handles an optional `export ` prefix and
+surrounding quotes on the value (python-dotenv semantics), which the raw provider APIs reject. -/
 def readDotEnv (key : String) : IO (Option String) := do
   let path : System.FilePath := ".env"
   unless ← path.pathExists do return none
   for raw in (← IO.FS.readFile path).splitOn "\n" do
     let line := raw.trimAscii.toString
+    let line := if line.startsWith "export " then (line.drop 7).trimAscii.toString else line
     if line.startsWith s!"{key}=" then
-      let v := (line.drop (key.length + 1)).trimAscii.toString
+      let v := unquote (line.drop (key.length + 1)).trimAscii.toString
       if !v.isEmpty then return some v
   return none
 
@@ -208,22 +118,24 @@ def callAnthropic (key prompt model : String) (maxTokens : Nat) : IO String := d
   | .ok bs => match bs[0]? >>= (·.getObjValAs? String "text" |>.toOption) with
     | some t => pure t | none => throw (IO.userError "Anthropic: no text block")
 
+-- Gemini via Google's OpenAI-compatible endpoint (Bearer auth + chat/completions) — the native
+-- `generateContent?key=` route rejects OpenAI-style keys with "API key not valid". Matches the
+-- proven-working `PyAstLean/src/transpile/llm.py` client.
 def callGemini (key prompt model : String) (maxTokens : Nat) : IO String := do
-  let body := Json.mkObj [
-    ("contents", Json.arr #[Json.mkObj [("parts", Json.arr #[Json.mkObj [("text", prompt)]])]]),
-    ("generationConfig", Json.mkObj [("maxOutputTokens", maxTokens)])]
-  let url := s!"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
-  let json ← curlPostJson url #["Content-Type: application/json"] body
+  let body := Json.mkObj [("model", model),
+    ("messages", Json.arr #[Json.mkObj [("role", "user"), ("content", prompt)]]),
+    ("max_tokens", maxTokens)]
+  let json ← curlPostJson "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+    #[s!"Authorization: Bearer {key}", "Content-Type: application/json"] body
   if let .ok err := json.getObjVal? "error" then throw (IO.userError s!"Gemini error: {err}")
-  match json.getObjValAs? (Array Json) "candidates" with
-  | .error e => throw (IO.userError s!"Gemini: no candidates ({e})")
-  | .ok cs => match cs[0]? >>= (·.getObjVal? "content" |>.toOption) >>=
-      (·.getObjValAs? (Array Json) "parts" |>.toOption) >>= (·[0]?) >>=
-      (·.getObjValAs? String "text" |>.toOption) with
-    | some t => pure t | none => throw (IO.userError "Gemini: no candidate text")
+  match json.getObjValAs? (Array Json) "choices" with
+  | .error e => throw (IO.userError s!"Gemini: no choices ({e})")
+  | .ok cs => match cs[0]? >>= (·.getObjVal? "message" |>.toOption) >>=
+      (·.getObjValAs? String "content" |>.toOption) with
+    | some t => pure t | none => throw (IO.userError "Gemini: no message.content")
 
 /-- One completion from `p`. -/
-def callLLM (p : Provider) (prompt model : String) (maxTokens : Nat := 2048) : IO String := do
+def callLLM (p : Provider) (prompt model : String) (maxTokens : Nat := 8192) : IO String := do
   let key ← getKey p
   match p with
   | .openai => callOpenAI key prompt model maxTokens
@@ -254,17 +166,58 @@ def isAuthError (s : String) : Bool :=
   sHas s "PERMISSION_DENIED" || sHas s "invalid_api_key" || sHas s "Incorrect API key" ||
   sHas s "authentication" || sHas s "Unauthorized" || sHas s "not set (checked env var"
 
+-- Wrap the reply as a parenthesised tactic block on its OWN lines: `(\n<seq>\n)`. Models reply with
+-- multi-line proofs using `·` focus bullets, `constructor`, `rcases … with ⟨…⟩`; the newline layout
+-- keeps bullet columns aligned so the block parses (inline `(<seq>)` collapses the columns and fails).
 def parseCandidate (t : String) : CoreM (Option Syntax) := do
-  match Parser.runParserCategory (← getEnv) `tactic s!"({stripFence t})" with
+  match Parser.runParserCategory (← getEnv) `tactic s!"(\n{stripFence t}\n)" with
   | .ok stx => pure (some stx) | .error _ => pure none
 
-/-- Trial `tac` on `goal`, state reverted; `.ok` if it closes it, else the error/left-goals message. -/
+/-- Trial `tac` on `goal`, state reverted; `.ok` only if it closes it with a **`sorry`-free** proof,
+else the error/left-goals message. Rejecting `sorry` is a soundness gate — a model that
+replies `sorry` "closes" any goal, even a false one. -/
 def trialCapture (goal : MVarId) (tac : Syntax) : TermElabM (Except String Unit) :=
   withoutModifyingState do
     try
       let (goals, _) ← Term.withoutErrToSorry do Elab.runTactic goal tac (← read) (← get)
-      pure (if goals.isEmpty then .ok () else .error "tactic ran but left open goals")
+      if !goals.isEmpty then
+        -- Report the *residual* goal state, not just "left open goals" — that's what lets the model
+        -- fix its next attempt.
+        let states ← goals.mapM fun g => return (← Meta.ppGoal g).pretty
+        pure (.error s!"tactic ran but left {goals.length} open goal(s):\n{String.intercalate "\n---\n" states}")
+      else if (← instantiateMVars (mkMVar goal)).hasSorry then
+        pure (.error "closed the goal with `sorry` — that is not a proof; prove it for real")
+      else pure (.ok ())
     catch e => pure (.error (← e.toMessageData.toString))
+
+/-- Run `tac` on `goal` (the main goal); return `true` iff it fully closes it with a **`sorry`-free**
+proof. On failure, a partial result, or a `sorry`-based closure the state is rolled back and no error
+escapes — so the caller can safely try another tactic. (A bare `evalTactic` would let a failed
+candidate's `grind`/`apply` error propagate to the call site, and a `sorry` reply would be accepted.) -/
+def tryClose (goal : MVarId) (tac : Syntax) : TacticM Bool := do
+  let saved ← saveState
+  let ok ← (try
+      evalTactic tac
+      if (← getUnsolvedGoals).isEmpty then
+        pure !(← instantiateMVars (mkMVar goal)).hasSorry
+      else pure false
+    catch _ => pure false)
+  unless ok do saved.restore
+  pure ok
+
+/-- Emit a `Try this:` suggestion whose continuation lines are indented to the call site's column.
+`TryThis` inserts a *string* suggestion verbatim (it only re-indents `tsyntax` suggestions), so a
+multi-line proof would otherwise land its 2nd+ lines at column 0. We shift them right by the column of
+the `sql_equiv_llm` token so the applied block is correctly indented (no `;`-linearisation). -/
+def suggestProof (code : String) : TacticM Unit := do
+  let ref ← getRef
+  let fileMap ← getFileMap
+  let col := (ref.getPos?.map fun p => (fileMap.toPosition p).column).getD 0
+  let pad := String.mk (List.replicate col ' ')
+  let indented := match code.splitOn "\n" with
+    | [] => code
+    | first :: rest => String.intercalate "\n" (first :: rest.map (fun l => pad ++ l))
+  TryThis.addSuggestion ref { suggestion := indented }
 
 /-! ## The tactic -/
 
@@ -277,18 +230,21 @@ candidate closes it, try the LLM's last code with `sql_equiv` appended (`… <;>
 model got partway; (3) else leave a `sorry`. Concise status to the infoview; code to `Try this:`. -/
 elab "sql_equiv_llm" : tactic => do
   let goal ← getMainGoal
-  -- Step 0: deterministic `sql_equiv` first.
+  -- Step 0: deterministic `sql_equiv` first. Run it once; if it doesn't fully close the goal (fails
+  -- or leaves subgoals), roll the state back cleanly so the LLM sees the original goal — a bare
+  -- `evalTactic` here would let `sql_equiv`'s internal `grind`/`apply` failure escape to the call site.
   let sqlEq ← `(tactic| sql_equiv)
-  if let .ok _ ← trialCapture goal sqlEq then
-    evalTactic sqlEq
+  if ← tryClose goal sqlEq then
     logInfo "LlmTactic: sql_equiv tactic PROVED the goal."
     TryThis.addSuggestion (← getRef) { suggestion := "sql_equiv" }
     return
   -- Step 1: LLM refinement loop.
   let goalText := (← Meta.ppGoal goal).pretty
   let context ← buildRepoContextFor (← goal.getType)
-  let p := defaultProvider
-  let model := p.defaultModel
+  let opts ← getOptions
+  let p := Provider.ofString? (sqlEquivLlm.provider.get opts) defaultProvider
+  let modelOpt := sqlEquivLlm.model.get opts
+  let model := if modelOpt.isEmpty then p.defaultModel else modelOpt
   let mut feedback := ""
   let mut lastCode := ""
   let mut status : Array String := #["sql_equiv: failed"]
@@ -313,25 +269,32 @@ elab "sql_equiv_llm" : tactic => do
         | .ok _ => status := status.push s!"call{round}: 200 OK, PROVED"; winner := some stx; break
         | .error e =>
           status := status.push s!"call{round}: 200 OK, failed"
-          feedback := s!"Tactic:\n{lastCode}\nfailed with:\n{e.take 400}"
-  let hdr := s!"LlmTactic: {p.name} ({model}) | " ++ String.intercalate " | " status.toList
-  match winner with
-  | some stx =>
-    evalTactic stx
-    logInfo s!"{hdr} → PROVED"
-    TryThis.addSuggestion (← getRef) { suggestion := lastCode }
-  | none =>
-    -- Step 2: append `sql_equiv` to whatever the LLM last produced (in case it got partway).
-    unless lastCode.isEmpty do
-      if let some cstx ← parseCandidate s!"({lastCode}) <;> sql_equiv" then
-        if let .ok _ ← trialCapture goal cstx then
-          evalTactic cstx
-          logInfo s!"{hdr} → PROVED by LLM code `<;> sql_equiv`"
-          TryThis.addSuggestion (← getRef) { suggestion := s!"{lastCode} <;> sql_equiv" }
-          return
-    -- Step 3: give up cleanly with a `sorry`.
-    evalTactic (← `(tactic| sorry))
-    logInfo s!"{hdr} → FAILED; left `sorry`"
-    unless lastCode.isEmpty do TryThis.addSuggestion (← getRef) { suggestion := lastCode }
+          feedback := s!"Tactic:\n{lastCode}\nfailed with:\n{e.take 1500}"
+  let hdr := s!"LlmTactic: {p.name} ({model})\n" ++ String.intercalate "\n" status.toList
+  -- Apply the winner if one closed the goal on trial (reapplied safely).
+  if let some stx := winner then
+    if ← tryClose goal stx then
+      logInfo s!"{hdr} → PROVED"
+      suggestProof lastCode
+      return
+  -- Step 2: append `sql_equiv` to whatever the LLM last produced (in case it got partway).
+  unless lastCode.isEmpty do
+    if let some cstx ← parseCandidate s!"(\n{lastCode}\n) <;> sql_equiv" then
+      if ← tryClose goal cstx then
+        logInfo s!"{hdr} → PROVED by LLM code `<;> sql_equiv`"
+        suggestProof s!"({lastCode}) <;> sql_equiv"
+        return
+  -- Step 3: give up cleanly with a `sorry`.
+  evalTactic (← `(tactic| sorry))
+  logInfo s!"{hdr} → FAILED; left `sorry`"
+  unless lastCode.isEmpty do suggestProof lastCode
+
+elab "dump_llm_ctx" : tactic => do
+  let goal ← getMainGoal
+  let ctx ← buildRepoContextFor (← goal.getType)
+  let lines := ctx.splitOn "\n"
+  let nThm := lines.filter (·.startsWith "theorem") |>.length
+  let nDef := lines.filter (·.startsWith "def") |>.length
+  logInfo s!"CTX: {ctx.length} chars, {nThm} theorems, {nDef} defs\n\n{ctx}"
 
 end LeanDatabase.SQLEquivLLM
