@@ -213,7 +213,7 @@ def suggestProof (code : String) : TacticM Unit := do
   let ref ← getRef
   let fileMap ← getFileMap
   let col := (ref.getPos?.map fun p => (fileMap.toPosition p).column).getD 0
-  let pad := String.mk (List.replicate col ' ')
+  let pad := String.ofList (List.replicate col ' ')
   let indented := match code.splitOn "\n" with
     | [] => code
     | first :: rest => String.intercalate "\n" (first :: rest.map (fun l => pad ++ l))
