@@ -63,8 +63,8 @@ elab_rules : term
     match ty with
     | `(sql_cast_type| INT) | `(sql_cast_type| INTEGER) | `(sql_cast_type| BIGINT)
     | `(sql_cast_type| NUMBER) => toInt
-    | `(sql_cast_type| FLOAT) | `(sql_cast_type| DOUBLE) | `(sql_cast_type| REAL)
-    | `(sql_cast_type| NUMERIC) | `(sql_cast_type| DECIMAL)
+    | `(sql_cast_type| FLOAT) | `(sql_cast_type| DOUBLE) | `(sql_cast_type| DOUBLE PRECISION)
+    | `(sql_cast_type| REAL) | `(sql_cast_type| NUMERIC) | `(sql_cast_type| DECIMAL)
     | `(sql_cast_type| NUMBER($_,*)) | `(sql_cast_type| NUMERIC($_,*))
     | `(sql_cast_type| DECIMAL($_,*)) => toFloat
     | `(sql_cast_type| STRING) | `(sql_cast_type| TEXT) | `(sql_cast_type| VARCHAR)

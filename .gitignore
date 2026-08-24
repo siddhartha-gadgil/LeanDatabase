@@ -14,3 +14,4 @@
 /run9.log
 **/CrossSkill/run9.py
 .env
+Bench/CrossSkill/__pycache__

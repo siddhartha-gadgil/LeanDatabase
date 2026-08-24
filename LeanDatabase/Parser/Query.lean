@@ -218,7 +218,36 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
     -- ORDER BY resolves against the (base-qualified) output labels, so baseify its column refs too.
     let ordCols? := ord.map (fun ords => ords.getElems.toList.map
       (fun o => ⟨baseifyIdents aliasMap (sqlColTerm (sqlOrderCol o))⟩))
-    let rel ← applyOrderLimit rel outSchema ordCols? (lim.map (·.getNat))
+    let limK? := lim.map (·.getNat)
+    let rel ←
+      try
+        applyOrderLimit rel outSchema ordCols? limK?
+      catch e =>
+        -- The sort key didn't resolve against the output — `ORDER BY` sorts by a column/aggregate the
+        -- SELECT projected away (only under a LIMIT, where the key must stay faithful). Re-project WITH
+        -- the sort expressions kept as extra columns, `limit` over that, then trim the extras. Scoped to
+        -- the col-list SELECT without DISTINCT; every working case still goes through `applyOrderLimit`.
+        let extended? : Option (Syntax.TSepArray `sql_col ",") := match sel with
+          | `(sql_cols| $cols:sql_col,*) => some cols
+          | _ => none
+        match extended?, limK?, ord, distinct? with
+        | some cols, some k, some ords, none =>
+          let extra ← ords.getElems.mapIdxM fun i o => do
+            let t : Syntax.Term := ⟨sqlColTerm (sqlOrderCol o)⟩
+            let al := mkIdent (Name.mkSimple s!"__sort{i}")
+            `(sql_col| $t:term AS $al:ident)
+          let extElems := cols.getElems ++ extra
+          let extSel ← `(sql_cols| $extElems:sql_col,*)
+          let (extRel, extSchema) ← elabSelect extSel combinedSchema filteredExpr groupItems
+            groups.isSome having?.join aliasMap
+          let outN := outSchema.length
+          let (keyFn, _) ← elabTypedTupleProjection [(.anonymous, extSchema)]
+            ((extSchema.drop outN).map (fun p => mkIdent p.1))
+          let (trimFn, _) ← elabTypedTupleProjection [(.anonymous, extSchema)]
+            ((extSchema.take outN).map (fun p => mkIdent p.1))
+          let limited ← mkAppM ``limit #[toExpr k, keyFn, extRel]
+          mkAppM ``TypedRelation.mapByList #[limited, toExpr (outSchema.map (·.1.toString)), trimFn]
+        | _, _, _, _ => throw e
     return (← mkLambdaFVars vars.toArray rel, outSchema)
   | _ => throwError "Unexpected syntax for SQL query"
   where

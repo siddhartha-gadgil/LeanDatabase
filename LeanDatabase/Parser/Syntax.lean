@@ -669,6 +669,7 @@ syntax "BIGINT" : sql_cast_type
 syntax "NUMBER" : sql_cast_type
 syntax "FLOAT" : sql_cast_type
 syntax "DOUBLE" : sql_cast_type
+syntax (priority := high) "DOUBLE" "PRECISION" : sql_cast_type   -- PostgreSQL's float spelling
 syntax "REAL" : sql_cast_type
 syntax "NUMERIC" : sql_cast_type
 syntax "DECIMAL" : sql_cast_type

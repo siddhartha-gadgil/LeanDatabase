@@ -58,7 +58,7 @@ def Provider.ofString? (s : String) (dflt : Provider) : Provider :=
 /-- Strip one layer of matching surrounding `"`/`'` quotes (as `.env` values are often written). -/
 def unquote (s : String) : String :=
   if s.length ≥ 2 && ((s.startsWith "\"" && s.endsWith "\"") || (s.startsWith "'" && s.endsWith "'"))
-  then (s.drop 1 |>.dropRight 1).toString else s
+  then (s.drop 1 |>.dropEnd 1).toString else s
 
 /-- `KEY=value` lookup in a `.env` file at the project root. Handles an optional `export ` prefix and
 surrounding quotes on the value (python-dotenv semantics), which the raw provider APIs reject. -/
