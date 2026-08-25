@@ -86,6 +86,9 @@ opaque truncTo {α : Type} (x : α) (n : Int) : α := x
 opaque splitOf (x : String) (delim : String) : String := x
 opaque objectKeys (x : String) : String := x
 opaque getPath (x : String) (path : String) : String := x
+-- Nested `JSON_EXTRACT_PATH(v, 'a', 'b'[, 'c'])` — multi-key semi-structured path (VARIANT as String).
+opaque getPath3 (x a b : String) : String := x
+opaque getPath4 (x a b c : String) : String := x
 opaque arrayConstruct {α : Type} (a b : α) : String := ""
 opaque leftOf (s : String) (n : Int) : String := s
 opaque rightOf (s : String) (n : Int) : String := s

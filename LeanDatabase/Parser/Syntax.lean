@@ -70,6 +70,15 @@ syntax ident ident : sql_from                         -- 1c. Bare alias (`t x`) 
 syntax "(" sql_query ")" "AS" ident : sql_from       -- 2. Subquery with alias (AS)
 syntax "(" sql_query ")" ident : sql_from             -- 2b. Subquery with bare alias
 
+-- `LATERAL FLATTEN` (Snowflake array/VARIANT unnest). The normalizer canonicalises sqlglot's
+-- `, LATERAL UNNEST(input => e) AS h(SEQ, KEY, PATH, INDEX, VALUE, THIS)` (and the no-`input =>` /
+-- bare-alias / no-collist variants) to `, LATERALFLATTEN(e) AS h (…)`. Left-associative on the
+-- preceding `sql_from`, so a later flatten's input may reference an earlier one (`p` off `h.value`).
+syntax sql_from "," "LATERALFLATTEN" "(" term ")" "AS" ident "(" ident,* ")" : sql_from
+syntax sql_from "," "LATERALFLATTEN" "(" term ")" ident "(" ident,* ")" : sql_from
+syntax sql_from "," "LATERALFLATTEN" "(" term ")" "AS" ident : sql_from
+syntax sql_from "," "LATERALFLATTEN" "(" term ")" ident : sql_from
+
 -- Recursive Cases (Chaining joins from left to right)
 syntax sql_from "JOIN" ident "ON" term : sql_from     -- 3. Explicit Inner Join
 syntax sql_from "JOIN" ident "USING" "(" ident,* ")" : sql_from   -- 3b. USING (shared columns)
@@ -121,13 +130,14 @@ syntax:40 sql_query:40 sql_setop sql_query:41 : sql_query
 -- Parenthesised query, for grouping set-ops: `a UNION (a INTERSECT b)`.
 syntax:max "(" sql_query ")" : sql_query
 
--- Common table expressions: `WITH x AS (q), y AS (q) SELECT …` (non-recursive). Each CTE is a local
--- relation binding, inlined at every reference (`Parser/Query.lean`). `WITH RECURSIVE` is out of
--- scope — it is not accepted by this grammar.
+-- Common table expressions: `WITH x AS (q), y AS (q) SELECT …`. Each CTE is a local relation binding,
+-- inlined at every reference (`Parser/Query.lean`). `WITH RECURSIVE` allows a CTE whose body is
+-- `anchor UNION [ALL] step` to reference itself; it elaborates to the opaque `recursiveCte` fixpoint.
 declare_syntax_cat sql_cte
 syntax ident "AS" "(" sql_query ")" : sql_cte
 syntax ident "(" ident,+ ")" "AS" "(" sql_query ")" : sql_cte   -- explicit column list `c (a, b) AS (…)`
 syntax:max "WITH" sql_cte,+ sql_query : sql_query
+syntax:max "WITH" "RECURSIVE" sql_cte,+ sql_query : sql_query
 
 -- macro_rules -- Gemini generated (then fixed) rules for desugaring JOINs and CROSS JOINs into comma-separated FROM clauses with WHERE conditions; GROUP BY omitted for now.
 --   -----------------------------------------------------------------------------
@@ -580,6 +590,8 @@ below are what sqlglot *emits*, and must parse too. They reuse the same opaque s
 scalar2 "ST_POINT" "stMakePoint"        -- PG spelling of Snowflake ST_MAKEPOINT
 scalar1 "ST_ASTEXT" "stAsText"
 scalar2 "JSON_EXTRACT_PATH" "getPath"   -- PG spelling of Snowflake GET_PATH
+scalar3 "JSON_EXTRACT_PATH" "getPath3"  -- nested path `JSON_EXTRACT_PATH(v, 'a', 'b')`
+scalar4 "JSON_EXTRACT_PATH" "getPath4"
 scalar2 "ARRAY_LENGTH" "arrayLength"
 
 -- `EXTRACT(field FROM x)` (PG) — opaque `extractOf "FIELD" x`; `field` is a bare keyword (YEAR/MONTH/…).

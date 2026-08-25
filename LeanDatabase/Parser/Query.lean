@@ -148,6 +148,12 @@ partial def liftAggExprs (stx : Syntax) :
     | `(COUNT($e:term)) => record .count e
     | _ => return none
 
+/-- Does `stx` reference the table name `nm` anywhere (i.e. is a CTE self-recursive)? -/
+partial def refsName (nm : Name) : Syntax → Bool
+  | .ident _ _ val _ => val == nm
+  | .node _ _ args => args.any (refsName nm)
+  | _ => false
+
 /--
 This is the main entry point for parsing a full SQL query (`SELECT` / `FROM` / `WHERE` / `GROUP BY`),
 plus the binary set operators `UNION` / `UNION ALL` / `INTERSECT` / `EXCEPT` and parenthesised
@@ -185,6 +191,32 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
         -- metadata; the relation Expr is unchanged.)
         ctes := ctes ++ [(name.getId, cteExpr, schemaQ)]
       | _ => throwError "malformed CTE (expected `name AS (query)`)"
+    elabSqlQueryCore tableVars ctes body
+  | `(sql_query| WITH RECURSIVE $cs:sql_cte,* $body:sql_query) => do
+    -- Like `WITH`, but a CTE whose body references its own name is a recursive fixpoint
+    -- (`anchor UNION [ALL] step`) → the opaque `recursiveCte`. Non-self-referencing CTEs (allowed
+    -- after `RECURSIVE` too) elaborate normally.
+    let mut ctes := ctes
+    for c in cs.getElems do
+      let (name, q, cols?) ← match c with
+        | `(sql_cte| $name:ident AS ( $q:sql_query )) => pure (name, q, none)
+        | `(sql_cte| $name:ident ( $cols,* ) AS ( $q:sql_query )) => pure (name, q, some cols)
+        | _ => throwError "malformed CTE (expected `name AS (query)`)"
+      let (cteExpr, schemaQ) ←
+        if refsName name.getId q.raw then
+          match q with
+          | `(sql_query| $anchor:sql_query $_op:sql_setop $step:sql_query) =>
+            recursiveCteExpr ctes name.getId anchor step
+          | `(sql_query| ( $anchor:sql_query $_op:sql_setop $step:sql_query )) =>
+            recursiveCteExpr ctes name.getId anchor step
+          | _ => throwError "recursive CTE `{name.getId}` must be `anchor UNION [ALL] step`"
+        else do
+          let (lamQ, schemaQ) ← elabSqlQueryCore tableVars ctes q
+          pure (lamQ.beta vars.toArray, schemaQ)
+      let schemaQ := match cols? with
+        | some cols => (cols.getElems.toList.map (·.getId)).zip (schemaQ.map (·.2))
+        | none => schemaQ
+      ctes := ctes ++ [(name.getId, cteExpr, schemaQ)]
     elabSqlQueryCore tableVars ctes body
   | `(sql_query| $l:sql_query $op:sql_setop $r:sql_query) => do
     let (lamL, schemaL) ← elabSqlQueryCore tableVars ctes l
@@ -269,6 +301,23 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
         | some cols => Prod.fst <$> elabTypedTupleProjection [(.anonymous, outSchema)] cols
         | none => Prod.fst <$> elabTypedTupleProjection [(.anonymous, outSchema)] []
       mkAppM ``limit #[toExpr k, key, rel]
+  -- A self-recursive CTE `name AS (anchor UNION [ALL] step)`: elaborate the anchor, bind `name` as an
+  -- fvar of the anchor's schema, elaborate the step against it, then abstract the fvar into the
+  -- `step` iterate and wrap in the opaque `recursiveCte`. Output schema = the anchor's.
+  recursiveCteExpr (ctes : List (Name × Expr × List (Name × SQLTypeProxy)))
+      (name : Name) (anchor step : TSyntax `sql_query) :
+      TermElabM (Expr × List (Name × SQLTypeProxy)) := do
+    let vars := tableVars.map (fun (relVar, _, _) => relVar)
+    let (lamA, schemaA) ← elabSqlQueryCore tableVars ctes anchor
+    let anchorRel := lamA.beta vars.toArray
+    let lExpr ← sqlTypeListExpr (schemaA.map (·.2))
+    let cteTy ← mkAppM ``TypedRelationOfList #[lExpr]
+    withLocalDeclD name cteTy fun cteVar => do
+      let (lamS, schemaS) ← elabSqlQueryCore tableVars (ctes ++ [(name, cteVar, schemaA)]) step
+      unless schemaS.map (·.2) == schemaA.map (·.2) do
+        throwError "recursive CTE `{name}`: step columns don't match the anchor"
+      let stepFn ← mkLambdaFVars #[cteVar] (lamS.beta vars.toArray)
+      return (← mkAppM ``recursiveCte #[anchorRel, stepFn], schemaA)
   -- The FROM relation + its schema
   productPair (dbs: TSyntax `sql_from) : TermElabM (Expr × List (Name × SQLTypeProxy)) := do
     match dbs with
@@ -299,6 +348,14 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       let (lamSub, subSchema) ← elabSqlQueryCore tableVars ctes sub
       let vars := tableVars.map (fun (relVar, _, _) => relVar)
       return (lamSub.beta vars.toArray, subSchema)
+    -- `LATERAL FLATTEN` — correlated unnest appended to the left FROM (see `flattenArm`). Matched
+    -- before the plain comma so `f1 , LATERALFLATTEN(e) …` doesn't fall through to a cross product.
+    | `(sql_from| $f1:sql_from , LATERALFLATTEN( $e:term ) AS $h:ident ( $cols:ident,* ))
+    | `(sql_from| $f1:sql_from , LATERALFLATTEN( $e:term ) $h:ident ( $cols:ident,* )) =>
+      flattenArm f1 e h.getId (cols.getElems.toList.map (·.getId))
+    | `(sql_from| $f1:sql_from , LATERALFLATTEN( $e:term ) AS $h:ident)
+    | `(sql_from| $f1:sql_from , LATERALFLATTEN( $e:term ) $h:ident) =>
+      flattenArm f1 e h.getId [`seq, `key, `path, `index, `value, `this]
     | `(sql_from| $f1:sql_from , $f2:sql_from) => do
       let (e1, s1) ← productPair f1
       let (e2, s2) ← productPair f2
@@ -355,6 +412,20 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       let condExpr ← elabTypedTupleFilter [(.anonymous, combined)] cond
       return (← mkAppM ``restriction #[condExpr, ← mkAppM ``TypedRelationOfList.append #[e1, e2]], combined)
     | _ => throwError "Unsupported FROM clause: {← PrettyPrinter.ppCategory `sql_from dbs}"
+  -- `LATERAL FLATTEN(e) AS h (cols)` — append flatten's six columns (qualified under `h`) to the
+  -- left FROM `f1`. `e` is the per-row VARIANT/array input, elaborated as `fun outerRow => (e :
+  -- String)` against `f1`'s schema so it may reference `f1`'s columns (including an earlier
+  -- flatten's `h.value`). The opaque `lateralFlatten` keeps it sound (see `Parser/Types.lean`).
+  flattenArm (f1 : TSyntax `sql_from) (e : Term) (h : Name) (colNames : List Name) :
+      TermElabM (Expr × List (Name × SQLTypeProxy)) := do
+    let (e1, s1) ← productPair f1
+    let fFn ← withSchemasTupleVars [(.anonymous, s1)] e.raw.hasIdent fun vars =>
+      mkLambdaLetsFVars vars (elabTermEnsuringType e (mkConst ``String))
+    let out ← mkAppM ``lateralFlatten #[e1, fFn]
+    let names := if colNames.length == flattenCols.length then colNames
+                 else [`seq, `key, `path, `index, `value, `this]
+    let hcols := (names.zip flattenCols).map (fun (c, ty) => (h ++ c, ty))
+    return (out, s1 ++ hcols)
   -- Inner / cross join: cross-product of `f1` and `rhs` (each elaborated by `productPair`, so an
   -- aliased RHS is already renamed), restricted by the `ON` predicate over the combined schema.
   innerJoin (f1 rhs : TSyntax `sql_from) (cond? : Option Term) :
@@ -405,7 +476,8 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
   elabExists (rel : Expr) (outerSchema : List (Name × SQLTypeProxy)) (inner : TSyntax `sql_query)
       (inCol? : Option Term) (isNeg : Bool) : TermElabM Expr := do
     match inner with
-    | `(sql_query| SELECT $sel:sql_cols FROM $sdb:sql_from $[WHERE $corr?]? $[;]?) => do
+    | `(sql_query| SELECT $[DISTINCT%$_d]? $sel:sql_cols FROM $sdb:sql_from $[WHERE $corr?]? $[;]?) => do
+      -- `DISTINCT` in an IN/EXISTS subquery is irrelevant (set membership), so it is accepted and ignored.
       let some innerName := (getIdents sdb).head? | throwError "subquery expects a single inner table"
       let (sExpr, sSchema) ← productPair sdb
       let corr ← match inCol?, corr? with
@@ -731,10 +803,60 @@ private partial def pathGo : List Char → List Char → List Char
       | _, _ => pathGo rest ('[' :: out)
   | c :: rest, out => pathGo rest (c :: out)
 
+/-! ## `LATERAL FLATTEN` canonicalization
+
+sqlglot renders Snowflake `LATERAL FLATTEN` as `LATERAL UNNEST(input => e) AS h(SEQ, …)` (with
+`input =>`/no-`input`, `UNNEST`/`FLATTEN`, `AS`/bare-alias variants). Fold every spelling to the
+single token `LATERALFLATTEN(e)` (keeping the trailing `[AS] alias (cols)` for the grammar), so one
+FROM production and one operator handle them all. -/
+private def dropWsF : List Char → List Char
+  | c :: r => if c == ' ' || c == '\n' || c == '\t' then dropWsF r else c :: r
+  | [] => []
+-- Case-insensitive keyword match at a *word boundary* (next char is non-word or end).
+private def ciWord (kw : List Char) (l : List Char) : Option (List Char) :=
+  match ciPrefix kw l with
+  | some (c :: r) => if isWordChar c then none else some (c :: r)
+  | some []       => some []
+  | none          => none
+-- At a `LATERAL` token, match `LATERAL (UNNEST|FLATTEN) ( [input =>]` and return the chars right
+-- after the `(` (and after any `input =>`). `none` if it isn't a FLATTEN/UNNEST lateral.
+private def tryLateral (l : List Char) : Option (List Char) :=
+  match ciWord ['l','a','t','e','r','a','l'] l with
+  | none => none
+  | some r1 =>
+    let r2 := dropWsF r1
+    match (ciWord ['u','n','n','e','s','t'] r2).orElse (fun _ => ciWord ['f','l','a','t','t','e','n'] r2) with
+    | none => none
+    | some r3 =>
+      match dropWsF r3 with
+      | '(' :: r5 =>
+        let r6 := dropWsF r5
+        match ciWord ['i','n','p','u','t'] r6 with
+        | some rIn => match dropWsF rIn with
+                      | '=' :: '>' :: r'' => some (dropWsF r'')
+                      | _ => some r6
+        | none => some r6
+      | _ => none
+private partial def flattenGo : List Char → String → String
+  | [], acc => acc
+  | '\'' :: rest, acc => let (s, r) := copyQuotedRun '\'' rest (String.singleton '\''); flattenGo r (acc ++ s)
+  | '"'  :: rest, acc => let (s, r) := copyQuotedRun '"'  rest (String.singleton '"');  flattenGo r (acc ++ s)
+  | c :: rest, acc =>
+      let boundary := acc.isEmpty || !(isWordChar acc.back)
+      match (if boundary && (c == 'l' || c == 'L') then tryLateral (c :: rest) else none) with
+      | some rest' => flattenGo rest' (acc ++ "LATERALFLATTEN(")
+      | none => flattenGo rest (acc.push c)
+
 /-- Normalize SQL surface syntax to what the grammar accepts (C3): path access `v:key`/`v['key']` →
 `VARIANTGET`, `'…'` strings → `"…"`, double-quoted **identifiers** → bare idents, `X::TYPE` → `CAST`. -/
 def normalizeSqlLiterals (s : String) : String :=
   let s := stripComments s.toList ""
+  -- Quantified subquery comparisons: `x <> ALL (subq)` ≡ `x NOT IN (subq)`, `x = ANY/SOME (subq)` ≡
+  -- `x IN (subq)` (the equivalences that hold for any subquery). sqlglot emits the keywords uppercase.
+  let s := s.replace " <> ALL (" " NOT IN ("
+  let s := s.replace " = ANY (" " IN ("
+  let s := s.replace " = SOME (" " IN ("
+  let s := flattenGo s.toList ""
   let s := wrapAliasGo s.toList ""
   let s := String.ofList (pathGo s.toList []).reverse
   String.ofList (castGo (normalizeGo s.toList "").toList []).reverse

@@ -63,10 +63,9 @@ def parse_ddl(ddl):
 def esc(q): return q.replace('\\','\\\\').replace('"','\\"').replace('\n','\\n')
 
 def is_window(q):
-    # Only RECURSIVE CTE / LATERAL / FLATTEN are still unsupported; plain window functions and
-    # non-recursive CTEs now elaborate, so check them too (a failure is a real one to fix).
-    u = q.upper()
-    return 'WITH RECURSIVE' in u or 'LATERAL' in u or 'FLATTEN' in u
+    # Nothing is categorically unsupported any more — window functions, CTEs (incl. WITH RECURSIVE),
+    # and LATERAL FLATTEN all elaborate, so every query is attempted (a failure is a real one to fix).
+    return False
 
 # ---- argument parsing ----
 args = sys.argv[1:]
@@ -90,10 +89,7 @@ N = int(args[0]) if args else 10**9
 jobs = []
 skipped = []   # (iid, k, sql, construct) — not attempted (parser can't yet handle the construct)
 def unsupported_construct(q):
-    u = q.upper()
-    if 'WITH RECURSIVE' in u: return 'WITH RECURSIVE'
-    if 'LATERAL' in u: return 'LATERAL'
-    if 'FLATTEN' in u: return 'FLATTEN'
+    # No construct is categorically refused any more; every query is attempted.
     return None
 for i, r in enumerate(recs):
     if only_id and r.get('instance_id') != only_id: continue
@@ -224,7 +220,8 @@ status = {
     "note": ("Elaboration census of the crossskill corpus (queries canonicalised to PostgreSQL). "
              "'elaborates' = parses and type-checks into a TypedRelation; 'failed' = attempted but "
              "Lean reported an error (see per-problem 'error'); 'unsupported' = a construct the parser "
-             "does not accept yet (RECURSIVE/LATERAL/FLATTEN), not attempted."),
+             "does not accept yet — currently none: window functions, CTEs (incl. WITH RECURSIVE), "
+             "and LATERAL FLATTEN all elaborate, so every query is attempted."),
     "corpus": "crossskill (Snowflake) transpiled to PostgreSQL on the fly",
     "summary": {
         "total": ok + (len(jobs) - ok) + len(skipped),

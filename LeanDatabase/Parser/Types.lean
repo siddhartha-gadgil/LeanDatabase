@@ -217,6 +217,38 @@ def TypedRelationOfList.append (r1 : TypedRelationOfList l1) (r2 : TypedRelation
    rows := (r1.rows ×ˢ r2.rows).image (fun ((ts1 : TypedTupleOfList l1), (ts2 : TypedTupleOfList l2)) => TypedTupleOfList.append ts1 ts2)}
 
 
+/-! ## `LATERAL FLATTEN` — correlated array/semi-structured unnest (opaque)
+
+Snowflake's `LATERAL FLATTEN(input => e)` (sqlglot emits it as `LATERAL UNNEST(input => e) AS
+h(SEQ, KEY, PATH, INDEX, VALUE, THIS)`) expands an array/`VARIANT` value — per outer row — into a
+table of six columns. We model it as one **opaque, correlated** operator: `lateralFlatten R f`
+appends flatten's six columns to `R`, where `f : row → String` extracts the (VARIANT-as-`String`)
+input from each outer row. It is opaque, so `sql_equiv` can only equate `lateralFlatten R₁ f₁` with
+`lateralFlatten R₂ f₂` when `R₁ ≡ R₂` and `f₁ ≡ f₂` — a genuine equality (same unnest of the same
+input). Different inputs stay unprovable, so no false equivalence can be derived. -/
+
+/-- The six columns `FLATTEN` produces, in sqlglot's emitted order
+`(SEQ, KEY, PATH, INDEX, VALUE, THIS)`. `VALUE`/`THIS` are `VARIANT`, modelled (like every VARIANT)
+as `String`. -/
+@[reducible] def flattenCols : List SQLTypeProxy :=
+  [.int, .string, .string, .int, .string, .string]
+
+/-- Correlated `LATERAL FLATTEN`: for each row of `R`, unnest `f row` (its VARIANT/array input) into
+flatten's six columns, appended to the row. Opaque — sound by congruence (see the section note). -/
+opaque lateralFlatten {l : List SQLTypeProxy}
+    (R : TypedRelationOfList l) (f : TypedTupleOfList l → String) :
+    TypedRelationOfList (l ++ flattenCols) :=
+  TypedRelationOfList.append R (emptyRel (fun _ => ""))
+
+/-- `WITH RECURSIVE cte AS (anchor UNION ALL step) …` — the recursive CTE's value is the least
+fixpoint of `anchor ∪ step(cte)`, which we can't compute, so model it as one **opaque** operator over
+the (faithful) `anchor` relation and the `step` iterate function. Sound by congruence, exactly like
+`lateralFlatten`: two recursive CTEs are provably equal only when both `anchor` and `step` are — a
+genuine equality; different recursions stay unprovable. -/
+opaque recursiveCte {l : List SQLTypeProxy}
+    (anchor : TypedRelationOfList l) (step : TypedRelationOfList l → TypedRelationOfList l) :
+    TypedRelationOfList l := anchor
+
 /-- Reflect a `List SQLTypeProxy` into the `Expr` of the corresponding Lean-level list. -/
 def sqlTypeListExpr (l: List SQLTypeProxy) : MetaM Expr := do
   match l with
