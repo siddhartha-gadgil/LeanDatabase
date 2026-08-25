@@ -288,12 +288,12 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
         return (tableExpr, columns)
     | `(sql_from| $t:ident AS $x:ident)
     | `(sql_from| $t:ident $x:ident) => do
-      -- Aliased table (`t AS x` or bare `t x`): resolve the base and rename its columns to the alias
-      -- prefix, so two aliases of the *same* base table get distinct columns (self-joins, S3). The
-      -- relation is positional, so renaming labels is all that's needed.
+      -- Aliased table/CTE (`t AS x` or bare `t x`): resolve the base and re-qualify its columns under
+      -- the alias, so two aliases of the same base get distinct columns (self-joins, S3) and CTE
+      -- references resolve. Rename to `x.<last component>` — works for base-table columns (already
+      -- `base.col`) AND for CTE columns (bare `col`, which `replacePrefix` could not touch).
       let (e, cols) ← productPair (← `(sql_from| $t:ident))
-      let baseP := (t.getId.components.getLast?).getD t.getId
-      return (e, cols.map (fun (n, ty) => (n.replacePrefix baseP x.getId, ty)))
+      return (e, cols.map (fun (n, ty) => (x.getId ++ (n.components.getLast?).getD n, ty)))
     | `(sql_from| ( $sub:sql_query ) AS $_alias:ident)
     | `(sql_from| ( $sub:sql_query ) $_alias:ident) => do
       let (lamSub, subSchema) ← elabSqlQueryCore tableVars ctes sub
@@ -561,8 +561,8 @@ private def popOperand (out : List Char) : List Char × List Char :=
   | _ => takeRunBack out []
 -- read a bare type word, then discard an optional `(size)` the cast grammar doesn't take
 private def takeTypeWord : List Char → List Char → (String × List Char)
-  | c :: rest, acc => if c.isAlphanum || c == '_' then takeTypeWord rest (acc ++ [c]) else (acc.asString, c :: rest)
-  | [], acc => (acc.asString, [])
+  | c :: rest, acc => if c.isAlphanum || c == '_' then takeTypeWord rest (acc ++ [c]) else (String.ofList acc, c :: rest)
+  | [], acc => (String.ofList acc, [])
 private partial def dropParenSize : List Char → List Char
   | '(' :: rest => (rest.dropWhile (· != ')')).drop 1
   | l => l
@@ -572,7 +572,7 @@ private partial def castGo : List Char → List Char → List Char
       let out := dropSp out
       let (operand, out') := popOperand out
       let (ty, rest2) := takeTypeWord (dropSp rest) []
-      let emit := "CAST(" ++ operand.asString ++ " AS " ++ ty ++ ")"
+      let emit := "CAST(" ++ String.ofList operand ++ " AS " ++ ty ++ ")"
       castGo (dropParenSize (dropSp rest2)) (emit.toList.reverse ++ out')
   | c :: rest, out => castGo rest (c :: out)
 
@@ -686,7 +686,7 @@ private partial def wrapAliasGo : List Char → String → String
       | some (repl, rest') => wrapAliasGo rest' (acc ++ repl)
       | none =>
         match (if boundary && (c == 'a' || c == 'A') then matchAsAlias (c :: rest) else none) with
-        | some (kw, rest') => wrapAliasGo rest' (acc ++ "AS «" ++ kw.asString ++ "»")
+        | some (kw, rest') => wrapAliasGo rest' (acc ++ "AS «" ++ String.ofList kw ++ "»")
         | none => wrapAliasGo rest (acc.push c)
 
 -- Semi-structured path access `v:key` / `v['key']` → `VARIANTGET(v, 'key')`, at the string level so
@@ -714,7 +714,7 @@ private partial def pathGo : List Char → List Char → List Char
       let out := dropSp out
       let (operand, out') := popOperand out
       let (key, rest') := readKey (dropSp rest)
-      let emit := "VARIANTGET(" ++ operand.asString ++ ", '" ++ key ++ "')"
+      let emit := "VARIANTGET(" ++ String.ofList operand ++ ", '" ++ key ++ "')"
       pathGo rest' (emit.toList.reverse ++ out')
   | '[' :: rest, out =>
       -- `operand['key']` access only — a *quoted* key must follow, so array literals `[1,2]` are left
@@ -725,7 +725,7 @@ private partial def pathGo : List Char → List Char → List Char
           let (operand, out') := popOperand out
           let (key, rest0) := readKey (dropSp rest)
           let rest' := (rest0.dropWhile (· != ']')).drop 1
-          let emit := "VARIANTGET(" ++ operand.asString ++ ", '" ++ key ++ "')"
+          let emit := "VARIANTGET(" ++ String.ofList operand ++ ", '" ++ key ++ "')"
           pathGo rest' (emit.toList.reverse ++ out')
         else pathGo rest ('[' :: out)
       | _, _ => pathGo rest ('[' :: out)
@@ -736,8 +736,8 @@ private partial def pathGo : List Char → List Char → List Char
 def normalizeSqlLiterals (s : String) : String :=
   let s := stripComments s.toList ""
   let s := wrapAliasGo s.toList ""
-  let s := (pathGo s.toList []).reverse.asString
-  (castGo (normalizeGo s.toList "").toList []).reverse.asString
+  let s := String.ofList (pathGo s.toList []).reverse
+  String.ofList (castGo (normalizeGo s.toList "").toList []).reverse
 
 /-- Fold a `Name`'s string components to lowercase (case-insensitive identifiers, C3). -/
 def lowerName (n : Name) : Name :=

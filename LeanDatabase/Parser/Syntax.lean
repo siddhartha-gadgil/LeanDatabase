@@ -30,7 +30,7 @@ syntax sql_col,* : sql_cols
 /-- Auto-name for a bare (unaliased) computed column: its source text with non-ident chars dropped,
 so `SUM(amt)` → `SUMamt`. Deterministic, so both sides of an equivalence agree. -/
 def autoColName (t : Syntax) : Name :=
-  Name.mkSimple <| ((t.reprint.getD "col").toList.filter (fun c => c.isAlphanum || c == '_')).asString
+  Name.mkSimple <| String.ofList ((t.reprint.getD "col").toList.filter (fun c => c.isAlphanum || c == '_'))
 
 -- Scalar-subquery columns are rewritten to `term AS ident` before this is called, so the subquery
 -- case is unreachable here.

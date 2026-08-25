@@ -12,3 +12,4 @@ import LeanDatabase.Schema
 import LeanDatabase.Operators
 import LeanDatabase.Parser
 import LeanDatabase.Hypothesis
+import LeanDatabase.Check

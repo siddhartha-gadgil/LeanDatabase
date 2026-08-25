@@ -244,6 +244,7 @@ class SqlConcatArg (α : Type) where toStr : α → String
 instance : SqlConcatArg String := ⟨id⟩
 instance : SqlConcatArg Int := ⟨intToStr⟩
 instance : SqlConcatArg Rat := ⟨floatToStr⟩
+/-- SQL `||` string concatenation: coerce each operand to its string form and `concat`. -/
 def sqlConcat {α β : Type} [SqlConcatArg α] [SqlConcatArg β] (a : α) (b : β) : String :=
   concat (SqlConcatArg.toStr a) (SqlConcatArg.toStr b)
 @[inherit_doc] infixl:30 " || " => sqlConcat

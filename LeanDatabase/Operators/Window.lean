@@ -35,7 +35,7 @@ computed over the whole relation `rel`. Parameterised by the grouped-aggregate o
 the partition is the whole relation. -/
 @[reducible] def windowAggAll {A : Type}
     (g : (TypedTuple colType → Unit) → Unit → TypedRelation colType → A)
-    (rel : TypedRelation colType) (t : TypedTuple colType) : A :=
+    (rel : TypedRelation colType) (_t : TypedTuple colType) : A :=
   g (fun _ => ()) () rel
 
 end LeanDatabase.TypedAgg

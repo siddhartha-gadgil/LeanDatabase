@@ -120,9 +120,7 @@ theorem restriction_absorb_and (p q : TypedTuple colType → Bool) (R : TypedRel
     (h : ∀ t ∈ R.rows, p t = true → q t = true) :
     restriction (fun t => p t && q t) R = restriction p R := by
   apply restriction_congr; intro t ht
-  cases hp : p t with
-  | false => simp [hp]
-  | true => simp [hp, h t ht hp]
+  simp_all only [Bool.and_eq_left_iff_imp, implies_true]
 
 /-- **Absorb into a stronger disjunct** (`sqlglot`: `absorb_and_eliminate`). If `p ⟹ q` on every row,
 `σ_{p∨q} = σ_q`. -/
@@ -132,8 +130,8 @@ theorem restriction_absorb_or (p q : TypedTuple colType → Bool) (R : TypedRela
     restriction (fun t => p t || q t) R = restriction q R := by
   apply restriction_congr; intro t ht
   cases hp : p t with
-  | false => simp [hp]
-  | true => simp [hp, h t ht hp]
+  | false => simp
+  | true => simp [h t ht hp]
 
 /-- **Constant propagation** (`sqlglot`: `propagate_constants`). Under `k = c`, replace `k` by `c` inside
 any (even opaque) predicate `φ`: `σ_{k=c ∧ φ(k)} = σ_{k=c ∧ φ(c)}` — what `grind` cannot do when `φ` is

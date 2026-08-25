@@ -127,7 +127,7 @@ theorem le_total : r ≤ s ∨ s ≤ r := by
     obtain ⟨i, hi, hi'⟩ := exists_first_diff _ _ h
     rcases Ne.lt_or_gt hi <;> grind only [lt_iff]
 
-instance  [inst : ∀ i, LinearOrder (colType i)] : LinearOrder (TypedTuple colType) where
+instance : LinearOrder (TypedTuple colType) where
   le_refl := le_refl
   le_trans := le_trans
   le_antisymm := le_antisymm
@@ -295,7 +295,7 @@ def formatTuple [∀ i, ToString (colType i)] (t : TypedTuple colType) : String 
 
 -- Helper to format the whole table
 -- Note: We use 'unsafe' to convert the Set of rows into a List for printing
-unsafe def simpleFormat [∀ i, DecidableEq (colType i)] [∀ i, ToString (colType i)]
+unsafe def simpleFormat [∀ i, ToString (colType i)]
     (rel : TypedRelation colType) : String :=
   let labelStr := "Labels: " ++ toString (List.ofFn rel.labels)
 
@@ -305,6 +305,6 @@ unsafe def simpleFormat [∀ i, DecidableEq (colType i)] [∀ i, ToString (colTy
 
   String.intercalate "\n" (labelStr :: rowStrs)
 
-unsafe instance [∀ i, DecidableEq (colType i)] [∀ i, ToString (colType i)] :
+unsafe instance [∀ i, ToString (colType i)] :
     Repr (TypedRelation colType) where
   reprPrec rel _ := simpleFormat rel

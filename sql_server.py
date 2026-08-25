@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["sqlglot>=25"]
+# ///
 """
-Small stdlib-only HTTP wrapper for `sql_process`.
+HTTP wrapper for `sql_process`.
 
 GET  /      serves a demo page.
 POST /      accepts the JSON payload expected by LeanDatabase.Parser.checkEquiv
             and returns the JSON line produced by `sql_process`.
+
+The HTTP layer is stdlib-only; `sqlglot` is used solely to enumerate input dialects and transpile
+them to the canonical PostgreSQL the prover works over. `uv run sql_server.py` installs it from the
+inline script metadata above; without it the demo falls back to PostgreSQL-only input.
 """
 
 from __future__ import annotations
@@ -14,6 +22,7 @@ import html
 import json
 import os
 import queue
+import socket
 import subprocess
 import sys
 import threading
@@ -22,7 +31,6 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-
 
 PORT = 6767
 REQUEST_TIMEOUT_SECONDS = 300.0
@@ -391,7 +399,7 @@ TABLE_AGE_ACTIVE_HEIGHT = {
 
 EXAMPLE_GROUPS = [
     {
-        "label": "Example0",
+        "label": "Boolean examples",
         "examples": [
             {
                 "label": "Example0: AND reorder",
@@ -476,7 +484,7 @@ EXAMPLE_GROUPS = [
         ],
     },
     {
-        "label": "Other examples",
+        "label": "Relational examples",
         "examples": [
             {
                 "label": "Example1: predicate pushdown through UNION",
@@ -598,8 +606,8 @@ EXAMPLE_GROUPS = [
                     }
                 ],
                 "queries": [
-                    'SELECT * FROM table WHERE status = "open" OR priority = "high"',
-                    'SELECT * FROM table WHERE status = "open" UNION SELECT * FROM table WHERE priority = "high"',
+                    "SELECT * FROM table WHERE status = 'open' OR priority = 'high'",
+                    "SELECT * FROM table WHERE status = 'open' UNION SELECT * FROM table WHERE priority = 'high'",
                 ],
             },
             {
@@ -614,8 +622,8 @@ EXAMPLE_GROUPS = [
                     }
                 ],
                 "queries": [
-                    'SELECT * FROM table WHERE status = "open" OR priority = "high"',
-                    'SELECT * FROM table WHERE status = "open" UNION ALL SELECT * FROM table WHERE priority = "high" AND status <> "open"',
+                    "SELECT * FROM table WHERE status = 'open' OR priority = 'high'",
+                    "SELECT * FROM table WHERE status = 'open' UNION ALL SELECT * FROM table WHERE priority = 'high' AND status <> 'open'",
                 ],
             },
             {
@@ -659,20 +667,82 @@ EXAMPLE_GROUPS = [
                     "SELECT a + b AS g FROM R WHERE p AND q",
                 ],
             },
+        ],
+    },
+    {
+        "label": "Hypothesis examples",
+        "examples": [
             {
-                "label": "Example18: LIKE, ORDER BY, LIMIT",
+                "label": "WHERE dropped: every row is valid",
                 "schemas": [
                     {
-                        "name": "table",
+                        "name": "orders",
                         "columns": [
-                            {"name": "name", "type": "String"},
-                            {"name": "age", "type": "Int"},
+                            {"name": "qty", "type": "Int"},
+                            {"name": "valid", "type": "Bool"},
                         ],
                     }
                 ],
+                "hypotheses": [{"table": "orders", "predicate": "valid"}],
                 "queries": [
-                    'SELECT * FROM table WHERE name LIKE "%" ORDER BY age LIMIT 10',
-                    "SELECT * FROM table",
+                    "SELECT qty FROM orders WHERE valid",
+                    "SELECT qty FROM orders",
+                ],
+            },
+            {
+                "label": "Column bridge: total = qty * price",
+                "schemas": [
+                    {
+                        "name": "orders",
+                        "columns": [
+                            {"name": "qty", "type": "Int"},
+                            {"name": "price", "type": "Int"},
+                            {"name": "total", "type": "Int"},
+                        ],
+                    }
+                ],
+                "hypotheses": [{"table": "orders", "predicate": "total = qty * price"}],
+                "queries": [
+                    "SELECT total AS amount FROM orders",
+                    "SELECT qty * price AS amount FROM orders",
+                ],
+            },
+            {
+                "label": "Chained assumptions: bridge + nonneg drop WHERE",
+                "schemas": [
+                    {
+                        "name": "orders",
+                        "columns": [
+                            {"name": "qty", "type": "Int"},
+                            {"name": "price", "type": "Int"},
+                            {"name": "total", "type": "Int"},
+                        ],
+                    }
+                ],
+                "hypotheses": [
+                    {"table": "orders", "predicate": "total = qty * price"},
+                    {"table": "orders", "predicate": "total >= 0"},
+                ],
+                "queries": [
+                    "SELECT qty * price AS amount FROM orders WHERE total >= 0",
+                    "SELECT total AS amount FROM orders",
+                ],
+            },
+            {
+                "label": "GROUP BY collapse under functional dependency a -> b",
+                "schemas": [
+                    {
+                        "name": "emp",
+                        "columns": [
+                            {"name": "a", "type": "Int"},
+                            {"name": "b", "type": "Int"},
+                        ],
+                    }
+                ],
+                "hypotheses": [{"table": "emp", "funcdep": ["a", "b"]}],
+                "queries": [
+                    "SELECT a, COUNT(*) AS c FROM emp GROUP BY a, b",
+                    "SELECT a, COUNT(*) AS c FROM emp GROUP BY a",
                 ],
             },
         ],
@@ -681,7 +751,7 @@ EXAMPLE_GROUPS = [
 
 
 DIALECT_LABELS = {
-    "postgres": "PostgreSQL (canonical — no conversion)", "tsql": "SQL Server (T-SQL)",
+    "postgres": "PostgreSQL (default)", "tsql": "SQL Server (T-SQL)",
     "bigquery": "BigQuery", "mysql": "MySQL", "duckdb": "DuckDB", "clickhouse": "ClickHouse",
     "sqlite": "SQLite", "redshift": "Redshift", "spark": "Spark SQL", "spark2": "Spark SQL 2",
     "databricks": "Databricks", "trino": "Trino", "presto": "Presto", "snowflake": "Snowflake",
@@ -751,6 +821,10 @@ def demo_html() -> str:
       line-height: 1.45;
     }}
     header {{
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
       padding: 24px clamp(16px, 4vw, 48px) 14px;
       border-bottom: 1px solid var(--line);
       background: var(--panel);
@@ -766,6 +840,22 @@ def demo_html() -> str:
       color: var(--muted);
       max-width: 760px;
     }}
+    .gh-link {{
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      flex: none;
+      text-decoration: none;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-weight: 650;
+      font-size: 13.5px;
+      white-space: nowrap;
+    }}
+    .gh-link:hover {{ border-color: var(--accent); color: var(--accent); }}
+    .gh-link svg {{ width: 18px; height: 18px; fill: currentColor; }}
     main {{
       display: grid;
       grid-template-columns: minmax(320px, 0.95fr) minmax(360px, 1.05fr);
@@ -821,10 +911,51 @@ def demo_html() -> str:
     }}
     .schema-title {{
       display: grid;
-      grid-template-columns: minmax(120px, 1fr) 36px;
+      grid-template-columns: auto minmax(90px, 1fr) 36px;
       gap: 8px;
       align-items: center;
       margin-bottom: 10px;
+    }}
+    .tag {{
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: var(--code);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }}
+    .hyp-card {{
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+    }}
+    .hyp-card-head {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }}
+    .hyp-grid {{
+      display: grid;
+      grid-template-columns: minmax(80px, 0.8fr) 120px minmax(140px, 1.7fr);
+      gap: 8px;
+      align-items: end;
+    }}
+    .field {{ min-width: 0; }}
+    .field .mini {{
+      display: block;
+      margin: 0 0 4px;
+      color: var(--muted);
+      font-size: 11.5px;
+      font-weight: 700;
+    }}
+    @media (max-width: 520px) {{
+      .hyp-grid {{ grid-template-columns: 1fr; }}
     }}
     .schema-head, .schema-row {{
       display: grid;
@@ -839,12 +970,56 @@ def demo_html() -> str:
       margin: 2px 0 6px;
     }}
     .schema-row {{ margin-bottom: 8px; }}
-    .example-grid {{
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+    .add-row {{
+      display: flex;
+      align-items: center;
       gap: 8px;
-      margin-bottom: 12px;
+      margin-top: 10px;
     }}
+    .info-badge {{
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      font-style: normal;
+      cursor: help;
+      user-select: none;
+    }}
+    .info-badge:hover {{ border-color: var(--accent); color: var(--accent); }}
+    .info-badge .tooltip {{
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(340px, 78vw);
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 12.5px;
+      font-weight: 400;
+      line-height: 1.5;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.12s ease;
+      z-index: 20;
+    }}
+    .info-badge .tooltip code {{
+      background: var(--code);
+      border-radius: 4px;
+      padding: 0 4px;
+    }}
+    .info-badge:hover .tooltip, .info-badge:focus .tooltip {{ opacity: 1; visibility: visible; }}
+    .example-picker {{ margin-bottom: 14px; }}
     button {{
       min-height: 38px;
       border: 1px solid var(--line);
@@ -910,28 +1085,26 @@ def demo_html() -> str:
     }}
     @media (max-width: 880px) {{
       main {{ grid-template-columns: 1fr; }}
-      .example-grid {{ grid-template-columns: 1fr; }}
     }}
   </style>
 </head>
 <body>
   <header>
-    <h1>LeanDatabase SQL Equivalence</h1>
-    <p>Build named schemas and SQL query pairs, then send the generated JSON to the Lean <code>sql_equiv</code>-backed checker.</p>
+    <div>
+      <h1>LeanDatabase SQL Equivalence</h1>
+      <p>Build named schemas and SQL query pairs, then send the generated JSON to the Lean <code>sql_equiv</code>-backed checker.</p>
+    </div>
+    <a class="gh-link" href="https://github.com/siddhartha-gadgil/LeanDatabase" target="_blank" rel="noopener">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a>
   </header>
   <main>
     <section class="panel">
       <h2>Query Pair</h2>
-      <div class="example-grid">
-        <div>
-          <label for="example0Menu">Example0</label>
-          <select id="example0Menu"></select>
-        </div>
-        <div>
-          <label for="otherExampleMenu">Other examples</label>
-          <select id="otherExampleMenu"></select>
-        </div>
-      </div>
+      <label for="examplePicker">Load an example</label>
+      <select id="examplePicker" class="example-picker"></select>
+
       <label for="dialect">Input SQL dialect</label>
       <select id="dialect">
         {dialect_options}
@@ -940,7 +1113,16 @@ def demo_html() -> str:
       to it with sqlglot — the converted SQL is what the prover actually receives.</p>
 
       <div id="schemas"></div>
-      <button type="button" id="addSchema">+ Table</button>
+      <div id="hypotheses"></div>
+      <div class="add-row">
+        <button type="button" id="addSchema">+ Table</button>
+        <button type="button" id="addHypothesis">+ Hypothesis</button>
+        <span class="info-badge" tabindex="0" aria-label="About hypotheses">i<span class="tooltip">Optional <code>HYPOTHESIS</code> facts. Each is assumed about a table's rows, so
+        equivalences that only hold under it become provable — while staying sound (the assumption is
+        explicit). Kinds: <code>predicate</code> (every row satisfies a bool expr),
+        <code>funcdep</code> (<code>a, b</code> ⟹ a→b), <code>unique</code> (<code>k</code> is a key),
+        <code>bijection</code> (<code>a, b</code> same partition).</span></span>
+      </div>
 
       <label for="first">First query</label>
       <textarea id="first" spellcheck="false"></textarea>
@@ -991,7 +1173,8 @@ def demo_html() -> str:
       card.className = "schema-card";
       card.innerHTML = `
         <div class="schema-title">
-          <input aria-label="Table name" class="schema-name" value="${{escapeAttr(schema.name || "")}}" placeholder="table">
+          <span class="tag">Table</span>
+          <input aria-label="Table name" class="schema-name" value="${{escapeAttr(schema.name || "")}}" placeholder="table name">
           <button type="button" class="danger remove-schema" title="Remove table">x</button>
         </div>
         <div class="schema-head"><span>Column</span><span>Type</span><span></span></div>
@@ -1040,8 +1223,67 @@ def demo_html() -> str:
       return String(value).replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
     }}
 
+    const hypothesesEl = document.querySelector("#hypotheses");
+
+    // Map a hypothesis payload object to editor fields [kind, argText].
+    function hypToFields(hyp) {{
+      if (hyp.predicate !== undefined) return ["predicate", hyp.predicate];
+      if (hyp.unique !== undefined) return ["unique", hyp.unique];
+      if (hyp.funcdep !== undefined) return ["funcdep", (hyp.funcdep || []).join(", ")];
+      if (hyp.bijection !== undefined) return ["bijection", (hyp.bijection || []).join(", ")];
+      return ["predicate", ""];
+    }}
+
+    function addHypothesis(hyp = {{}}) {{
+      const [kind, arg] = hypToFields(hyp);
+      const row = document.createElement("div");
+      row.className = "hyp-card";
+      row.innerHTML = `
+        <div class="hyp-card-head">
+          <span class="tag">Hypothesis</span>
+          <button type="button" class="danger" title="Remove hypothesis">x</button>
+        </div>
+        <div class="hyp-grid">
+          <div class="field">
+            <label class="mini">Table</label>
+            <input aria-label="Table" class="hyp-table" value="${{escapeAttr(hyp.table || "")}}" placeholder="table">
+          </div>
+          <div class="field">
+            <label class="mini">Type</label>
+            <select aria-label="Kind" class="hyp-kind">
+              <option value="predicate">predicate</option>
+              <option value="funcdep">funcdep</option>
+              <option value="unique">unique</option>
+              <option value="bijection">bijection</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="mini">Statement</label>
+            <input aria-label="Statement" class="hyp-arg" value="${{escapeAttr(arg)}}" placeholder="age > 30  /  a, b  /  k">
+          </div>
+        </div>
+      `;
+      row.querySelector(".hyp-kind").value = kind;
+      row.querySelector(".danger").addEventListener("click", () => {{ row.remove(); updateRequest(); }});
+      row.querySelectorAll("input, select").forEach(el => el.addEventListener("input", updateRequest));
+      hypothesesEl.appendChild(row);
+    }}
+
+    function currentHypotheses() {{
+      return [...hypothesesEl.querySelectorAll(".hyp-card")].map(row => {{
+        const table = row.querySelector(".hyp-table").value.trim();
+        const kind = row.querySelector(".hyp-kind").value;
+        const arg = row.querySelector(".hyp-arg").value.trim();
+        if (!table || !arg) return null;
+        if (kind === "predicate") return {{ table, predicate: arg }};
+        if (kind === "unique") return {{ table, unique: arg }};
+        const cols = arg.split(",").map(s => s.trim()).filter(Boolean);
+        return {{ table, [kind]: cols }};   // funcdep / bijection: [a, b]
+      }}).filter(Boolean);
+    }}
+
     function currentPayload() {{
-      return {{
+      const payload = {{
         schemas: [...schemasEl.querySelectorAll(".schema-card")].map(card => ({{
           name: card.querySelector(".schema-name").value.trim(),
           columns: [...card.querySelectorAll(".schema-row")].map(row => ({{
@@ -1052,6 +1294,9 @@ def demo_html() -> str:
         queries: [first.value, second.value],
         dialect: dialect.value
       }};
+      const hyps = currentHypotheses();
+      if (hyps.length) payload.hypotheses = hyps;
+      return payload;
     }}
 
     function updateRequest() {{
@@ -1071,8 +1316,8 @@ def demo_html() -> str:
         const data = await res.json();
         const out = (data.queries || []).map((q, i) => {{
           const err = (data.errors || [])[i];
-          return `-- query ${{i + 1}}` + (err ? ` (transpile error: ${{err}})` : "") + `\n${{q}}`;
-        }}).join("\n\n");
+          return `-- query ${{i + 1}}` + (err ? ` (transpile error: ${{err}})` : "") + `\\n${{q}}`;
+        }}).join("\\n\\n");
         convertedFrom.textContent = `(from ${{dialect.value}})`;
         convertedSql.textContent = out || "-";
         convertedPanel.style.display = "";
@@ -1086,6 +1331,8 @@ def demo_html() -> str:
     function loadPayload(payload) {{
       schemasEl.replaceChildren();
       (payload.schemas || []).forEach(addSchema);
+      hypothesesEl.replaceChildren();
+      (payload.hypotheses || []).forEach(addHypothesis);
       first.value = (payload.queries && payload.queries[0]) || "";
       second.value = (payload.queries && payload.queries[1]) || "";
       dialect.value = payload.dialect || "postgres";
@@ -1143,30 +1390,54 @@ def demo_html() -> str:
     second.addEventListener("input", scheduleConverted);
     dialect.addEventListener("change", () => {{ updateRequest(); refreshConverted(); }});
 
-    function fillMenu(selector, groupIndex) {{
-      const menu = document.querySelector(selector);
-      menu.append(new Option("Choose example...", ""));
-      exampleGroups[groupIndex].examples.forEach((example, index) => {{
-        menu.append(new Option(example.label, String(index)));
+    // A single picker with one <optgroup> per example group; strip internal "ExampleN:" prefixes.
+    function buildExampleMenus() {{
+      const menu = document.querySelector("#examplePicker");
+      menu.replaceChildren();
+      menu.append(new Option("Choose an example…", ""));
+      exampleGroups.forEach((group, g) => {{
+        const grp = document.createElement("optgroup");
+        grp.label = group.label;
+        group.examples.forEach((ex, i) =>
+          grp.append(new Option(ex.label.replace(/^Example\d+:\s*/, ""), g + ":" + i)));
+        menu.append(grp);
       }});
       menu.addEventListener("change", () => {{
         if (!menu.value) return;
-        loadPayload(exampleGroups[groupIndex].examples[Number(menu.value)]);
-        document.querySelector(groupIndex === 0 ? "#otherExampleMenu" : "#example0Menu").value = "";
+        const [g, i] = menu.value.split(":").map(Number);
+        loadPayload(exampleGroups[g].examples[i]);
+        menu.value = "";
       }});
     }}
 
-    fillMenu("#example0Menu", 0);
-    fillMenu("#otherExampleMenu", 1);
+    document.querySelector("#addHypothesis").addEventListener("click", () => {{ addHypothesis(); updateRequest(); }});
+    buildExampleMenus();
     reset();
   </script>
 </body>
 </html>"""
 
 
+def lan_ips() -> list[str]:
+    """Best-effort list of this host's non-loopback IPv4 addresses (e.g. the LAN 10.x/192.168.x)."""
+    ips: set[str] = set()
+    try:  # the IP of the interface used to reach the outside world
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80)); ips.add(s.getsockname()[0]); s.close()
+    except OSError:
+        pass
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ips.add(info[4][0])
+    except OSError:
+        pass
+    return sorted(i for i in ips if not i.startswith("127."))
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--host", default="0.0.0.0",
+                        help="interface to bind (default 0.0.0.0 = all, reachable on the LAN IP)")
     parser.add_argument("--port", default=PORT, type=int)
     parser.add_argument("--timeout", default=REQUEST_TIMEOUT_SECONDS, type=float)
     parser.add_argument(
@@ -1196,6 +1467,9 @@ def main() -> None:
         server = SqlServer((args.host, args.port), Handler)
         server.sql_process = sql_process
         print(f"Serving on http://{args.host}:{args.port}", file=sys.stderr, flush=True)
+        if args.host in ("0.0.0.0", "::"):
+            for url in [f"http://127.0.0.1:{args.port}"] + [f"http://{ip}:{args.port}" for ip in lan_ips()]:
+                print(f"  reachable at {url}", file=sys.stderr, flush=True)
         server.serve_forever()
     except KeyboardInterrupt:
         pass

@@ -212,6 +212,9 @@ if failed_only:
     print(f"\n[*] of {len(jobs)} previously-failed: {len(now_ok)} now elaborate, {len(jobs)-len(now_ok)} still fail")
     if now_ok:
         print("    now OK:", ', '.join(f"{iid}[{k}]" for iid, k in sorted(now_ok)))
+    print("\n    still failing:")
+    for j, (i, k, q, tables, iid) in enumerate(jobs):
+        if j in errs: print(f"      {iid}[{k}]  {kind(errs[j])}  ::  {errs[j][:110]}")
     os.remove(path)
     sys.exit(len(jobs) - ok)
 

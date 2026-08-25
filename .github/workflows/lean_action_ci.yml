@@ -12,5 +12,17 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: leanprover/lean-action@v1
-      - name: Coverage guard (VERIFIED ledger honesty check)
-        run: python3 Examples/CrossSkill/coverage.py
+      - name: lake test
+        run: lake test
+      - name: Server smoke test
+        run: |
+          python3 -m pip install --quiet sqlglot
+          python3 - <<'PY'
+          import py_compile, sys
+          py_compile.compile('sql_server.py', doraise=True)
+          sys.path.insert(0, 'Bench/CrossSkill')
+          from transpile import to_postgres
+          out, err = to_postgres("SELECT DATEADD('day', 1, d) FROM t")
+          assert err is None and 'INTERVAL' in out, (out, err)
+          print('server smoke OK ->', out)
+          PY

@@ -1,5 +1,5 @@
 import Lean.Meta
-import LeanDatabase.Parser
+import LeanDatabase.Check
 open Lean Meta LeanDatabase
 
 set_option maxHeartbeats 10000000
