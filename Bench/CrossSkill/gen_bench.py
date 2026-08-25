@@ -8,14 +8,11 @@ build glob (many don't elaborate yet), so they are a worklist to open and run in
 Usage: python3 gen_bench.py [--limit N]
 """
 import json, re, os, sys, itertools
+from transpile import to_postgres
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 OUT  = os.path.join(HERE, "Problems")
-# Canonical corpus is PostgreSQL (transpiled from Snowflake by to_postgres_corpus.py); fall back
-# to the raw Snowflake corpus if the Postgres one has not been generated yet.
-_PG = os.path.join(HERE, "crossskill_equivalent_postgres.jsonl")
-_CORPUS = _PG if os.path.exists(_PG) else os.path.join(HERE, "crossskill_equivalent_sql.jsonl")
-recs = [json.loads(l) for l in open(_CORPUS) if l.strip()]
+recs = [json.loads(l) for l in open(os.path.join(HERE, "crossskill_equivalent_sql.jsonl")) if l.strip()]
 
 def maptype(t):
     t = t.upper()
@@ -94,7 +91,7 @@ made, index = 0, []
 for r in recs:
     if made >= limit: break
     iid = r.get('instance_id', f'r{made}')
-    variants = [e['sql'] for e in r['equivalent_sqls']]
+    variants = [to_postgres(e['sql'])[0] for e in r['equivalent_sqls']]  # canonicalise to PostgreSQL
     tables = parse_ddl(r.get('ddl', ''))
     if not tables: continue
     seen = {}

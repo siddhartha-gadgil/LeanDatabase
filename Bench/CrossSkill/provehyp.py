@@ -8,16 +8,13 @@ and we only assume the SYMMETRIC-DIFFERENCE WHERE conjuncts (a filter vacuous in
 it) — never both sides of a contradictory pair.
 """
 import json, re, os, sys, subprocess, itertools
+from transpile import to_postgres
 from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 GEN  = os.path.join(ROOT, ".genhyp")
-# Canonical corpus is PostgreSQL (transpiled from Snowflake by to_postgres_corpus.py); fall back
-# to the raw Snowflake corpus if the Postgres one has not been generated yet.
-_PG = os.path.join(HERE, "crossskill_equivalent_postgres.jsonl")
-_CORPUS = _PG if os.path.exists(_PG) else os.path.join(HERE, "crossskill_equivalent_sql.jsonl")
-recs = [json.loads(l) for l in open(_CORPUS) if l.strip()]
+recs = [json.loads(l) for l in open(os.path.join(HERE, "crossskill_equivalent_sql.jsonl")) if l.strip()]
 
 def maptype(t):
     t = t.upper()
@@ -120,7 +117,7 @@ files = []
 skipped_multi = 0
 for i, r in enumerate(recs):
     if len(files) >= limit: break
-    variants = [e['sql'] for e in r['equivalent_sqls']]
+    variants = [to_postgres(e['sql'])[0] for e in r['equivalent_sqls']]  # canonicalise to PostgreSQL
     if any(is_window(v) for v in variants): continue
     tables = parse_ddl(r.get('ddl',''))
     if not tables: continue

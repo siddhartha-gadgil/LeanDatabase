@@ -609,6 +609,16 @@ syntax:max "RANK" "(" ")" &"OVER" "(" win_spec ")" : term
 syntax:max "DENSE_RANK" "(" ")" &"OVER" "(" win_spec ")" : term
 syntax:max "LAG" "(" term,+ ")" &"OVER" "(" win_spec ")" : term
 syntax:max "LEAD" "(" term,+ ")" &"OVER" "(" win_spec ")" : term
+-- Windowed aggregates (`SUM(x) OVER (…)`, `COUNT(*) OVER (…)`, `FIRST_VALUE`, …) — opaque, like above.
+syntax:max "SUM" "(" term ")" &"OVER" "(" win_spec ")" : term
+syntax:max "AVG" "(" term ")" &"OVER" "(" win_spec ")" : term
+syntax:max "MIN" "(" term ")" &"OVER" "(" win_spec ")" : term
+syntax:max "MAX" "(" term ")" &"OVER" "(" win_spec ")" : term
+syntax:max "COUNT" "(" "*" ")" &"OVER" "(" win_spec ")" : term
+syntax:max "COUNT" "(" term ")" &"OVER" "(" win_spec ")" : term
+syntax:max "FIRST_VALUE" "(" term ")" &"OVER" "(" win_spec ")" : term
+syntax:max "LAST_VALUE" "(" term ")" &"OVER" "(" win_spec ")" : term
+syntax:max "NTH_VALUE" "(" term "," term ")" &"OVER" "(" win_spec ")" : term
 
 open Lean Elab Term in
 /-- Build `Scalar.winOf (marker, k₁, k₂, …)` — the marker string tags the function, the rest are the
@@ -630,6 +640,15 @@ elab_rules : term
   | `(DENSE_RANK() OVER ($s:win_spec))   => elabWindow "dense_rank" #[] s
   | `(LAG($as,*) OVER ($s:win_spec))     => elabWindow "lag" as.getElems.raw s
   | `(LEAD($as,*) OVER ($s:win_spec))    => elabWindow "lead" as.getElems.raw s
+  | `(SUM($a) OVER ($s:win_spec))          => elabWindow "win_sum" #[a] s
+  | `(AVG($a) OVER ($s:win_spec))          => elabWindow "win_avg" #[a] s
+  | `(MIN($a) OVER ($s:win_spec))          => elabWindow "win_min" #[a] s
+  | `(MAX($a) OVER ($s:win_spec))          => elabWindow "win_max" #[a] s
+  | `(COUNT(*) OVER ($s:win_spec))         => elabWindow "win_count_star" #[] s
+  | `(COUNT($a) OVER ($s:win_spec))        => elabWindow "win_count" #[a] s
+  | `(FIRST_VALUE($a) OVER ($s:win_spec))  => elabWindow "win_first" #[a] s
+  | `(LAST_VALUE($a) OVER ($s:win_spec))   => elabWindow "win_last" #[a] s
+  | `(NTH_VALUE($a, $b) OVER ($s:win_spec)) => elabWindow "win_nth" #[a, b] s
 
 -- Non-uniform scalars (special emission), as `macro` one-liners.
 open Lean in

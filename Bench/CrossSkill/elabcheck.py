@@ -15,14 +15,11 @@ Usage:
 Exit code is the number of COMPILE ERRORs (0 = all elaborate).
 """
 import json, re, os, sys, subprocess
+from transpile import to_postgres     # every query is canonicalised Snowflake → PostgreSQL on the fly
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
-# Canonical corpus is PostgreSQL (transpiled from Snowflake by to_postgres_corpus.py); fall back
-# to the raw Snowflake corpus if the Postgres one has not been generated yet.
-_PG = os.path.join(HERE, "crossskill_equivalent_postgres.jsonl")
-_CORPUS = _PG if os.path.exists(_PG) else os.path.join(HERE, "crossskill_equivalent_sql.jsonl")
-recs = [json.loads(l) for l in open(_CORPUS) if l.strip()]
+recs = [json.loads(l) for l in open(os.path.join(HERE, "crossskill_equivalent_sql.jsonl")) if l.strip()]
 
 def maptype(t):
     t = t.upper()
@@ -79,14 +76,14 @@ only_id = None
 if '--id' in args:
     only_id = args[args.index('--id')+1]
     args = [a for a in args if a not in ('--id', only_id)]
-log_path = None
-if '--log' in args:
-    log_path = args[args.index('--log')+1]
-    args = [a for a in args if a not in ('--log', log_path)]
-postgres = '--postgres' in args; args = [a for a in args if a != '--postgres']
-to_postgres = None
-if postgres:
-    from transpile import to_postgres      # transpile Snowflake → PostgreSQL before elaborating
+# `--failed`: re-check only the (id, variant) pairs currently listed as failed in status.json (fast;
+# does NOT overwrite the full census — use a plain run for that).
+failed_only = '--failed' in args; args = [a for a in args if a != '--failed']
+only_pairs = None
+if failed_only:
+    st = json.load(open(os.path.join(HERE, "status.json")))
+    only_pairs = {(e["id"], e["variant"]) for e in st["failed"]}
+    all_variants = True
 N = int(args[0]) if args else 10**9
 
 # ---- select (record-index, variant-index, sql) triples ----
@@ -104,9 +101,8 @@ for i, r in enumerate(recs):
     idxs = range(len(variants)) if all_variants else [0]
     picked = False
     for k in idxs:
-        q = variants[k]['sql']
-        if to_postgres is not None:
-            q, _terr = to_postgres(q)          # canonicalise to PostgreSQL; check constructs post-transpile
+        if only_pairs is not None and (r.get('instance_id','?'), k) not in only_pairs: continue
+        q, _terr = to_postgres(variants[k]['sql'])   # canonicalise to PostgreSQL, then classify
         c = unsupported_construct(q)
         if c: skipped.append((r.get('instance_id','?'), k, q, c)); continue
         tables = parse_ddl(r.get('ddl',''))
@@ -128,6 +124,10 @@ for j, (i, k, q, tables, iid) in enumerate(jobs):
     seen = {}
     for name, cols in tables:
         if name not in seen: seen[name] = cols
+    # Emit only the tables the query references — a record's DDL can carry hundreds of unused tables,
+    # which makes `sql%` elaboration crawl. Fall back to all if none match (e.g. bare `*`).
+    ql = q.lower()
+    seen = {n: c for n, c in seen.items() if re.search(r'\b'+re.escape(n.lower())+r'\b', ql)} or seen
     lines.append(f'namespace R{i}_{k}')
     for name, cols in seen.items():
         lines.append(f'CREATE TABLE {name} ({", ".join(f"«{c}» {t}" for c,t in cols)})')
@@ -192,7 +192,7 @@ for j, (i, k, q, tables, iid) in enumerate(jobs):
 
 print(f"\n{'='*60}")
 print(f"ELABORATES OK: {ok}/{len(jobs)}   COMPILE ERRORS: {len(jobs)-ok}")
-from collections import Counter, defaultdict
+from collections import Counter
 def kind(msg):
     # bucket an error by ROOT CAUSE (coarse), so failures group for fixing one class at a time
     m = ' '.join(msg.split())
@@ -206,41 +206,44 @@ def kind(msg):
 c = Counter(kind(m) for m in errs.values())
 print("error kinds:", dict(c.most_common(15)))
 
-# ---- verbose grouped failures log ----
-if log_path:
-    groups = defaultdict(list)          # error-kind -> [(iid, k, q, msg)]
-    for j, (i, k, q, tables, iid) in enumerate(jobs):
-        if j in errs: groups[kind(errs[j])].append((iid, k, q, errs[j], j))
-    subc = Counter(c for _, _, _, c in skipped)   # unsupported-construct breakdown
-    total = ok + (len(jobs) - ok) + len(skipped)
-    L = []
-    bar = '=' * 70
-    L += [bar, f" crossskill elaboration census — {total} queries ({len(recs)} records)", bar, '']
-    L += [f"[*] ELABORATES OK: {ok}/{total}",
-          f"[*] COMPILE ERRORS (attempted, failed): {len(jobs)-ok}",
-          f"[*] UNSUPPORTED (not attempted — RECURSIVE/LATERAL/FLATTEN): {len(skipped)}",
-          f"    ( {ok} + {len(jobs)-ok} + {len(skipped)} = {total} )", '',
-          "[*] Failure categories (root cause, most common first):"]
-    for kd, cnt in sorted(((k, len(v)) for k, v in groups.items()), key=lambda x: -x[1]):
-        L.append(f"    {cnt:4d}x  {kd}")
-    for cst, cnt in subc.most_common():
-        L.append(f"    {cnt:4d}x  unsupported: {cst} (not attempted)")
-    L += ['', bar, ' FAILURES BY CATEGORY (attempted)', bar]
-    for kd, cnt in sorted(((k, len(v)) for k, v in groups.items()), key=lambda x: -x[1]):
-        L += ['', f"### [{cnt}x]  {kd}", '']
-        for iid, k, q, msg, j in groups[kd]:
-            L.append(f"[compile_fail] {iid} variant[{k}]")
-            L.append(f"    SQL:       {re.sub(chr(10),' ',q)[:220]}")
-            L.append(f"    CONVERTED: {conv.get(j,'<not captured>')[:220]}")
-            L.append(f"    ERROR:     {msg[:400]}")
-    L += ['', bar, ' UNSUPPORTED CONSTRUCTS (not attempted)', bar]
-    for cst, _ in subc.most_common():
-        L += ['', f"### [{subc[cst]}x]  unsupported: {cst}", '']
-        for iid, k, q, c in [s for s in skipped if s[3] == cst]:
-            L.append(f"[unsupported] {iid} variant[{k}]  ({c})")
-            L.append(f"    SQL:       {re.sub(chr(10),' ',q)[:220]}")
-    open(log_path, 'w').write('\n'.join(L) + '\n')
-    print(f"[*] verbose grouped census -> {log_path}  ({ok} ok, {len(jobs)-ok} fail, {len(skipped)} unsupported)")
+# `--failed`: targeted recheck of the previously-failed set — report the delta, don't touch status.json.
+if failed_only:
+    now_ok = [(iid, k) for j, (i, k, q, tables, iid) in enumerate(jobs) if j not in errs]
+    print(f"\n[*] of {len(jobs)} previously-failed: {len(now_ok)} now elaborate, {len(jobs)-len(now_ok)} still fail")
+    if now_ok:
+        print("    now OK:", ', '.join(f"{iid}[{k}]" for iid, k in sorted(now_ok)))
+    os.remove(path)
+    sys.exit(len(jobs) - ok)
+
+# ---- single machine-written status JSON (never hand-edited; errors come straight from Lean) ----
+# The one source of truth for corpus status. Overwrites Bench/CrossSkill/status.json each run.
+status = {
+    "note": ("Elaboration census of the crossskill corpus (queries canonicalised to PostgreSQL). "
+             "'elaborates' = parses and type-checks into a TypedRelation; 'failed' = attempted but "
+             "Lean reported an error (see per-problem 'error'); 'unsupported' = a construct the parser "
+             "does not accept yet (RECURSIVE/LATERAL/FLATTEN), not attempted."),
+    "corpus": "crossskill (Snowflake) transpiled to PostgreSQL on the fly",
+    "summary": {
+        "total": ok + (len(jobs) - ok) + len(skipped),
+        "elaborates": ok,
+        "failed": len(jobs) - ok,
+        "unsupported": len(skipped),
+    },
+    "failure_categories": dict(Counter(kind(m) for m in errs.values()).most_common()),
+    "unsupported_constructs": dict(Counter(c for _, _, _, c in skipped).most_common()),
+    "failed": sorted(
+        ({"id": iid, "variant": k, "category": kind(errs[j]), "error": errs[j],
+          "sql": re.sub(chr(10), ' ', q)[:300]}
+         for j, (i, k, q, tables, iid) in enumerate(jobs) if j in errs),
+        key=lambda e: (e["category"], e["id"], e["variant"])),
+    "unsupported": sorted(
+        ({"id": iid, "variant": k, "construct": c, "sql": re.sub(chr(10), ' ', q)[:300]}
+         for (iid, k, q, c) in skipped),
+        key=lambda e: (e["construct"], e["id"], e["variant"])),
+}
+out_path = os.path.join(HERE, "status.json")
+open(out_path, 'w').write(json.dumps(status, indent=2) + "\n")
+print(f"[*] status -> {out_path}  ({ok} elaborate, {len(jobs)-ok} failed, {len(skipped)} unsupported)")
 
 os.remove(path)
 sys.exit(len(jobs) - ok)

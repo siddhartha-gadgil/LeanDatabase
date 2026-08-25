@@ -104,6 +104,47 @@ theorem restriction_congr (p q : TypedTuple colType → Bool) (R : TypedRelation
     (h : ∀ t ∈ R.rows, p t = q t) : restriction p R = restriction q R := by
   grind only [= restriction.eq_1, Finset.filter_congr]
 
+/-! ### Optimizer-inspired `WHERE` rewrites (proven; `sqlglot.optimizer.simplify` counterparts)
+
+`sql_equiv`'s `grind` already folds predicate-level boolean/comparison rules (`x>3 ∧ x>5 ≡ x>5`,
+`a ∧ (a∨b) ≡ a`, De Morgan…). These are the *general* forms that also hold for **opaque** predicates,
+where `grind` can't reason inside — discharged instead from an implication/equality, exactly like the
+`UNIQUE`/`FUNCDEP`/`BIJECTION` `HYPOTHESIS` facts feed `restriction_congr`. Each carries a `grind_pattern`
+so `grind +locals` fires it when the side condition is available (e.g. from a stated `HYPOTHESIS`). -/
+
+/-- **Absorb a weaker conjunct** (`sqlglot`: `absorb_and_eliminate` + `_simplify_comparison`). If
+`p ⟹ q` on every row, `σ_{p∧q} = σ_p` — generalises comparison-range merging and AND-absorption to any
+predicates (incl. opaque), given the implication as a side condition. -/
+@[simp]
+theorem restriction_absorb_and (p q : TypedTuple colType → Bool) (R : TypedRelation colType)
+    (h : ∀ t ∈ R.rows, p t = true → q t = true) :
+    restriction (fun t => p t && q t) R = restriction p R := by
+  apply restriction_congr; intro t ht
+  cases hp : p t with
+  | false => simp [hp]
+  | true => simp [hp, h t ht hp]
+
+/-- **Absorb into a stronger disjunct** (`sqlglot`: `absorb_and_eliminate`). If `p ⟹ q` on every row,
+`σ_{p∨q} = σ_q`. -/
+@[simp]
+theorem restriction_absorb_or (p q : TypedTuple colType → Bool) (R : TypedRelation colType)
+    (h : ∀ t ∈ R.rows, p t = true → q t = true) :
+    restriction (fun t => p t || q t) R = restriction q R := by
+  apply restriction_congr; intro t ht
+  cases hp : p t with
+  | false => simp [hp]
+  | true => simp [hp, h t ht hp]
+
+/-- **Constant propagation** (`sqlglot`: `propagate_constants`). Under `k = c`, replace `k` by `c` inside
+any (even opaque) predicate `φ`: `σ_{k=c ∧ φ(k)} = σ_{k=c ∧ φ(c)}` — what `grind` cannot do when `φ` is
+uninterpreted. -/
+theorem restriction_const_prop {α : Type} [DecidableEq α]
+    (k : TypedTuple colType → α) (c : α) (φ : α → Bool) (R : TypedRelation colType) :
+    restriction (fun t => decide (k t = c) && φ (k t)) R
+      = restriction (fun t => decide (k t = c) && φ c) R := by
+  apply restriction_congr; intro t _
+  by_cases hk : k t = c <;> simp [hk]
+
 
 attribute [grind =]
   restriction_idempotence          -- σ_p(σ_p R) = σ_p R

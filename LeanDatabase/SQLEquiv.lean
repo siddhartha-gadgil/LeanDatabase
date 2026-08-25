@@ -111,6 +111,12 @@ macro "sql_equiv" : tactic => `(tactic|
      | sql_bijection
      | sql_funcdep
      | sql_project
+     -- WHERE-congruence: reduce `σ_p R = σ_q R` to the per-row predicate equality `p t = q t`, which
+     -- `grind +locals` then closes — this is where optimizer-style rewrites land (constant propagation
+     -- into opaque scalars, absorption/comparison-merge under a HYPOTHESIS). See `restriction_*` in
+     -- SQLToolbox. Must precede `TypedRelation.ext`, which would first split off `.rows` and hide the
+     -- `σ_p R = σ_q R` shape.
+     | refine restriction_congr _ _ _ (fun _ _ => ?_)
      | (apply TypedRelation.ext <;> try rfl)
      | refine Finset.filter_congr (fun _ _ => ?_)
      | refine Finset.image_congr (fun _ _ => ?_)

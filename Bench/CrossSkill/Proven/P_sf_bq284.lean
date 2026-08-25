@@ -18,6 +18,6 @@ namespace P_sf_bq284
 CREATE TABLE FULLTEXT («body» STRING, «title» STRING, «filename» STRING, «category» STRING)
 
 theorem eq_0_3 (t : TableRel FULLTEXT_schema) :
-    (sql%([FULLTEXT_schema]) "SELECT \n    \"category\",\n    COUNT(*) AS NUMBER_TOTAL_BY_CATEGORY,\n    ROUND(\n        SUM(CASE WHEN LOWER(\"body\") LIKE '%education%' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), \n        6\n    ) AS PERCENT_EDUCATION\nFROM \"BBC\".\"BBC_NEWS\".\"FULLTEXT\"\nGROUP BY \"category\"\nORDER BY \"category\";") t = (sql%([FULLTEXT_schema]) "SELECT\n  \"category\",\n  COUNT(*) AS NUMBER_TOTAL_BY_CATEGORY,\n  ROUND(100.0 * SUM(CASE WHEN LOWER(\"body\") LIKE '%education%' THEN 1 ELSE 0 END) / COUNT(*), 6) AS PERCENT_EDUCATION\nFROM \"BBC\".\"BBC_NEWS\".\"FULLTEXT\"\nGROUP BY \"category\"\nORDER BY \"category\";") t := by sql_equiv
+    (sql%([FULLTEXT_schema]) "SELECT \"category\", COUNT(*) AS NUMBER_TOTAL_BY_CATEGORY, ROUND(CAST(CAST(SUM(CASE WHEN LOWER(\"body\") LIKE '%education%' THEN 1 ELSE 0 END) * 100.0 AS DOUBLE PRECISION) / COUNT(*) AS DECIMAL), 6) AS PERCENT_EDUCATION FROM \"BBC\".\"BBC_NEWS\".\"FULLTEXT\" GROUP BY \"category\" ORDER BY \"category\"") t = (sql%([FULLTEXT_schema]) "SELECT \"category\", COUNT(*) AS NUMBER_TOTAL_BY_CATEGORY, ROUND(CAST(CAST(100.0 * SUM(CASE WHEN LOWER(\"body\") LIKE '%education%' THEN 1 ELSE 0 END) AS DOUBLE PRECISION) / COUNT(*) AS DECIMAL), 6) AS PERCENT_EDUCATION FROM \"BBC\".\"BBC_NEWS\".\"FULLTEXT\" GROUP BY \"category\" ORDER BY \"category\"") t := by sql_equiv
 
 end P_sf_bq284

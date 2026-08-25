@@ -59,8 +59,8 @@ opaque dateAdd (unit : String) (n : Int) (d : String) : String := d
 opaque lastDay (d : String) : String := d
 
 /-- Date/timestamp construction and truncation — dates are `String`s, so these are `String`-valued. -/
-opaque toDate (x : String) : String := x
-opaque toTimestamp (x : String) : String := x
+opaque toDate {α : Type} (x : α) : String := ""       -- accepts a string or an epoch number
+opaque toTimestamp {α : Type} (x : α) : String := ""  -- `TO_TIMESTAMP(epoch)` / `TO_TIMESTAMP(str)`
 opaque nowVal : String := ""
 opaque toChar {α : Type} (x : α) : String := ""
 opaque toNumber {α : Type} (x : α) : Rat := 0
@@ -235,6 +235,23 @@ opaque toBoolOpaque {α : Type} (x : α) : Bool := false
 /-- Casts to string — opaque, per source type. -/
 opaque intToStr (x : Int) : String := ""
 opaque floatToStr (x : Rat) : String := ""
+
+/-- `||` string concatenation over mixed operand types (PostgreSQL/ANSI). Lean's `||` is hard-wired to
+boolean `or`, so we add an **overloaded** `||` notation: `SqlConcatArg` coerces each operand to `String`
+(opaque for numbers) and `sqlConcat` folds them via `concat`. For `Bool` operands neither `SqlConcatArg`
+instance applies, so the elaborator falls back to boolean `or` — both meanings coexist. -/
+class SqlConcatArg (α : Type) where toStr : α → String
+instance : SqlConcatArg String := ⟨id⟩
+instance : SqlConcatArg Int := ⟨intToStr⟩
+instance : SqlConcatArg Rat := ⟨floatToStr⟩
+def sqlConcat {α β : Type} [SqlConcatArg α] [SqlConcatArg β] (a : α) (b : β) : String :=
+  concat (SqlConcatArg.toStr a) (SqlConcatArg.toStr b)
+@[inherit_doc] infixl:30 " || " => sqlConcat
+
+/-- Date/timestamp subtraction `a - b` (dates are `String` in our model) → an opaque interval count.
+`-` is typeclass-based (`HSub`), so this needs no notation overload. -/
+opaque dateSub (a b : String) : Int := 0
+instance : HSub String String Int := ⟨dateSub⟩
 
 /-- Order-dependent window functions (`ROW_NUMBER`/`RANK`/`LAG`/… ) — opaque, since a `Finset` has no
 row order to define them. `spec` bundles a per-function marker plus the args and PARTITION BY/ORDER BY
