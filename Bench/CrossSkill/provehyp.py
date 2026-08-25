@@ -13,7 +13,11 @@ from concurrent.futures import ThreadPoolExecutor
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 GEN  = os.path.join(ROOT, ".genhyp")
-recs = [json.loads(l) for l in open(os.path.join(HERE, "crossskill_equivalent_sql.jsonl")) if l.strip()]
+# Canonical corpus is PostgreSQL (transpiled from Snowflake by to_postgres_corpus.py); fall back
+# to the raw Snowflake corpus if the Postgres one has not been generated yet.
+_PG = os.path.join(HERE, "crossskill_equivalent_postgres.jsonl")
+_CORPUS = _PG if os.path.exists(_PG) else os.path.join(HERE, "crossskill_equivalent_sql.jsonl")
+recs = [json.loads(l) for l in open(_CORPUS) if l.strip()]
 
 def maptype(t):
     t = t.upper()

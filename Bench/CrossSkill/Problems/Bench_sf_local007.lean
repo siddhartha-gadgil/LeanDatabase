@@ -19,18 +19,16 @@ namespace Bench_sf_local007
 
 CREATE TABLE PLAYER («player_id» STRING, «birth_year» STRING, «birth_month» STRING, «birth_day» STRING, «birth_country» STRING, «birth_state» STRING, «birth_city» STRING, «death_year» STRING, «death_month» STRING, «death_day» STRING, «death_country» STRING, «death_state» STRING, «death_city» STRING, «name_first» STRING, «name_last» STRING, «name_given» STRING, «weight» STRING, «height» STRING, «bats» STRING, «throws» STRING, «debut» STRING, «final_game» STRING, «retro_id» STRING, «bbref_id» STRING)
 
-HYPOTHESIS hyp0_1_0 : PLAYER "\"FINAL_GAME\" IS NOT NULL"
-theorem eq_0_1 (t : TableRel PLAYER_schema) (h0 : hyp0_1_0 t) :
-    (sql%([PLAYER_schema]) "SELECT AVG(DATEDIFF('day', \"DEBUT\", \"FINAL_GAME\") / 365.0) AS \"AVG_CAREER_SPAN\"\nFROM \"BASEBALL\".\"BASEBALL\".\"PLAYER\"\nWHERE \"DEBUT\" IS NOT NULL AND \"FINAL_GAME\" IS NOT NULL") t ~= (sql%([PLAYER_schema]) "SELECT \n  AVG(DATEDIFF('day', \"DEBUT\", \"FINAL_GAME\") / 365.0) AS \"AVERAGE_CAREER_SPAN_YEARS\"\nFROM \"BASEBALL\".\"BASEBALL\".\"PLAYER\"\nWHERE \"DEBUT\" IS NOT NULL \n  AND \"FINAL_GAME\" IS NOT NULL;") t := by
-  first | sql_equiv | sorry
+theorem eq_0_1 : ∀ t,
+    (sql%([PLAYER_schema]) "SELECT AVG(CAST((CAST(\"FINAL_GAME\" AS DATE) - CAST(\"DEBUT\" AS DATE)) AS DOUBLE PRECISION) / 365.0) AS \"AVG_CAREER_SPAN\" FROM \"BASEBALL\".\"BASEBALL\".\"PLAYER\" WHERE NOT \"DEBUT\" IS NULL AND NOT \"FINAL_GAME\" IS NULL") t ~= (sql%([PLAYER_schema]) "SELECT AVG(CAST((CAST(\"FINAL_GAME\" AS DATE) - CAST(\"DEBUT\" AS DATE)) AS DOUBLE PRECISION) / 365.0) AS \"AVERAGE_CAREER_SPAN_YEARS\" FROM \"BASEBALL\".\"BASEBALL\".\"PLAYER\" WHERE NOT \"DEBUT\" IS NULL AND NOT \"FINAL_GAME\" IS NULL") t := by
+  intro t; first | sql_equiv | sorry
 
-HYPOTHESIS hyp0_2_0 : PLAYER "\"FINAL_GAME\" IS NOT NULL"
-theorem eq_0_2 (t : TableRel PLAYER_schema) (h0 : hyp0_2_0 t) :
-    (sql%([PLAYER_schema]) "SELECT AVG(DATEDIFF('day', \"DEBUT\", \"FINAL_GAME\") / 365.0) AS \"AVG_CAREER_SPAN\"\nFROM \"BASEBALL\".\"BASEBALL\".\"PLAYER\"\nWHERE \"DEBUT\" IS NOT NULL AND \"FINAL_GAME\" IS NOT NULL") t ~= (sql%([PLAYER_schema]) "SELECT\n    ROUND(AVG(DATEDIFF('day', \"DEBUT\", \"FINAL_GAME\") / 365.0), 12) AS \"AVERAGE_CAREER_SPAN_YEARS\"\nFROM \"BASEBALL\".\"BASEBALL\".\"PLAYER\"\nWHERE \"DEBUT\" IS NOT NULL AND \"FINAL_GAME\" IS NOT NULL;") t := by
-  first | sql_equiv | sorry
+theorem eq_0_2 : ∀ t,
+    (sql%([PLAYER_schema]) "SELECT AVG(CAST((CAST(\"FINAL_GAME\" AS DATE) - CAST(\"DEBUT\" AS DATE)) AS DOUBLE PRECISION) / 365.0) AS \"AVG_CAREER_SPAN\" FROM \"BASEBALL\".\"BASEBALL\".\"PLAYER\" WHERE NOT \"DEBUT\" IS NULL AND NOT \"FINAL_GAME\" IS NULL") t ~= (sql%([PLAYER_schema]) "SELECT ROUND(CAST(AVG(CAST((CAST(\"FINAL_GAME\" AS DATE) - CAST(\"DEBUT\" AS DATE)) AS DOUBLE PRECISION) / 365.0) AS DECIMAL), 12) AS \"AVERAGE_CAREER_SPAN_YEARS\" FROM \"BASEBALL\".\"BASEBALL\".\"PLAYER\" WHERE NOT \"DEBUT\" IS NULL AND NOT \"FINAL_GAME\" IS NULL") t := by
+  intro t; first | sql_equiv | sorry
 
 theorem eq_1_2 :
-    sql%([PLAYER_schema]) "SELECT \n  AVG(DATEDIFF('day', \"DEBUT\", \"FINAL_GAME\") / 365.0) AS \"AVERAGE_CAREER_SPAN_YEARS\"\nFROM \"BASEBALL\".\"BASEBALL\".\"PLAYER\"\nWHERE \"DEBUT\" IS NOT NULL \n  AND \"FINAL_GAME\" IS NOT NULL;" = sql%([PLAYER_schema]) "SELECT\n    ROUND(AVG(DATEDIFF('day', \"DEBUT\", \"FINAL_GAME\") / 365.0), 12) AS \"AVERAGE_CAREER_SPAN_YEARS\"\nFROM \"BASEBALL\".\"BASEBALL\".\"PLAYER\"\nWHERE \"DEBUT\" IS NOT NULL AND \"FINAL_GAME\" IS NOT NULL;" := by
+    sql%([PLAYER_schema]) "SELECT AVG(CAST((CAST(\"FINAL_GAME\" AS DATE) - CAST(\"DEBUT\" AS DATE)) AS DOUBLE PRECISION) / 365.0) AS \"AVERAGE_CAREER_SPAN_YEARS\" FROM \"BASEBALL\".\"BASEBALL\".\"PLAYER\" WHERE NOT \"DEBUT\" IS NULL AND NOT \"FINAL_GAME\" IS NULL" = sql%([PLAYER_schema]) "SELECT ROUND(CAST(AVG(CAST((CAST(\"FINAL_GAME\" AS DATE) - CAST(\"DEBUT\" AS DATE)) AS DOUBLE PRECISION) / 365.0) AS DECIMAL), 12) AS \"AVERAGE_CAREER_SPAN_YEARS\" FROM \"BASEBALL\".\"BASEBALL\".\"PLAYER\" WHERE NOT \"DEBUT\" IS NULL AND NOT \"FINAL_GAME\" IS NULL" := by
   first | sql_equiv | sorry
 
 end Bench_sf_local007

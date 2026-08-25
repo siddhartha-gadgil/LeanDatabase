@@ -572,6 +572,28 @@ scalar3 "DATE_ADD" "dateAdd"
 scalar2 "ARRAY_TO_STRING" "arrayToString"
 scalar2 "VARIANTGET" "variantGet"
 
+/-! ### PostgreSQL canonical-dialect forms
+
+Everything above is the Snowflake-oriented surface (kept for direct Snowflake input). Since the prover's
+canonical dialect is now PostgreSQL — every source dialect is transpiled to it via sqlglot — the forms
+below are what sqlglot *emits*, and must parse too. They reuse the same opaque scalar bodies. -/
+scalar2 "ST_POINT" "stMakePoint"        -- PG spelling of Snowflake ST_MAKEPOINT
+scalar1 "ST_ASTEXT" "stAsText"
+scalar2 "JSON_EXTRACT_PATH" "getPath"   -- PG spelling of Snowflake GET_PATH
+scalar2 "ARRAY_LENGTH" "arrayLength"
+
+-- `EXTRACT(field FROM x)` (PG) — opaque `extractOf "FIELD" x`; `field` is a bare keyword (YEAR/MONTH/…).
+macro:max "EXTRACT" "(" f:ident "FROM" x:term ")" : term => do
+  let fs := Syntax.mkStrLit f.getId.toString.toUpper
+  `($(mkIdent `LeanDatabase.Scalar.extractOf) $fs $x)
+
+-- `SUBSTRING(x FROM n [FOR m])` (PG/ANSI) — reuses the Snowflake `substr`/`substr2` bodies.
+syntax:max "SUBSTRING" "(" term "FROM" term "FOR" term ")" : term
+syntax:max "SUBSTRING" "(" term "FROM" term ")" : term
+macro_rules
+  | `(SUBSTRING($x FROM $n FOR $m)) => `($(mkIdent `LeanDatabase.Scalar.substr) $x $n $m)
+  | `(SUBSTRING($x FROM $n))        => `($(mkIdent `LeanDatabase.Scalar.substr2) $x $n)
+
 /-! ## Window functions (order-dependent ⇒ opaque)
 
 `ROW_NUMBER`/`RANK`/`DENSE_RANK`/`LAG`/`LEAD` over `(PARTITION BY … ORDER BY …)` elaborate to the opaque

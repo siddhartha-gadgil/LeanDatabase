@@ -105,6 +105,10 @@ opaque stMakePoint {α : Type} (a b : α) : String := ""
 opaque haversine {α : Type} (a b c d : α) : Rat := 0
 opaque arraySize (x : String) : Int := 0
 opaque toGeography (x : String) : String := x
+-- PostgreSQL canonical-dialect opaque scalars (sqlglot emits these when transpiling from any dialect).
+opaque stAsText {α : Type} (x : α) : String := ""            -- ST_ASTEXT(geom)
+opaque arrayLength (x : String) (dim : Int) : Int := 0       -- ARRAY_LENGTH(arr, dim)
+opaque extractOf {α : Type} (field : String) (x : α) : Int := 0  -- EXTRACT(field FROM x)
 opaque toTimestamp2 {α : Type} (x : α) (scale : Int) : String := ""
 opaque dateFromParts {α : Type} (y m d : α) : String := ""
 opaque stIntersects {α : Type} (a b : α) : Bool := false

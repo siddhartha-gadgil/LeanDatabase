@@ -21,7 +21,7 @@ CREATE TABLE INTERNATIONAL_DEBT («country_name» STRING, «country_code» STRIN
 
 HYPOTHESIS bij0_1_0 : INTERNATIONAL_DEBT BIJECTION «indicator_name» «indicator_code»
 theorem eq_0_1 (t : TableRel INTERNATIONAL_DEBT_schema) (h0 : bij0_1_0 t) :
-    (sql%([INTERNATIONAL_DEBT_schema]) "SELECT COUNT(DISTINCT \"indicator_name\") AS number_of_indicators_with_zero\nFROM \"WORLD_BANK\".\"WORLD_BANK_INTL_DEBT\".\"INTERNATIONAL_DEBT\"\nWHERE \"country_name\" = 'Russian Federation'\n  AND \"value\" = 0;") t = (sql%([INTERNATIONAL_DEBT_schema]) "SELECT\n  COUNT(DISTINCT \"indicator_code\") AS \"number_of_indicators_with_zero\"\nFROM \"WORLD_BANK\".\"WORLD_BANK_INTL_DEBT\".\"INTERNATIONAL_DEBT\"\nWHERE \"country_name\" = 'Russian Federation'\n  AND \"value\" = 0;") t := by
+    (sql%([INTERNATIONAL_DEBT_schema]) "SELECT COUNT(DISTINCT \"indicator_name\") AS number_of_indicators_with_zero FROM \"WORLD_BANK\".\"WORLD_BANK_INTL_DEBT\".\"INTERNATIONAL_DEBT\" WHERE \"country_name\" = 'Russian Federation' AND \"value\" = 0") t = (sql%([INTERNATIONAL_DEBT_schema]) "SELECT COUNT(DISTINCT \"indicator_code\") AS \"number_of_indicators_with_zero\" FROM \"WORLD_BANK\".\"WORLD_BANK_INTL_DEBT\".\"INTERNATIONAL_DEBT\" WHERE \"country_name\" = 'Russian Federation' AND \"value\" = 0") t := by
   first | sql_equiv | sorry
 
 end Bench_sf_bq327

@@ -3,6 +3,7 @@
 # Cross-skill SQL-equivalence instance files (not pushed)
 **/CrossSkill/Sf*.lean
 **/CrossSkill/crossskill_equivalent_sql.jsonl
+**/CrossSkill/crossskill_equivalent_postgres.jsonl
 
 # Auto-generated per-record proof files (experimental, run individually via lake env lean)
 **/CrossSkill/generated/
@@ -14,4 +15,4 @@
 /run9.log
 **/CrossSkill/run9.py
 .env
-Bench/CrossSkill/__pycache__
+**/__pycache__/**

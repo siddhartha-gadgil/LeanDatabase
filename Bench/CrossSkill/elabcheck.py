@@ -18,7 +18,11 @@ import json, re, os, sys, subprocess
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
-recs = [json.loads(l) for l in open(os.path.join(HERE, "crossskill_equivalent_sql.jsonl")) if l.strip()]
+# Canonical corpus is PostgreSQL (transpiled from Snowflake by to_postgres_corpus.py); fall back
+# to the raw Snowflake corpus if the Postgres one has not been generated yet.
+_PG = os.path.join(HERE, "crossskill_equivalent_postgres.jsonl")
+_CORPUS = _PG if os.path.exists(_PG) else os.path.join(HERE, "crossskill_equivalent_sql.jsonl")
+recs = [json.loads(l) for l in open(_CORPUS) if l.strip()]
 
 def maptype(t):
     t = t.upper()
@@ -62,8 +66,10 @@ def parse_ddl(ddl):
 def esc(q): return q.replace('\\','\\\\').replace('"','\\"').replace('\n','\\n')
 
 def is_window(q):
-    u = q.upper().replace(' ','')
-    return 'OVER(' in u or 'ROW_NUMBER' in u or 'RANK()' in u or 'WITHRECURSIVE' in u
+    # Only RECURSIVE CTE / LATERAL / FLATTEN are still unsupported; plain window functions and
+    # non-recursive CTEs now elaborate, so check them too (a failure is a real one to fix).
+    u = q.upper()
+    return 'WITH RECURSIVE' in u or 'LATERAL' in u or 'FLATTEN' in u
 
 # ---- argument parsing ----
 args = sys.argv[1:]
@@ -73,10 +79,25 @@ only_id = None
 if '--id' in args:
     only_id = args[args.index('--id')+1]
     args = [a for a in args if a not in ('--id', only_id)]
+log_path = None
+if '--log' in args:
+    log_path = args[args.index('--log')+1]
+    args = [a for a in args if a not in ('--log', log_path)]
+postgres = '--postgres' in args; args = [a for a in args if a != '--postgres']
+to_postgres = None
+if postgres:
+    from transpile import to_postgres      # transpile Snowflake → PostgreSQL before elaborating
 N = int(args[0]) if args else 10**9
 
 # ---- select (record-index, variant-index, sql) triples ----
 jobs = []
+skipped = []   # (iid, k, sql, construct) — not attempted (parser can't yet handle the construct)
+def unsupported_construct(q):
+    u = q.upper()
+    if 'WITH RECURSIVE' in u: return 'WITH RECURSIVE'
+    if 'LATERAL' in u: return 'LATERAL'
+    if 'FLATTEN' in u: return 'FLATTEN'
+    return None
 for i, r in enumerate(recs):
     if only_id and r.get('instance_id') != only_id: continue
     variants = r['equivalent_sqls']
@@ -84,7 +105,10 @@ for i, r in enumerate(recs):
     picked = False
     for k in idxs:
         q = variants[k]['sql']
-        if is_window(q): continue
+        if to_postgres is not None:
+            q, _terr = to_postgres(q)          # canonicalise to PostgreSQL; check constructs post-transpile
+        c = unsupported_construct(q)
+        if c: skipped.append((r.get('instance_id','?'), k, q, c)); continue
         tables = parse_ddl(r.get('ddl',''))
         if not tables: continue
         jobs.append((i, k, q, tables, r.get('instance_id','?')))
@@ -168,10 +192,55 @@ for j, (i, k, q, tables, iid) in enumerate(jobs):
 
 print(f"\n{'='*60}")
 print(f"ELABORATES OK: {ok}/{len(jobs)}   COMPILE ERRORS: {len(jobs)-ok}")
-if quiet or True:
-    from collections import Counter
-    c = Counter(re.sub(r"'[^']*'", "'X'", re.sub(r'[0-9]+','N',m.split(':')[0])) for m in errs.values())
-    print("error kinds:", dict(c.most_common()))
+from collections import Counter, defaultdict
+def kind(msg):
+    # bucket an error by ROOT CAUSE (coarse), so failures group for fixing one class at a time
+    m = ' '.join(msg.split())
+    if m.startswith('Failed to parse type in AS clause'): return 'parse: AS-clause alias/expression'
+    if re.match(r'Failed to parse SQL query:\s*WITH', m):  return 'parse: WITH / CTE'
+    if re.match(r'Failed to parse SQL query:\s*SELECT', m): return 'parse: SELECT body'
+    if m.startswith('Failed to parse SQL query'):          return 'parse: other (empty/unknown)'
+    if 'timeout at' in m or 'heartbeats' in m:             return 'elaboration timeout (heartbeats)'
+    # fall back to a normalised head (strip quoted names + numbers)
+    return re.sub(r"'[^']*'", "'X'", re.sub(r'[0-9]+', 'N', m))[:90]
+c = Counter(kind(m) for m in errs.values())
+print("error kinds:", dict(c.most_common(15)))
+
+# ---- verbose grouped failures log ----
+if log_path:
+    groups = defaultdict(list)          # error-kind -> [(iid, k, q, msg)]
+    for j, (i, k, q, tables, iid) in enumerate(jobs):
+        if j in errs: groups[kind(errs[j])].append((iid, k, q, errs[j], j))
+    subc = Counter(c for _, _, _, c in skipped)   # unsupported-construct breakdown
+    total = ok + (len(jobs) - ok) + len(skipped)
+    L = []
+    bar = '=' * 70
+    L += [bar, f" crossskill elaboration census — {total} queries ({len(recs)} records)", bar, '']
+    L += [f"[*] ELABORATES OK: {ok}/{total}",
+          f"[*] COMPILE ERRORS (attempted, failed): {len(jobs)-ok}",
+          f"[*] UNSUPPORTED (not attempted — RECURSIVE/LATERAL/FLATTEN): {len(skipped)}",
+          f"    ( {ok} + {len(jobs)-ok} + {len(skipped)} = {total} )", '',
+          "[*] Failure categories (root cause, most common first):"]
+    for kd, cnt in sorted(((k, len(v)) for k, v in groups.items()), key=lambda x: -x[1]):
+        L.append(f"    {cnt:4d}x  {kd}")
+    for cst, cnt in subc.most_common():
+        L.append(f"    {cnt:4d}x  unsupported: {cst} (not attempted)")
+    L += ['', bar, ' FAILURES BY CATEGORY (attempted)', bar]
+    for kd, cnt in sorted(((k, len(v)) for k, v in groups.items()), key=lambda x: -x[1]):
+        L += ['', f"### [{cnt}x]  {kd}", '']
+        for iid, k, q, msg, j in groups[kd]:
+            L.append(f"[compile_fail] {iid} variant[{k}]")
+            L.append(f"    SQL:       {re.sub(chr(10),' ',q)[:220]}")
+            L.append(f"    CONVERTED: {conv.get(j,'<not captured>')[:220]}")
+            L.append(f"    ERROR:     {msg[:400]}")
+    L += ['', bar, ' UNSUPPORTED CONSTRUCTS (not attempted)', bar]
+    for cst, _ in subc.most_common():
+        L += ['', f"### [{subc[cst]}x]  unsupported: {cst}", '']
+        for iid, k, q, c in [s for s in skipped if s[3] == cst]:
+            L.append(f"[unsupported] {iid} variant[{k}]  ({c})")
+            L.append(f"    SQL:       {re.sub(chr(10),' ',q)[:220]}")
+    open(log_path, 'w').write('\n'.join(L) + '\n')
+    print(f"[*] verbose grouped census -> {log_path}  ({ok} ok, {len(jobs)-ok} fail, {len(skipped)} unsupported)")
 
 os.remove(path)
 sys.exit(len(jobs) - ok)

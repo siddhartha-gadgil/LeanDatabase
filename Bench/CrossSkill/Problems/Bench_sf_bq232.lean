@@ -20,17 +20,17 @@ namespace Bench_sf_bq232
 CREATE TABLE CRIME_BY_LSOA («lsoa_code» STRING, «borough» STRING, «major_category» STRING, «minor_category» STRING, «value» INT, «year» INT, «month» INT)
 
 theorem eq_0_1 :
-    sql%([CRIME_BY_LSOA_schema]) "SELECT\n    \"year\",\n    SUM(\"value\") AS YEAR_TOTAL\nFROM \"LONDON\".\"LONDON_CRIME\".\"CRIME_BY_LSOA\"\nWHERE \"borough\" = 'Westminster'\n  AND \"major_category\" = 'Theft and Handling'\n  AND \"minor_category\" = 'Other Theft'\nGROUP BY \"year\"\nORDER BY \"year\";" = sql%([CRIME_BY_LSOA_schema]) "SELECT\n    \"year\" AS \"year\",\n    SUM(\"value\") AS \"YEAR_TOTAL\"\nFROM \"LONDON\".\"LONDON_CRIME\".\"CRIME_BY_LSOA\"\nWHERE \"borough\" = 'Westminster'\n  AND \"major_category\" = 'Theft and Handling'\n  AND \"minor_category\" = 'Other Theft'\nGROUP BY \"year\"\nORDER BY \"year\";" := by
+    sql%([CRIME_BY_LSOA_schema]) "SELECT \"year\", SUM(\"value\") AS YEAR_TOTAL FROM \"LONDON\".\"LONDON_CRIME\".\"CRIME_BY_LSOA\" WHERE \"borough\" = 'Westminster' AND \"major_category\" = 'Theft and Handling' AND \"minor_category\" = 'Other Theft' GROUP BY \"year\" ORDER BY \"year\"" = sql%([CRIME_BY_LSOA_schema]) "SELECT \"year\" AS \"year\", SUM(\"value\") AS \"YEAR_TOTAL\" FROM \"LONDON\".\"LONDON_CRIME\".\"CRIME_BY_LSOA\" WHERE \"borough\" = 'Westminster' AND \"major_category\" = 'Theft and Handling' AND \"minor_category\" = 'Other Theft' GROUP BY \"year\" ORDER BY \"year\"" := by
   first | sql_equiv | sorry
 
 HYPOTHESIS hyp0_2_0 : CRIME_BY_LSOA "\"major_category\" = 'Theft and Handling'"
 theorem eq_0_2 (t : TableRel CRIME_BY_LSOA_schema) (h0 : hyp0_2_0 t) :
-    (sql%([CRIME_BY_LSOA_schema]) "SELECT\n    \"year\",\n    SUM(\"value\") AS YEAR_TOTAL\nFROM \"LONDON\".\"LONDON_CRIME\".\"CRIME_BY_LSOA\"\nWHERE \"borough\" = 'Westminster'\n  AND \"major_category\" = 'Theft and Handling'\n  AND \"minor_category\" = 'Other Theft'\nGROUP BY \"year\"\nORDER BY \"year\";") t = (sql%([CRIME_BY_LSOA_schema]) "SELECT\n    \"year\",\n    SUM(\"value\") AS YEAR_TOTAL\nFROM \"LONDON\".\"LONDON_CRIME\".\"CRIME_BY_LSOA\"\nWHERE \"borough\" = 'Westminster'\n  AND \"minor_category\" = 'Other Theft'\nGROUP BY \"year\"\nORDER BY \"year\";") t := by
+    (sql%([CRIME_BY_LSOA_schema]) "SELECT \"year\", SUM(\"value\") AS YEAR_TOTAL FROM \"LONDON\".\"LONDON_CRIME\".\"CRIME_BY_LSOA\" WHERE \"borough\" = 'Westminster' AND \"major_category\" = 'Theft and Handling' AND \"minor_category\" = 'Other Theft' GROUP BY \"year\" ORDER BY \"year\"") t = (sql%([CRIME_BY_LSOA_schema]) "SELECT \"year\", SUM(\"value\") AS YEAR_TOTAL FROM \"LONDON\".\"LONDON_CRIME\".\"CRIME_BY_LSOA\" WHERE \"borough\" = 'Westminster' AND \"minor_category\" = 'Other Theft' GROUP BY \"year\" ORDER BY \"year\"") t := by
   first | sql_equiv | sorry
 
 HYPOTHESIS hyp1_2_0 : CRIME_BY_LSOA "\"major_category\" = 'Theft and Handling'"
 theorem eq_1_2 (t : TableRel CRIME_BY_LSOA_schema) (h0 : hyp1_2_0 t) :
-    (sql%([CRIME_BY_LSOA_schema]) "SELECT\n    \"year\" AS \"year\",\n    SUM(\"value\") AS \"YEAR_TOTAL\"\nFROM \"LONDON\".\"LONDON_CRIME\".\"CRIME_BY_LSOA\"\nWHERE \"borough\" = 'Westminster'\n  AND \"major_category\" = 'Theft and Handling'\n  AND \"minor_category\" = 'Other Theft'\nGROUP BY \"year\"\nORDER BY \"year\";") t = (sql%([CRIME_BY_LSOA_schema]) "SELECT\n    \"year\",\n    SUM(\"value\") AS YEAR_TOTAL\nFROM \"LONDON\".\"LONDON_CRIME\".\"CRIME_BY_LSOA\"\nWHERE \"borough\" = 'Westminster'\n  AND \"minor_category\" = 'Other Theft'\nGROUP BY \"year\"\nORDER BY \"year\";") t := by
+    (sql%([CRIME_BY_LSOA_schema]) "SELECT \"year\" AS \"year\", SUM(\"value\") AS \"YEAR_TOTAL\" FROM \"LONDON\".\"LONDON_CRIME\".\"CRIME_BY_LSOA\" WHERE \"borough\" = 'Westminster' AND \"major_category\" = 'Theft and Handling' AND \"minor_category\" = 'Other Theft' GROUP BY \"year\" ORDER BY \"year\"") t = (sql%([CRIME_BY_LSOA_schema]) "SELECT \"year\", SUM(\"value\") AS YEAR_TOTAL FROM \"LONDON\".\"LONDON_CRIME\".\"CRIME_BY_LSOA\" WHERE \"borough\" = 'Westminster' AND \"minor_category\" = 'Other Theft' GROUP BY \"year\" ORDER BY \"year\"") t := by
   first | sql_equiv | sorry
 
 end Bench_sf_bq232

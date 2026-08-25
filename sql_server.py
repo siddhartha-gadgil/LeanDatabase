@@ -28,6 +28,30 @@ PORT = 6767
 REQUEST_TIMEOUT_SECONDS = 300.0
 MAX_BODY_BYTES = 1_000_000
 
+# The prover works over ONE canonical dialect (PostgreSQL); any other input dialect is transpiled to it
+# via sqlglot before being sent to Lean. `transpile.py` lives with the corpus tooling.
+sys.path.insert(0, str(Path(__file__).resolve().parent / "Bench" / "CrossSkill"))
+try:
+    from transpile import transpile_sql
+except Exception:  # noqa: BLE001 — sqlglot may be absent; then only PostgreSQL input is accepted
+    transpile_sql = None
+
+
+def is_postgres_dialect(dialect: str | None) -> bool:
+    return (dialect or "postgres").strip().lower() in ("", "postgres", "postgresql", "pg")
+
+
+def transpile_queries(queries: list[str], dialect: str | None) -> tuple[list[str], list[str | None]]:
+    """Transpile each query from `dialect` to PostgreSQL. Identity when the input already is PostgreSQL
+    (or sqlglot is unavailable). Returns (converted_queries, per-query error-or-None)."""
+    if is_postgres_dialect(dialect) or transpile_sql is None:
+        return list(queries), [None] * len(queries)
+    out, errs = [], []
+    for q in queries:
+        pg, err = transpile_sql(q, read=dialect, write="postgres")
+        out.append(pg); errs.append(err)
+    return out, errs
+
 
 class SqlProcess:
     def __init__(
@@ -275,8 +299,25 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
 
+        # `/transpile` — preview only: convert the queries to PostgreSQL and return them (no proof).
+        if self.path == "/transpile":
+            queries = payload.get("queries") or []
+            converted, errs = transpile_queries(queries, payload.get("dialect"))
+            self._send_json(
+                {"status": "ok", "queries": converted, "errors": errs,
+                 "dialect": payload.get("dialect") or "postgres"},
+                HTTPStatus.OK,
+            )
+            return
+
+        # Normalise to PostgreSQL before proving; keep the source dialect in the payload so the Lean
+        # side has the input language available (future per-dialect handling, e.g. casts).
+        dialect = payload.get("dialect")
+        converted, errs = transpile_queries(payload.get("queries") or [], dialect)
+        forward = {**payload, "queries": converted}
+
         try:
-            response = self.server.sql_process.request(payload)  # type: ignore[attr-defined]
+            response = self.server.sql_process.request(forward)  # type: ignore[attr-defined]
         except Exception as exc:
             self._send_json(
                 {
@@ -287,6 +328,13 @@ class Handler(BaseHTTPRequestHandler):
                 HTTPStatus.BAD_GATEWAY,
             )
             return
+        if isinstance(response, dict):
+            response = {**response, "sourceDialect": dialect or "postgres"}
+            if not is_postgres_dialect(dialect):
+                response["convertedQueries"] = converted
+            transpile_errors = [e for e in errs if e]
+            if transpile_errors:
+                response["transpileErrors"] = transpile_errors
         self._send_json(response, HTTPStatus.OK)
 
     def _cors_headers(self) -> None:
@@ -632,10 +680,35 @@ EXAMPLE_GROUPS = [
 ]
 
 
+DIALECT_LABELS = {
+    "postgres": "PostgreSQL (canonical — no conversion)", "tsql": "SQL Server (T-SQL)",
+    "bigquery": "BigQuery", "mysql": "MySQL", "duckdb": "DuckDB", "clickhouse": "ClickHouse",
+    "sqlite": "SQLite", "redshift": "Redshift", "spark": "Spark SQL", "spark2": "Spark SQL 2",
+    "databricks": "Databricks", "trino": "Trino", "presto": "Presto", "snowflake": "Snowflake",
+    "oracle": "Oracle", "teradata": "Teradata", "starrocks": "StarRocks", "risingwave": "RisingWave",
+    "materialize": "Materialize",
+}
+
+
+def dialect_options_html() -> str:
+    """`<option>`s for every dialect sqlglot supports, PostgreSQL first (selected/default)."""
+    try:
+        from sqlglot.dialects.dialect import Dialects
+        vals = sorted(d.value for d in Dialects if d.value)
+    except Exception:  # noqa: BLE001 — sqlglot absent: offer PostgreSQL only
+        vals = ["postgres"]
+    others = [v for v in vals if v != "postgres"]
+    opts = [f'<option value="postgres" selected>{DIALECT_LABELS["postgres"]}</option>']
+    opts += [f'<option value="{html.escape(v)}">{html.escape(DIALECT_LABELS.get(v, v))}</option>'
+             for v in others]
+    return "\n        ".join(opts)
+
+
 def demo_html() -> str:
     initial = DEFAULT_DEMO
     initial_json = html.escape(json.dumps(initial, indent=2))
     examples_json = json.dumps(EXAMPLE_GROUPS)
+    dialect_options = dialect_options_html()
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -829,6 +902,8 @@ def demo_html() -> str:
     }}
     .result-ok {{ color: var(--accent-2); font-weight: 700; }}
     .result-error {{ color: var(--danger); font-weight: 700; }}
+    .hint {{ margin: 6px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.4; }}
+    .muted {{ color: var(--muted); font-weight: 400; font-size: 12.5px; }}
     .stack {{
       display: grid;
       gap: 14px;
@@ -857,6 +932,13 @@ def demo_html() -> str:
           <select id="otherExampleMenu"></select>
         </div>
       </div>
+      <label for="dialect">Input SQL dialect</label>
+      <select id="dialect">
+        {dialect_options}
+      </select>
+      <p class="hint">Proofs run over one canonical dialect (PostgreSQL). Other dialects are transpiled
+      to it with sqlglot — the converted SQL is what the prover actually receives.</p>
+
       <div id="schemas"></div>
       <button type="button" id="addSchema">+ Table</button>
 
@@ -874,6 +956,10 @@ def demo_html() -> str:
     </section>
 
     <section class="stack">
+      <div class="panel" id="convertedPanel" style="display:none">
+        <h2>Converted to PostgreSQL <span id="convertedFrom" class="muted"></span></h2>
+        <pre id="convertedSql">-</pre>
+      </div>
       <div class="panel">
         <h2>JSON Sent</h2>
         <pre id="requestJson">{initial_json}</pre>
@@ -895,6 +981,10 @@ def demo_html() -> str:
     const requestJson = document.querySelector("#requestJson");
     const responseJson = document.querySelector("#responseJson");
     const statusLine = document.querySelector("#status");
+    const dialect = document.querySelector("#dialect");
+    const convertedPanel = document.querySelector("#convertedPanel");
+    const convertedSql = document.querySelector("#convertedSql");
+    const convertedFrom = document.querySelector("#convertedFrom");
 
     function addSchema(schema = {{ name: "", columns: [] }}) {{
       const card = document.createElement("div");
@@ -959,7 +1049,8 @@ def demo_html() -> str:
             type: row.querySelector(".col-type").value.trim()
           }})).filter(col => col.name && col.type)
         }})).filter(schema => schema.name && schema.columns.length),
-        queries: [first.value, second.value]
+        queries: [first.value, second.value],
+        dialect: dialect.value
       }};
     }}
 
@@ -967,14 +1058,41 @@ def demo_html() -> str:
       requestJson.textContent = JSON.stringify(currentPayload(), null, 2);
     }}
 
+    let convTimer = null;
+    function scheduleConverted() {{ clearTimeout(convTimer); convTimer = setTimeout(refreshConverted, 350); }}
+    async function refreshConverted() {{
+      if (dialect.value === "postgres") {{ convertedPanel.style.display = "none"; return; }}
+      try {{
+        const res = await fetch("/transpile", {{
+          method: "POST",
+          headers: {{ "Content-Type": "application/json" }},
+          body: JSON.stringify({{ queries: [first.value, second.value], dialect: dialect.value }})
+        }});
+        const data = await res.json();
+        const out = (data.queries || []).map((q, i) => {{
+          const err = (data.errors || [])[i];
+          return `-- query ${{i + 1}}` + (err ? ` (transpile error: ${{err}})` : "") + `\n${{q}}`;
+        }}).join("\n\n");
+        convertedFrom.textContent = `(from ${{dialect.value}})`;
+        convertedSql.textContent = out || "-";
+        convertedPanel.style.display = "";
+      }} catch (err) {{
+        convertedFrom.textContent = "";
+        convertedSql.textContent = "transpile request failed: " + err.message;
+        convertedPanel.style.display = "";
+      }}
+    }}
+
     function loadPayload(payload) {{
       schemasEl.replaceChildren();
       (payload.schemas || []).forEach(addSchema);
       first.value = (payload.queries && payload.queries[0]) || "";
       second.value = (payload.queries && payload.queries[1]) || "";
+      dialect.value = payload.dialect || "postgres";
       responseJson.textContent = "No request sent yet.";
       statusLine.textContent = "";
       updateRequest();
+      refreshConverted();
     }}
 
     function reset() {{
@@ -1021,6 +1139,9 @@ def demo_html() -> str:
     document.querySelector("#reset").addEventListener("click", reset);
     first.addEventListener("input", updateRequest);
     second.addEventListener("input", updateRequest);
+    first.addEventListener("input", scheduleConverted);
+    second.addEventListener("input", scheduleConverted);
+    dialect.addEventListener("change", () => {{ updateRequest(); refreshConverted(); }});
 
     function fillMenu(selector, groupIndex) {{
       const menu = document.querySelector(selector);
