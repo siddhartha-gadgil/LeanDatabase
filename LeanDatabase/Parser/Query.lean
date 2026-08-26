@@ -901,7 +901,9 @@ def parseSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (str : S
   -- Case-insensitive identifiers: fold the schema and the query's idents to a common (lower) case.
   let tables := tables.map (fun (t, cols) => (lowerName t, cols.map (fun (c, ty) => (lowerName c, ty))))
   let tables := tables.map (fun (tableName, columns) => (tableName, schemaWithFullNames tableName columns))
-  let .ok stx := Parser.runParserCategory (← getEnv) `sql_query str | throwError "Failed to parse SQL query: {str}"
+  let stx ← match Parser.runParserCategory (← getEnv) `sql_query str with
+    | .ok stx => pure stx
+    | .error err => throwError "Failed to parse SQL query: {err}\n--- input ---\n{str}"
   let stx := lowerIdents stx
   -- Resolution labels: every base column `t.col`, plus each alias's columns under its own prefix
   -- (`x.col`), so an aliased table's columns — renamed to `x.col` by `productPair` — resolve, and two

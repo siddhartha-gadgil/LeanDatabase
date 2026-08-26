@@ -367,13 +367,18 @@ macro_rules
         acc ← `(if ($c : Bool) then some $v else $acc)
       return acc
 
--- `CASE WHEN … THEN … END` *without* `ELSE`. Its full semantics is `ELSE NULL`, which needs the
--- Phase-4 NULL layer we don't have yet — so there is deliberately **no** general term macro, and it
--- errors in an ordinary scalar position rather than silently defaulting the missing branch to `0`
--- (which would be wrong for `SUM`/`AVG`/`MIN`). It is meaningful only in the aggregate-argument
--- position `COUNT(CASE WHEN p THEN _ END)`, where `COUNT` skips the NULLs; `liftAggExprs`
--- intercepts exactly that shape and rewrites it to the indicator sum.
+-- `CASE WHEN … THEN … END` *without* `ELSE`. Its full semantics is `ELSE NULL`, so it expands
+-- exactly like the `ELSE NULL` form to an `Option`-typed term (`some v` on a match, `none`
+-- otherwise) — the AS-clause probe discovers the `nullable` column type. The COUNT-argument shape
+-- `COUNT(CASE WHEN p THEN _ END)` is intercepted syntactically by `liftAggExprs` (before this macro
+-- fires) and rewritten to the indicator sum, so counting still skips the NULLs.
 syntax:90 "CASE" ( "WHEN" term "THEN" term ) + "END" : term
+macro_rules
+  | `(CASE $[WHEN $cs THEN $vs]* END) => do
+      let mut acc : Term ← `(none)
+      for (c, v) in (cs.zip vs).reverse do
+        acc ← `(if ($c : Bool) then some $v else $acc)
+      return acc
 
 -- Simple `CASE e WHEN v1 THEN r1 … [ELSE d] END` → the searched form comparing `e == vᵢ`.
 syntax:90 "CASE" term ( "WHEN" term "THEN" term ) + "ELSE" term "END" : term
@@ -601,6 +606,9 @@ scalar2 "JSON_EXTRACT_PATH" "getPath"   -- PG spelling of Snowflake GET_PATH
 scalar3 "JSON_EXTRACT_PATH" "getPath3"  -- nested path `JSON_EXTRACT_PATH(v, 'a', 'b')`
 scalar4 "JSON_EXTRACT_PATH" "getPath4"
 scalar2 "ARRAY_LENGTH" "arrayLength"
+scalar1 "DAY_OF_WEEK" "dayOfWeek"     -- sqlglot's underscored spellings of DAYOFWEEK / DAYOFYEAR
+scalar1 "DAY_OF_YEAR" "dayOfYear"
+scalar1 "DAYOFWEEKISO" "dayOfWeek"
 
 -- `EXTRACT(field FROM x)` (PG) — opaque `extractOf "FIELD" x`; `field` is a bare keyword (YEAR/MONTH/…).
 macro:max "EXTRACT" "(" f:ident "FROM" x:term ")" : term => do

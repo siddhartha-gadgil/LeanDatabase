@@ -19,6 +19,18 @@ name = "LeanDatabase"
 name = "Examples"
 globs = ["Examples.+"]
 
+# The proven cross-skill equivalences. Building this lib re-checks every `sql_equiv` proof — the
+# regression gate for core-elaboration changes (`lake build Bench`). Kept out of defaultTargets so a
+# plain `lake build` stays fast.
+[[lean_lib]]
+name = "Bench"
+globs = ["Bench.CrossSkill.Proven.+"]
+
 [[lean_exe]]
 name = "sql_process"
+supportInterpreter = true
+
+[[lean_exe]]
+name = "elabcheck"
+root = "Bench.CrossSkill.Elabcheck"
 supportInterpreter = true

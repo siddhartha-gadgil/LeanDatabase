@@ -132,6 +132,34 @@ def checkEquiv (data : Json) : TermElabM Bool := do
 def checkEquivCore (data : Json) : CoreM Bool := do
   checkEquiv data |>.run' {} |>.run' {}
 
+/-! ## Elaboration check (Lean-native corpus census)
+
+`elabCheckOne` elaborates a single query against its schemas and reports the outcome **directly** from
+the elaborator — no scraping of Lean's textual output. It catches the exception on failure and, on
+success, still rejects a term that carries unresolved metavariables or `sorry` (an elaboration that
+"succeeds" into an unprovable goal is a failure, not a pass). This is the authoritative corpus metric;
+the Python driver only transpiles SQL and feeds `{schemas, query}` JSON. -/
+def elabCheckOne (schemas : List Json) (sql : String) : TermElabM (Except String Unit) := do
+  try
+    let tables ← schemas.mapM parseSchema
+    withoutErrToSorry do
+      let (e, _) ← parseSqlQuery tables sql
+      let e ← instantiateMVars e
+      if e.hasExprMVar then return .error "elaborated with unresolved metavariables"
+      else if e.hasSorry then return .error "elaborated with sorry"
+      else return .ok ()
+  catch ex => return .error (← ex.toMessageData.toString)
+
+/-- Process one `{id?, schemas, query}` record → `{status: "ok"|"fail", error?}`. -/
+def elabCheckCore (data : Json) : CoreM Json := do
+  let run : TermElabM Json := do
+    let .ok schemas := data.getObjValAs? (List Json) "schemas" | return json% {"status": "fail", "error": "missing schemas"}
+    let .ok sql := data.getObjValAs? String "query" | return json% {"status": "fail", "error": "missing query"}
+    match ← elabCheckOne schemas sql with
+    | .ok _    => return json% {"status": "ok"}
+    | .error e => return Json.mkObj [("status", "fail"), ("error", Json.str e)]
+  run |>.run' {} |>.run' {}
+
 def dataEg := json% {"schemas": [{"name": "table", "columns": [{"name": "age", "type": "Int"}, {"name": "isActive", "type": "Bool"}]}],
   "queries": ["SELECT * FROM table WHERE age > 30 AND isActive", "SELECT * FROM table WHERE age > 30 && isActive && age > 20"]}
 
