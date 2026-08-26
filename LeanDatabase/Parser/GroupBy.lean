@@ -36,12 +36,17 @@ open Lean
 namespace LeanDatabase
 
 /-- Resolve one `GROUP BY` item to the key term to elaborate: a positional `n` becomes the n-th SELECT
-column's term (1-based); everything else is passed through unchanged. The key is elaborated against the
-*input* schema (whose columns keep their alias prefix, e.g. `s.dept`), exactly like a SELECT column —
-so, unlike `ORDER BY`, the term is **not** base-qualified. -/
-def resolveGroupItem (selCols : Array Syntax.Term) (item : Syntax.Term) : Syntax.Term :=
+column's term (1-based); a bare ident that names a SELECT **alias** becomes that alias's expression
+(`GROUP BY session_day` where `session_day` is `CAST(…) AS session_day`); everything else is passed
+through unchanged. The key is elaborated against the *input* schema (columns keep their alias prefix,
+e.g. `s.dept`), exactly like a SELECT column — so, unlike `ORDER BY`, the term is **not** base-qualified. -/
+def resolveGroupItem (selCols : Array Syntax.Term) (aliases : List (Name × Syntax.Term))
+    (item : Syntax.Term) : Syntax.Term :=
   match item.raw.isNatLit? with
   | some n => (selCols[n - 1]?).getD item          -- out of range: left to error at elaboration
-  | none   => item
+  | none   =>
+    match item.raw with
+    | .ident _ _ v _ => ((aliases.find? (·.1 == v)).map (·.2)).getD item
+    | _ => item
 
 end LeanDatabase

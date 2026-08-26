@@ -347,6 +347,9 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
     | `(sql_from| ( $sub:sql_query ) $_alias:ident) => do
       let (lamSub, subSchema) ← elabSqlQueryCore tableVars ctes sub
       let vars := tableVars.map (fun (relVar, _, _) => relVar)
+      -- Keep the subquery's own output column names (do NOT re-prefix under the alias): `expandNames`
+      -- qualifies a bare outer ref to the base table those columns came from, and the per-scope bare
+      -- binding (`withLetColumnVars`) resolves bare refs — re-prefixing would break both.
       return (lamSub.beta vars.toArray, subSchema)
     -- `LATERAL FLATTEN` — correlated unnest appended to the left FROM (see `flattenArm`). Matched
     -- before the plain comma so `f1 , LATERALFLATTEN(e) …` doesn't fall through to a cross product.
@@ -566,8 +569,9 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
         pure (← mkAppM ``TypedRelation.mapByList #[filteredExpr, toExpr nameStrs, m], names.zip types)
       else
         -- The group *key* is the list of GROUP BY terms (a bare column is just `term = col`);
-        -- positional `GROUP BY 1` resolves to the nth SELECT term. See `Parser/GroupBy.lean`.
-        let groupTerms := (groupItems.map (resolveGroupItem colTerms)).toList
+        -- positional `GROUP BY 1` and SELECT-alias refs resolve here. See `Parser/GroupBy.lean`.
+        let aliasPairs := ((colStxs.map sqlColName).zip colTerms).toList
+        let groupTerms := (groupItems.map (resolveGroupItem colTerms aliasPairs)).toList
         let liftedCols : List Syntax.Term := liftedRaw.map (⟨·⟩)
         let (m, types) ← elabTypedTupleGroupProjection
           [(.anonymous, combinedSchema)] liftedCols groupTerms filteredExpr selAggs.toList
@@ -908,6 +912,7 @@ def parseSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (str : S
     | some (_, cols) => acc ++ cols.map (fun (n, _) => n.replacePrefix base al)
     | none => acc) []
   let stx ← expandNames (baseLabels ++ aliasLabels) stx
+    (subqAliases := collectSubqueryAliases stx ++ collectCteNames stx)
   elabSqlQuery tables stx
 
 

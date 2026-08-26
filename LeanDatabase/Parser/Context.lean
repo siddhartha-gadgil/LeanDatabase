@@ -29,7 +29,15 @@ def elabAsSql (stx: Syntax) : TermElabM (SQLTypeProxy × Expr) := do
   )
   match res? with
   | some res => pure res
-  | none => throwError s!"Failed to parse type in AS clause: {← PrettyPrinter.ppCategory `term stx}"
+  | none =>
+    -- Every proxy type failed. Re-elaborate without an expected type so the *real* reason (unknown
+    -- identifier, failed typeclass, unsupported op, …) surfaces instead of a generic message.
+    let pp ← PrettyPrinter.ppCategory `term stx
+    try
+      let _ ← withoutErrToSorry (elabTerm stx none)
+      throwError s!"Failed to parse type in AS clause: {pp} (result type not a supported column type)"
+    catch e =>
+      throwError s!"AS clause `{pp}`: {← e.toMessageData.toString}"
 
 /-- `CAST(x AS <type>)` — type-directed (see `Operators/Scalar.lean`). Unlike the opaque scalars,
 CAST inspects the *source* type: `Int → FLOAT` is the genuine `Int → Rat` coercion (so a division
@@ -78,16 +86,23 @@ elab_rules : term
 
 /-! ## Column-binding context -/
 
-def withLetColumnVars  (columns : List ((Name × SQLTypeProxy) × Expr)) (typedTupleVar : Expr) (usedName : Name → Bool)
-    (k : Array Expr → TermElabM α )  : TermElabM α := do
+/-- Bind each schema column as a `let` over the tuple. A column is bound under its **full** name
+(`t.col`) and, when its bare last-component is unique in this scope, **also** under that bare name
+(`col`). The bare binding makes a reference resolve against the *local* FROM scope regardless of how
+`expandNames` qualified it — which is what lets a column in a `UNION`-of-partitions arm, a subquery
+alias, or a plain single-table SELECT resolve to the right relation. `bareUnique` marks last-components
+that occur exactly once (safe to bind bare; ambiguous ones stay qualified-only, as in a join). -/
+partial def withLetColumnVarsGo (columns : List ((Name × SQLTypeProxy) × Expr)) (typedTupleVar : Expr)
+    (usedName : Name → Bool) (bareUnique : Name → Bool) (k : Array Expr → TermElabM α) : TermElabM α := do
   match columns with
   | [] => k #[]
   | ((name, colType), projExpr) :: rest => do
-    -- Only bind columns the query actually references; skipping the unused ones keeps the term (and
-    -- the goal `grind` sees) narrow. The tuple lambda arg is bound regardless (in `mkLambdaLetsFVars`),
-    -- so the relation type is unchanged — this is a pure dead-`let` elimination.
-    if !usedName name then
-      withLetColumnVars rest typedTupleVar usedName k
+    let bare := (name.components.getLast?).getD name
+    let wantBare := bare != name && bareUnique bare && usedName bare
+    -- Only bind columns the query actually references (by full or bare name); skipping the unused ones
+    -- keeps the term (and the goal `grind` sees) narrow — a pure dead-`let` elimination.
+    if !usedName name && !wantBare then
+      withLetColumnVarsGo rest typedTupleVar usedName bareUnique k
     else
     let colTypeExpr := typeExpr colType
     let funcName := name ++ `proj
@@ -97,8 +112,17 @@ def withLetColumnVars  (columns : List ((Name × SQLTypeProxy) × Expr)) (typedT
       let colExpr ← mkAppM' funcVar #[typedTupleVar]
       let colExpr ← zetaReduce colExpr
       withLetDecl name colTypeExpr colExpr fun localVar => do
-        let letVars := #[funcVar, localVar]
-        withLetColumnVars rest typedTupleVar usedName (fun restExpr => k (letVars ++ restExpr))
+        let cont (extra : Array Expr) := withLetColumnVarsGo rest typedTupleVar usedName bareUnique
+          (fun restExpr => k (#[funcVar, localVar] ++ extra ++ restExpr))
+        if wantBare then
+          withLetDecl bare colTypeExpr colExpr fun bareVar => cont #[bareVar]
+        else cont #[]
+
+def withLetColumnVars (columns : List ((Name × SQLTypeProxy) × Expr)) (typedTupleVar : Expr)
+    (usedName : Name → Bool) (k : Array Expr → TermElabM α) : TermElabM α := do
+  let lasts := columns.map (fun ((n, _), _) => (n.components.getLast?).getD n)
+  let bareUnique : Name → Bool := fun c => (lasts.filter (· == c)).length == 1
+  withLetColumnVarsGo columns typedTupleVar usedName bareUnique k
 
 def mkLambdaLetsFVars (vars : List (Expr × Array Expr)) (k: TermElabM Expr) : TermElabM Expr := do
   match vars with
@@ -143,7 +167,8 @@ syntax "VARIANCE" "(" term ")" : term
 syntax "VAR_POP" "(" term ")" : term
 syntax "VAR_SAMP" "(" term ")" : term
 
-def expandNames (labels : List Name) (stx: Syntax) (aliases : List (Name × Name) := []) :
+def expandNames (labels : List Name) (stx: Syntax) (aliases : List (Name × Name) := [])
+    (subqAliases : List Name := []) :
     MetaM Syntax := do
   let pairs ← labels.filterMapM fun label => do
     let shorter? := label.components.getLast?
@@ -154,6 +179,11 @@ def expandNames (labels : List Name) (stx: Syntax) (aliases : List (Name × Name
     if id.getKind == `scientific then
       return some (← `(($(⟨id⟩) : Rat)))
     let idName := id.getId
+    -- `X.col` where `X` is a subquery alias or a CTE name (columns stored under their own bare names,
+    -- unlike base-table aliases which re-prefix) → bare `col`, resolved per-scope. Restricted to those
+    -- prefixes so base/alias/lateral qualified refs (`t.col`, `e.col`, `h.value`) are untouched.
+    if subqAliases.any (fun a => a != idName && a.isPrefixOf idName) then
+      return some (mkIdent ((idName.components.getLast?).getD idName))
     -- alias-qualified `o.col` → `base.col` (the table's canonical prefix)
     match aliases.find? (fun (a, _) => a != idName && a.isPrefixOf idName) with
     | some (a, base) => pure <| mkIdent <| idName.replacePrefix a base

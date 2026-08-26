@@ -48,6 +48,27 @@ partial def collectAliases : Syntax → List (Name × Name) :=
       | _ => []
     stx.getArgs.foldl (fun acc s => acc ++ collectAliases s) here
 
+/-- Subquery/derived-table aliases (`(…) AS x` / `(…) x`). Unlike base-table/CTE aliases these have
+no base table to re-qualify to; `expandNames` strips a `x.col` reference to bare `col` so the per-scope
+column binding resolves it against the subquery's own output. -/
+partial def collectSubqueryAliases : Syntax → List Name :=
+  fun stx =>
+    let here := match stx with
+      | `(sql_from| ( $_:sql_query ) AS $x:ident) => [x.getId]
+      | `(sql_from| ( $_:sql_query ) $x:ident)    => [x.getId]
+      | _ => []
+    stx.getArgs.foldl (fun acc s => acc ++ collectSubqueryAliases s) here
+
+/-- CTE names bound by a `WITH`/`WITH RECURSIVE`. A `cte.col` reference (CTE used without a fresh
+alias) is stripped to `col` like a subquery alias, since a CTE's columns keep their own bare names. -/
+partial def collectCteNames : Syntax → List Name :=
+  fun stx =>
+    let here := match stx with
+      | `(sql_cte| $name:ident AS ( $_:sql_query ))          => [name.getId]
+      | `(sql_cte| $name:ident ( $_,* ) AS ( $_:sql_query )) => [name.getId]
+      | _ => []
+    stx.getArgs.foldl (fun acc s => acc ++ collectCteNames s) here
+
 /-- Map an alias prefix back to its base table (`e1.col → emp.col`), so a projected column's *output*
 label is base-qualified regardless of aliasing — an aliased and non-aliased query then agree, and CTE
 column resolution (which relies on base-qualified names) keeps working. -/
