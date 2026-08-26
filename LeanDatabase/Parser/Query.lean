@@ -356,6 +356,12 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
     | `(sql_from| $f1:sql_from , LATERALFLATTEN( $e:term ) AS $h:ident)
     | `(sql_from| $f1:sql_from , LATERALFLATTEN( $e:term ) $h:ident) =>
       flattenArm f1 e h.getId [`seq, `key, `path, `index, `value, `this]
+    -- `LATERAL SPLIT_TO_TABLE(s, d)`: unnest like FLATTEN over the opaque `splitOf s d` (captures both
+    -- args, so different (string, delimiter) stay distinct — sound).
+    | `(sql_from| $f1:sql_from , LATERAL SPLIT_TO_TABLE( $s:term , $d:term ) AS $h:ident)
+    | `(sql_from| $f1:sql_from , LATERAL SPLIT_TO_TABLE( $s:term , $d:term ) $h:ident) =>
+      flattenArm f1 (← `($(mkIdent ``LeanDatabase.Scalar.splitOf) $s $d)) h.getId
+        [`seq, `key, `path, `index, `value, `this]
     | `(sql_from| $f1:sql_from , $f2:sql_from) => do
       let (e1, s1) ← productPair f1
       let (e2, s2) ← productPair f2
@@ -567,6 +573,12 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
           [(.anonymous, combinedSchema)] liftedCols groupTerms filteredExpr selAggs.toList
         let havingFilteredExpr ← match having? with
           | some having => do
+            -- HAVING may reference a SELECT alias (`HAVING cnt > 150` where `cnt` is `COUNT(*) AS cnt`).
+            -- Expand each such alias to its SELECT expression before lifting aggregates.
+            let aliasPairs := (colStxs.map sqlColName).zip (colStxs.map sqlColTerm) |>.toList
+            let having := having.raw.replaceM (m := Id) fun s => match s with
+              | .ident _ _ v _ => (aliasPairs.find? (·.1 == v)).map (·.2.raw)
+              | _ => none
             let (having, havAggs) ← (liftAggExprs having).run #[]
             let h ← elabTypedTupleGroupFilter
               [(.anonymous, combinedSchema)] having groupTerms filteredExpr havAggs.toList
@@ -595,6 +607,9 @@ private def convSingleQuoted : List Char → String → String × List Char
   | '\'' :: '\'' :: rest, acc => convSingleQuoted rest (acc.push '\'')   -- SQL `''` = escaped quote
   | '\'' :: rest, acc => (acc.push '"', rest)
   | '"' :: rest, acc => convSingleQuoted rest ((acc.push '\\').push '"') -- escape inner `"`
+  -- SQL backslashes are literal; escape them so the emitted Lean string literal is valid (a regex
+  -- like `'stackoverflow\.com'` would otherwise produce the invalid Lean escape `\.`).
+  | '\\' :: rest, acc => convSingleQuoted rest ((acc.push '\\').push '\\')
   | c :: rest, acc => convSingleQuoted rest (acc.push c)
 
 private partial def normalizeGo : List Char → String → String
@@ -699,9 +714,10 @@ private def ciTake : List Char → List Char → List Char → Option (List Char
   | k :: ks, c :: cs, acc => if k == c.toLower then ciTake ks cs (c :: acc) else none
   | _ :: _, [], _ => none
 
--- Longest-first so `dayofweek`/`timestamp` win over their `day`/`time` prefixes.
+-- Longest-first so `dayofweek`/`timestamp` win over their `day`/`time` prefixes. Includes reserved
+-- function/window keywords (`RANK`, `ROW_NUMBER`, …) that queries also use as `AS` aliases.
 private def aliasKWList : List (List Char) :=
-  ["dayofweek","timestamp","quarter","second","minute","month","count","week","hour","year","date","time","day"].map (·.toList)
+  ["dayofweek","row_number","dense_rank","timestamp","quarter","second","minute","month","count","week","hour","year","date","time","rank","day"].map (·.toList)
 
 private def tryAliasKW : List (List Char) → List Char → Option (List Char × List Char)
   | [], _ => none

@@ -70,7 +70,9 @@ elab_rules : term
     | `(sql_cast_type| STRING) | `(sql_cast_type| TEXT) | `(sql_cast_type| VARCHAR)
     | `(sql_cast_type| CHAR) | `(sql_cast_type| VARCHAR($_)) | `(sql_cast_type| CHAR($_))
     | `(sql_cast_type| DATE) | `(sql_cast_type| TIMESTAMP) | `(sql_cast_type| DATETIME)
-    | `(sql_cast_type| VARIANT) => toStr
+    | `(sql_cast_type| VARIANT) | `(sql_cast_type| GEOGRAPHY) | `(sql_cast_type| GEOMETRY)
+    | `(sql_cast_type| JSON) | `(sql_cast_type| JSONB) | `(sql_cast_type| OBJECT)
+    | `(sql_cast_type| ARRAY) => toStr
     | `(sql_cast_type| BOOLEAN) => toBool
     | _ => throwUnsupportedSyntax
 
@@ -262,6 +264,19 @@ def AggKind.op : AggKind → Name
   | .stddev => ``groupStddev
   | .variance => ``groupVariance
 
+/-- The `Rat`-valued operator for a numeric aggregate over a `FLOAT`/`NUMBER` column (see
+`groupAggExprsE`). Non-numeric kinds reuse `.op` (never selected — they don't probe to `Rat`). -/
+def AggKind.ratOp : AggKind → Name
+  | .sum => ``groupSumRat
+  | .min => ``groupMinRat
+  | .max => ``groupMaxRat
+  | .avg => ``groupAvgRat
+  | .sumDistinct => ``groupSumDistinctRat
+  | .avgDistinct => ``groupAvgDistinctRat
+  | .stddev => ``groupStddevRat
+  | .variance => ``groupVarianceRat
+  | k => k.op
+
 /-- The summand each aggregate feeds its operator. -/
 def AggKind.summand : AggKind → AggSummand
   | .count => .void
@@ -307,27 +322,36 @@ def groupAggExprsE (schema : List (Name × SQLTypeProxy)) (groupTerms : List Syn
           let cod ← mkAppM ``TypedTupleOfList #[← sqlTypeListExpr (keyExprsTypes.map (·.1))]
           pure (e, cod)
   let keyValue ← mkAppM' keyMapE #[typedTupleVar]
+  -- Build the summand lambda `fun (t : TypedTuple schema) => (exprStx : ty)` for a fixed target type.
+  let mkSummand (exprStx : Syntax.Term) (ty : Expr) : TermElabM Expr :=
+    withSchemasTupleVars [(.anonymous, schema)] (fun _ => true) fun vars =>
+      mkLambdaLetsFVars vars (elabTermEnsuringType exprStx ty)
   aggs.mapM fun (name, kind, exprStx) => do
-    -- summand `fun (t : TypedTuple schema) => (exprStx : <summand type>)`, absent for COUNT(*)
-    let projE? ← match kind.summand with
-      | .void => pure none
-      | s => do
-          let projE ← withSchemasTupleVars [(.anonymous, schema)] (fun _ => true) fun vars => do
-            let body ← match s with
-              | .int => elabTermEnsuringType exprStx (mkConst ``Int)
-              | .bool => elabTermEnsuringType exprStx (mkConst ``Bool)
-              | _ => Prod.snd <$> elabAsSql exprStx        -- `.probe`: discover the column type
-            mkLambdaLetsFVars vars (pure body)
-          pure (some projE)
+    -- Choose operator, result type, and summand. Numeric aggregates (`.int` summand) probe the
+    -- argument's SQL type and dispatch to the `Int` or the `Rat` operator, so `SUM`/`AVG`/`MIN`/`MAX`
+    -- over a `FLOAT`/`NUMBER` column type-check (and stay exact) rather than failing `_ : ℚ = ℤ`.
+    let (opName, resType, projE?) ← match kind.summand with
+      | .void => pure (kind.op, kind.resultType, none)
+      | .bool => pure (kind.op, kind.resultType, some (← mkSummand exprStx (mkConst ``Bool)))
+      | .probe => do          -- `COUNT(DISTINCT …)`: any column type
+          let projE ← withSchemasTupleVars [(.anonymous, schema)] (fun _ => true) fun vars =>
+            mkLambdaLetsFVars vars (Prod.snd <$> elabAsSql exprStx)
+          pure (kind.op, kind.resultType, some projE)
+      | .int => do            -- numeric: `Int` first (identical to the prior path), else `Rat`
+          try
+            let p ← withoutErrToSorry (mkSummand exprStx (mkConst ``Int))
+            pure (kind.op, kind.resultType, some p)
+          catch _ =>
+            pure (kind.ratOp, .float, some (← mkSummand exprStx (mkConst ``Rat)))
     let aggE ← withLocalDeclD `k codomainE fun keyVar => do
       let base ← match projE? with
-        | none => mkAppM kind.op #[keyMapE, keyVar, relE]
-        | some projE => mkAppM kind.op #[keyMapE, keyVar, relE, projE]
+        | none => mkAppM opName #[keyMapE, keyVar, relE]
+        | some projE => mkAppM opName #[keyMapE, keyVar, relE, projE]
       let call ← if kind.wrapNat then mkAppM ``Int.ofNat #[base] else pure base
       mkLambdaFVars #[keyVar] call
     let aggValue ← mkAppM' aggE #[keyValue]
     let aggValue ← mkLambdaFVars #[typedTupleVar] aggValue
-    pure ((name, kind.resultType), aggValue)
+    pure ((name, resType), aggValue)
 
 def withSchemasGroupedTupleVars (schemas : List (Name × List (Name × SQLTypeProxy))) (usedName : Name → Bool)
     (groupTerms : List Syntax.Term) (relE : Expr) (aggs : List (Name × AggKind × Syntax.Term))

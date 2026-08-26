@@ -339,6 +339,35 @@ def groupAvgDistinct (key : TypedTuple colType → K) (k : K) (rel : TypedRelati
     (f : TypedTuple colType → Int) : Rat :=
   (groupSumDistinct key k rel f : Rat) / (groupCountDistinct key k rel f : Rat)
 
+/-! ## `Rat`-valued numeric aggregates
+
+Counterparts of the `Int` aggregates for `FLOAT`/`NUMBER`/`DECIMAL` columns (modelled as `Rat`), so
+`SUM`/`AVG`/`MIN`/`MAX` over a real column type-check (and are exact — real, not truncating). Selected
+by `groupAggExprsE` when the summand probes to `Rat`. Proof lemmas mirroring the `Int` ones are future
+work; these exist so the queries elaborate soundly. -/
+def groupSumRat (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
+    (f : TypedTuple colType → Rat) : Rat :=
+  ∑ t ∈ (group key k rel).rows, f t
+def groupMaxRat (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
+    (f : TypedTuple colType → Rat) : Rat :=
+  if h : (group key k rel).rows.Nonempty then (group key k rel).rows.sup' h f else 0
+def groupMinRat (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
+    (f : TypedTuple colType → Rat) : Rat :=
+  if h : (group key k rel).rows.Nonempty then (group key k rel).rows.inf' h f else 0
+def groupAvgRat (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
+    (f : TypedTuple colType → Rat) : Rat :=
+  (groupSumRat key k rel f) / (groupCount key k rel : Rat)
+def groupSumDistinctRat (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
+    (f : TypedTuple colType → Rat) : Rat :=
+  ∑ x ∈ (group key k rel).rows.image f, x
+def groupAvgDistinctRat (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
+    (f : TypedTuple colType → Rat) : Rat :=
+  (groupSumDistinctRat key k rel f) / (groupCountDistinct key k rel f : Rat)
+opaque groupStddevRat (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
+    (f : TypedTuple colType → Rat) : Rat := 0
+opaque groupVarianceRat (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
+    (f : TypedTuple colType → Rat) : Rat := 0
+
 /-- `EVERY` / `BOOL_AND(p)` — true iff every row in the group satisfies `p`. -/
 def groupBoolAnd (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
     (p : TypedTuple colType → Bool) : Bool :=
@@ -482,5 +511,6 @@ end LeanDatabase.TypedAgg
 /- Re-export the aggregate operators into the top-level `LeanDatabase` namespace-/
 namespace LeanDatabase
 export LeanDatabase.TypedAgg
-  (group groupCount groupSum groupKeys groupMax groupMaxInt groupMinInt groupAvg groupSumDistinct groupCountDistinct groupAvgDistinct groupBoolAnd groupBoolOr groupStddev groupVariance relCount relSum relMax relMin relCountDistinct relAvg groupBy)
+  (group groupCount groupSum groupKeys groupMax groupMaxInt groupMinInt groupAvg groupSumDistinct groupCountDistinct groupAvgDistinct groupBoolAnd groupBoolOr groupStddev groupVariance relCount relSum relMax relMin relCountDistinct relAvg groupBy
+   groupSumRat groupMaxRat groupMinRat groupAvgRat groupSumDistinctRat groupAvgDistinctRat groupStddevRat groupVarianceRat)
 end LeanDatabase

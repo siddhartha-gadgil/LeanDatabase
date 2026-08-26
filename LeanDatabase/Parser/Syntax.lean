@@ -78,6 +78,10 @@ syntax sql_from "," "LATERALFLATTEN" "(" term ")" "AS" ident "(" ident,* ")" : s
 syntax sql_from "," "LATERALFLATTEN" "(" term ")" ident "(" ident,* ")" : sql_from
 syntax sql_from "," "LATERALFLATTEN" "(" term ")" "AS" ident : sql_from
 syntax sql_from "," "LATERALFLATTEN" "(" term ")" ident : sql_from
+-- `LATERAL SPLIT_TO_TABLE(str, delim)` — Snowflake row-per-token unnest; modelled like FLATTEN over
+-- the (opaque) split value, so its rows are `(SEQ, KEY, PATH, INDEX, VALUE, THIS)` with `VALUE` a token.
+syntax sql_from "," "LATERAL" "SPLIT_TO_TABLE" "(" term "," term ")" "AS" ident : sql_from
+syntax sql_from "," "LATERAL" "SPLIT_TO_TABLE" "(" term "," term ")" ident : sql_from
 
 -- Recursive Cases (Chaining joins from left to right)
 syntax sql_from "JOIN" ident "ON" term : sql_from     -- 3. Explicit Inner Join
@@ -295,12 +299,15 @@ macro_rules
   | `(CONCAT($a))        => `($a)
   | `(CONCAT($a, $bs,*)) => `($(mkIdent `LeanDatabase.Scalar.concat) $a (CONCAT($bs,*)))
 
--- `REGEXP_SUBSTR`/`REGEXP_REPLACE` accept extra positional args (position, occurrence, flags) — drop.
+-- `REGEXP_SUBSTR`/`REGEXP_EXTRACT`/`REGEXP_REPLACE` accept extra positional args (position,
+-- occurrence, flags, capture group) — drop them. `REGEXP_EXTRACT` is BigQuery's spelling of SUBSTR.
 syntax:max "REGEXP_SUBSTR" "(" term "," term "," term,+ ")" : term
+syntax:max "REGEXP_EXTRACT" "(" term "," term "," term,+ ")" : term
 syntax:max "REGEXP_REPLACE" "(" term "," term "," term "," term,+ ")" : term
 open Lean in
 macro_rules
   | `(REGEXP_SUBSTR($s, $p, $_rest,*))       => `($(mkIdent `LeanDatabase.Scalar.regexpSubstr) $s $p)
+  | `(REGEXP_EXTRACT($s, $p, $_rest,*))      => `($(mkIdent `LeanDatabase.Scalar.regexpSubstr) $s $p)
   | `(REGEXP_REPLACE($s, $p, $r, $_rest,*))  => `($(mkIdent `LeanDatabase.Scalar.regexpReplace) $s $p $r)
 
 -- No-arg "current time" functions (opaque), bool/typed literals, and a couple null helpers.
@@ -563,6 +570,7 @@ scalar2 "LOG" "logOf"
 scalar2 "GREATEST" "greatestOf"
 scalar2 "LEAST" "leastOf"
 scalar2 "REGEXP_SUBSTR" "regexpSubstr"
+scalar2 "REGEXP_EXTRACT" "regexpSubstr"
 scalar2 "STRPOS" "strposOf"
 scalar2 "POSITION" "strposOf"
 scalar2 "DATE_TRUNC" "dateTrunc"
@@ -734,6 +742,13 @@ syntax "TIMESTAMP" : sql_cast_type
 syntax "DATETIME" : sql_cast_type
 syntax "BOOLEAN" : sql_cast_type
 syntax "VARIANT" : sql_cast_type
+-- Semi-structured / spatial target types — `String`-valued in our model (like `VARIANT`).
+syntax "GEOGRAPHY" : sql_cast_type
+syntax "GEOMETRY" : sql_cast_type
+syntax "JSON" : sql_cast_type
+syntax "JSONB" : sql_cast_type
+syntax "OBJECT" : sql_cast_type
+syntax "ARRAY" : sql_cast_type
 syntax "CHAR" : sql_cast_type
 -- Sized variants `VARCHAR(n)` / `NUMBER(p,s)` / … (the size is discarded). Higher priority so the
 -- bare forms don't win and leave `(n)` dangling.

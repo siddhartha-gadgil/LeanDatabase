@@ -124,13 +124,13 @@ for j, (i, k, q, tables, iid) in enumerate(jobs):
     # which makes `sql%` elaboration crawl. Fall back to all if none match (e.g. bare `*`).
     ql = q.lower()
     seen = {n: c for n, c in seen.items() if re.search(r'\b'+re.escape(n.lower())+r'\b', ql)} or seen
+    startline = len(lines) + 1                     # 1-indexed line where this job's block begins
+    job_lineinfo.append((j, startline))
     lines.append(f'namespace R{i}_{k}')
     for name, cols in seen.items():
         lines.append(f'CREATE TABLE {name} ({", ".join(f"«{c}» {t}" for c,t in cols)})')
     schemas = ', '.join(f'{name}_schema' for name in seen)
     lines.append(f'#eval IO.println s!"@@CONV {j}: " *> IO.println (LeanDatabase.normalizeSqlLiterals "{esc(q)}")')
-    defline = len(lines) + 1                      # 1-indexed line of the def
-    job_lineinfo.append((j, defline))
     lines.append(f'def probed := sql%([{schemas}]) "{esc(q)}"')
     lines.append(f'end R{i}_{k}')
 
@@ -168,8 +168,10 @@ def job_of_line(L):
     return owner
 
 errs = {}   # job -> first error message
-combined = err if err else out
-for m in re.finditer(r'_elabcheck_gen\.lean:(\d+):\d+: error: (.*)', combined):
+combined = (err or '') + '\n' + (out or '')
+# NB: Lean 4.31 tags errors with their class, e.g. `error(lean.unknownIdentifier):` — match the
+# optional `(...)` so typeclass / unknown-identifier / invalid-field failures aren't silently missed.
+for m in re.finditer(r'_elabcheck_gen\.lean:(\d+):\d+: error(?:\([^)]*\))?: (.*)', combined):
     L = int(m.group(1)); msg = m.group(2).strip()
     j = job_of_line(L)
     if j is not None and j not in errs:
