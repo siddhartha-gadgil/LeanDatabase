@@ -184,9 +184,10 @@ def expandNames (labels : List Name) (stx: Syntax) (aliases : List (Name × Name
     -- prefixes so base/alias/lateral qualified refs (`t.col`, `e.col`, `h.value`) are untouched.
     if subqAliases.any (fun a => a != idName && a.isPrefixOf idName) then
       return some (mkIdent ((idName.components.getLast?).getD idName))
-    -- alias-qualified `o.col` → `base.col` (the table's canonical prefix)
+    -- Alias-as-owner: an alias-qualified `x.col` is kept as-is — `productPair` binds an aliased table's
+    -- columns under `x.col`, so the reference matches the binding directly (and self-joins stay distinct).
     match aliases.find? (fun (a, _) => a != idName && a.isPrefixOf idName) with
-    | some (a, base) => pure <| mkIdent <| idName.replacePrefix a base
+    | some _ => return none
     | none =>
       match pairs.find? (fun (shorter, _) => shorter.isPrefixOf idName) with
       | some (_, pfx) => pure <| mkIdent <| pfx ++ idName

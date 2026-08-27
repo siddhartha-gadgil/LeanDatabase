@@ -487,11 +487,12 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       TermElabM (Expr × List (Name × SQLTypeProxy)) := do
     let (e1, s1) ← productPair f1
     let (e2, s2raw) ← productPair (← `(sql_from| $t:ident))
-    -- an aliased RHS renames its columns to the alias prefix (self-join safe)
+    -- an aliased RHS renames its columns under the alias prefix (self-join safe). Prepend the alias to
+    -- the last component so it works for base tables (`base.col`) AND CTEs (bare `col`) alike.
     let baseP := (t.getId.components.getLast?).getD t.getId
     let rhsP := (rhsAlias.map (·.getId)).getD baseP
     let s2 := match rhsAlias with
-      | some x => s2raw.map (fun (n, ty) => (n.replacePrefix baseP x.getId, ty))
+      | some x => s2raw.map (fun (n, ty) => (x.getId ++ (n.components.getLast?).getD n, ty))
       | none => s2raw
     let condExpr ← elabTypedTupleFilter [(.anonymous, s1), (rhsP, s2)] cond
     let joinExpr ← mkAppM opName #[e1, e2, condExpr]
