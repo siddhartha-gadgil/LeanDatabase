@@ -154,6 +154,29 @@ partial def refsName (nm : Name) : Syntax → Bool
   | .node _ _ args => args.any (refsName nm)
   | _ => false
 
+/-- Per-scope column fix-up: `expandNames` is global, so it pins a bare column to one fixed table —
+wrong for other partition-`UNION` arms. Re-qualify a broken `A.col` (not an in-scope label) to the
+unique in-scope column with the same last component; bare aliases and valid refs are left alone. Halts
+at nested `sql_query` boundaries so a correlated inner ref keeps binding to its own scope. -/
+partial def resolveInScope (scopeLabels : List Name) (stx : Syntax) : Syntax := Id.run do
+  let lastOf : Name → Name := fun n => (n.components.getLast?).getD n
+  stx.replaceM (m := Id) fun s => do
+    match s with
+    | `(sql_col| ( $_:sql_query ) AS $_:ident)
+    | `(term| EXISTS ( $_:sql_query ))
+    | `(term| NOT EXISTS ( $_:sql_query ))
+    | `(term| $_:term IN ( $_:sql_query ))
+    | `(term| $_:term NOT IN ( $_:sql_query )) => return some s
+    | _ =>
+      match s with
+      | .ident info raw val _ =>
+        if val.components.length ≥ 2 && !(scopeLabels.contains val) then
+          match scopeLabels.filter (fun l => lastOf l == lastOf val) with
+          | [uniq] => return some (.ident info raw uniq [])
+          | _ => return none
+        else return none
+      | _ => return none
+
 /--
 This is the main entry point for parsing a full SQL query (`SELECT` / `FROM` / `WHERE` / `GROUP BY`),
 plus the binary set operators `UNION` / `UNION ALL` / `INTERSECT` / `EXCEPT` and parenthesised
@@ -239,13 +262,19 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       $[GROUP BY $groups:term,* $[HAVING $having?]?]? $[ORDER BY $ord:sql_order_item,*]?
       $[LIMIT $lim:num]? $[OFFSET $_off:num]? $[;]?) => do
     let (productExpr, combinedSchema) ← productPair dbs
+    -- Re-qualify column refs against this arm's own tables (see `resolveInScope`).
+    let scopeLabels := combinedSchema.map (·.1)
+    let sel : TSyntax `sql_cols := ⟨resolveInScope scopeLabels sel⟩
+    let filter? := filter?.map (fun f => (⟨resolveInScope scopeLabels f⟩ : Syntax.Term))
+    let havingT? := having?.join.map (fun h => (⟨resolveInScope scopeLabels h⟩ : Syntax.Term))
     let filteredExpr ← match filter? with
       | some filter => elabWhere productExpr combinedSchema filter
       | none => pure productExpr
-    let groupItems := (groups.map (·.getElems)).getD #[]
+    let groupItems := ((groups.map (·.getElems)).getD #[]).map
+      (fun g => (⟨resolveInScope scopeLabels g⟩ : Syntax.Term))
     let aliasMap := collectAliases dbs
     let (rel, outSchema) ← elabSelect sel combinedSchema filteredExpr groupItems groups.isSome
-      having?.join aliasMap
+      havingT? aliasMap
     let rel ← if distinct?.isSome then mkAppM ``distinct #[rel] else pure rel
     -- ORDER BY resolves against the (base-qualified) output labels, so baseify its column refs too.
     let ordCols? := ord.map (fun ords => ords.getElems.toList.map
