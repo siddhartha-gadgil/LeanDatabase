@@ -252,6 +252,10 @@ class SqlConcatArg (α : Type) where toStr : α → String
 instance : SqlConcatArg String := ⟨id⟩
 instance : SqlConcatArg Int := ⟨intToStr⟩
 instance : SqlConcatArg Rat := ⟨floatToStr⟩
+-- A nullable operand (NULL-able column, or a bare `CASE … END`): concatenating `NULL` yields `NULL`,
+-- but under our string model an absent value contributes the empty string (opaque `toStr`).
+instance {α : Type} [SqlConcatArg α] : SqlConcatArg (Option α) :=
+  ⟨fun o => match o with | some a => SqlConcatArg.toStr a | none => ""⟩
 /-- SQL `||` string concatenation: coerce each operand to its string form and `concat`. -/
 def sqlConcat {α β : Type} [SqlConcatArg α] [SqlConcatArg β] (a : α) (b : β) : String :=
   concat (SqlConcatArg.toStr a) (SqlConcatArg.toStr b)

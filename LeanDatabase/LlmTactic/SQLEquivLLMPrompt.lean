@@ -158,7 +158,20 @@ def promptPreamble : String :=
     "You may use any Mathlib lemma or standard tactic (simp, grind, ring, omega, Finset lemmas). The",
     "REPO CONTEXT below is this project's own vocabulary — its **theorems** are lemmas you can `apply`",
     "or feed to `simp`; its **defs** are the operators the goal is built from. It is additional",
-    "information, not a restriction."
+    "information, not a restriction.",
+    "",
+    "Useful facts for this domain:",
+    "- `UNION`/`INTERSECT`/`EXCEPT` are SET operations: arm ORDER and DUPLICATES do not matter, and",
+    "  `sql_equiv` ALREADY normalizes arm order — so two queries differing only in the order of",
+    "  `UNION [ALL]` arms are closed by `sql_equiv` alone. Do NOT hand-reorder with `union_comm`/",
+    "  `union_assoc`; just call `sql_equiv`.",
+    "- For an `A ~= B` goal, output column *labels* are already ignored, so alias-only differences",
+    "  (a renamed column or CTE) need NO work — do not try to rewrite labels.",
+    "- Try `sql_equiv` FIRST (it runs the repo's whole reduction+grind pipeline); only add a targeted",
+    "  step when it leaves a specific residual goal it cannot discharge, then finish with `sql_equiv`.",
+    "- If the two queries genuinely differ in an output VALUE (a different string/number literal, a",
+    "  different column selected, a different filter), they are NOT equal — do not force a proof; a",
+    "  `sorry`-free failure is the correct, sound outcome."
   ]
 
 /-- Delimits the repo-context block so it reads as reference material, not instructions or the goal. -/

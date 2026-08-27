@@ -95,9 +95,10 @@ def curlPostJson (url : String) (headers : Array String) (body : Json) : IO Json
     | .error _ => throw (IO.userError s!"non-JSON response (curl exit {out.exitCode}): {out.stdout}")
 
 def callOpenAI (key prompt model : String) (maxTokens : Nat) : IO String := do
+  -- Newer OpenAI models (gpt-5.x) reject `max_tokens` and require `max_completion_tokens`.
   let body := Json.mkObj [("model", model),
     ("messages", Json.arr #[Json.mkObj [("role", "user"), ("content", prompt)]]),
-    ("max_tokens", maxTokens)]
+    ("max_completion_tokens", maxTokens)]
   let json ← curlPostJson "https://api.openai.com/v1/chat/completions"
     #[s!"Authorization: Bearer {key}", "Content-Type: application/json"] body
   if let .ok err := json.getObjVal? "error" then throw (IO.userError s!"OpenAI error: {err}")
