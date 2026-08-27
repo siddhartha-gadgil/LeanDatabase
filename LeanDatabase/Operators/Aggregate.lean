@@ -368,6 +368,18 @@ opaque groupStddevRat (key : TypedTuple colType → K) (k : K) (rel : TypedRelat
 opaque groupVarianceRat (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
     (f : TypedTuple colType → Rat) : Rat := 0
 
+/-- `STRING_AGG`/`LISTAGG` — order-dependent string concatenation, so opaque like stddev. The summand
+`f` folds the element, delimiter, DISTINCT-ness and ORDER BY keys into one string per row, so two
+aggregations differing in any of those keep distinct summands and never wrongly unify. -/
+opaque groupStringAgg (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
+    (f : TypedTuple colType → String) : String := ""
+
+/-- `PERCENTILE_CONT/DISC(p) WITHIN GROUP (ORDER BY e)` — ordered-set aggregate, opaque. The summand
+`f` folds the percentile, the CONT/DISC marker and the order value (via `pctTag`), so aggregations
+differing in any of these keep distinct summands. -/
+opaque groupPercentile (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
+    (f : TypedTuple colType → Rat) : Rat := 0
+
 /-- `EVERY` / `BOOL_AND(p)` — true iff every row in the group satisfies `p`. -/
 def groupBoolAnd (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
     (p : TypedTuple colType → Bool) : Bool :=
@@ -511,6 +523,6 @@ end LeanDatabase.TypedAgg
 /- Re-export the aggregate operators into the top-level `LeanDatabase` namespace-/
 namespace LeanDatabase
 export LeanDatabase.TypedAgg
-  (group groupCount groupSum groupKeys groupMax groupMaxInt groupMinInt groupAvg groupSumDistinct groupCountDistinct groupAvgDistinct groupBoolAnd groupBoolOr groupStddev groupVariance relCount relSum relMax relMin relCountDistinct relAvg groupBy
+  (group groupCount groupSum groupKeys groupMax groupMaxInt groupMinInt groupAvg groupSumDistinct groupCountDistinct groupAvgDistinct groupBoolAnd groupBoolOr groupStddev groupVariance groupStringAgg groupPercentile relCount relSum relMax relMin relCountDistinct relAvg groupBy
    groupSumRat groupMaxRat groupMinRat groupAvgRat groupSumDistinctRat groupAvgDistinctRat groupStddevRat groupVarianceRat)
 end LeanDatabase

@@ -641,6 +641,7 @@ syntax:max "RANK" "(" ")" &"OVER" "(" win_spec ")" : term
 syntax:max "DENSE_RANK" "(" ")" &"OVER" "(" win_spec ")" : term
 syntax:max "LAG" "(" term,+ ")" &"OVER" "(" win_spec ")" : term
 syntax:max "LEAD" "(" term,+ ")" &"OVER" "(" win_spec ")" : term
+syntax:max "NTILE" "(" term ")" &"OVER" "(" win_spec ")" : term
 -- Windowed aggregates (`SUM(x) OVER (…)`, `COUNT(*) OVER (…)`, `FIRST_VALUE`, …) — opaque, like above.
 syntax:max "SUM" "(" term ")" &"OVER" "(" win_spec ")" : term
 syntax:max "AVG" "(" term ")" &"OVER" "(" win_spec ")" : term
@@ -672,6 +673,7 @@ elab_rules : term
   | `(DENSE_RANK() OVER ($s:win_spec))   => elabWindow "dense_rank" #[] s
   | `(LAG($as,*) OVER ($s:win_spec))     => elabWindow "lag" as.getElems.raw s
   | `(LEAD($as,*) OVER ($s:win_spec))    => elabWindow "lead" as.getElems.raw s
+  | `(NTILE($a) OVER ($s:win_spec))      => elabWindow "ntile" #[a] s
   | `(SUM($a) OVER ($s:win_spec))          => elabWindow "win_sum" #[a] s
   | `(AVG($a) OVER ($s:win_spec))          => elabWindow "win_avg" #[a] s
   | `(MIN($a) OVER ($s:win_spec))          => elabWindow "win_min" #[a] s

@@ -64,6 +64,9 @@ opaque toTimestamp {α : Type} (x : α) : String := ""  -- `TO_TIMESTAMP(epoch)`
 opaque nowVal : String := ""
 opaque toChar {α : Type} (x : α) : String := ""
 opaque toNumber {α : Type} (x : α) : Rat := 0
+-- Tags a `PERCENTILE_CONT/DISC` order value with its percentile + a CONT/DISC marker, so the opaque
+-- ordered-set aggregate stays distinct across different percentiles and the two kinds.
+opaque pctTag (marker : String) (p v : Rat) : Rat := v
 opaque dateTrunc (unit : String) (x : String) : String := x
 
 /-- String functions. -/
@@ -112,7 +115,9 @@ opaque toGeography (x : String) : String := x
 opaque stAsText {α : Type} (x : α) : String := ""            -- ST_ASTEXT(geom)
 opaque arrayLength (x : String) (dim : Int) : Int := 0       -- ARRAY_LENGTH(arr, dim)
 opaque extractOf {α : Type} (field : String) (x : α) : Int := 0  -- EXTRACT(field FROM x)
-opaque toTimestamp2 {α : Type} (x : α) (scale : Int) : String := ""
+-- `TO_TIMESTAMP(x, scale)` (numeric scale) or `TO_TIMESTAMP(str, fmt)` (format string) — 2nd arg
+-- generic so both forms elaborate; opaque, so both args are still captured faithfully.
+opaque toTimestamp2 {α β : Type} (x : α) (fmt : β) : String := ""
 opaque dateFromParts {α : Type} (y m d : α) : String := ""
 opaque stIntersects {α : Type} (a b : α) : Bool := false
 opaque toDate2 {α : Type} (x : α) (fmt : String) : String := ""

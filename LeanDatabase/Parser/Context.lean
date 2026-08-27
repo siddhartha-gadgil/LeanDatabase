@@ -166,6 +166,14 @@ syntax "STDDEV_SAMP" "(" term ")" : term
 syntax "VARIANCE" "(" term ")" : term
 syntax "VAR_POP" "(" term ")" : term
 syntax "VAR_SAMP" "(" term ")" : term
+-- `STRING_AGG(expr, delim [ORDER BY keys])` (and `DISTINCT`) — order-dependent string concat, opaque.
+syntax "STRING_AGG" "(" "DISTINCT" term "," term "ORDER" "BY" term,+ ")" : term
+syntax "STRING_AGG" "(" term "," term "ORDER" "BY" term,+ ")" : term
+syntax "STRING_AGG" "(" "DISTINCT" term "," term ")" : term
+syntax "STRING_AGG" "(" term "," term ")" : term
+-- `PERCENTILE_CONT/DISC(p) WITHIN GROUP (ORDER BY e)` — ordered-set aggregate, opaque.
+syntax "PERCENTILE_CONT" "(" term ")" &"WITHIN" &"GROUP" "(" "ORDER" "BY" term ")" : term
+syntax "PERCENTILE_DISC" "(" term ")" &"WITHIN" &"GROUP" "(" "ORDER" "BY" term ")" : term
 
 def expandNames (labels : List Name) (stx: Syntax) (aliases : List (Name × Name) := [])
     (subqAliases : List Name := []) :
@@ -274,11 +282,12 @@ inductive AggKind where
   | sumDistinct | countDistinct | avgDistinct
   | boolAnd | boolOr
   | stddev | variance
+  | stringAgg | percentile
   deriving DecidableEq, Inhabited
 
-/-- The summand shape: `void` (no argument, `COUNT(*)`), an `Int`/`Bool` expression, or a type-probed
-expression (`COUNT(DISTINCT …)`, which counts distinct values of any column type). -/
-inductive AggSummand | void | int | bool | probe
+/-- The summand shape: `void` (no argument, `COUNT(*)`), an `Int`/`Bool`/`String`/`Rat` expression, or
+a type-probed expression (`COUNT(DISTINCT …)`, which counts distinct values of any column type). -/
+inductive AggSummand | void | int | bool | str | rat | probe
 
 /-- The `group*` operator constant backing each aggregate. -/
 def AggKind.op : AggKind → Name
@@ -294,6 +303,8 @@ def AggKind.op : AggKind → Name
   | .boolOr => ``groupBoolOr
   | .stddev => ``groupStddev
   | .variance => ``groupVariance
+  | .stringAgg => ``groupStringAgg
+  | .percentile => ``groupPercentile
 
 /-- The `Rat`-valued operator for a numeric aggregate over a `FLOAT`/`NUMBER` column (see
 `groupAggExprsE`). Non-numeric kinds reuse `.op` (never selected — they don't probe to `Rat`). -/
@@ -313,6 +324,8 @@ def AggKind.summand : AggKind → AggSummand
   | .count => .void
   | .countDistinct => .probe
   | .boolAnd | .boolOr => .bool
+  | .stringAgg => .str
+  | .percentile => .rat
   | _ => .int
 
 /-- Whether the operator returns `Nat` (so its result is wrapped with `Int.ofNat`). -/
@@ -323,7 +336,8 @@ def AggKind.wrapNat : AggKind → Bool
 /-- The SQL column type of the aggregate's result. -/
 def AggKind.resultType : AggKind → SQLTypeProxy
   | .boolAnd | .boolOr => .bool
-  | .avg | .avgDistinct | .stddev | .variance => .float   -- Rat-valued
+  | .avg | .avgDistinct | .stddev | .variance | .percentile => .float   -- Rat-valued
+  | .stringAgg => .string
   | _ => .int
 
 /-- Builds one grouped aggregate per lifted `(freshName, kind, expr)`: each `expr` is elaborated
@@ -364,6 +378,8 @@ def groupAggExprsE (schema : List (Name × SQLTypeProxy)) (groupTerms : List Syn
     let (opName, resType, projE?) ← match kind.summand with
       | .void => pure (kind.op, kind.resultType, none)
       | .bool => pure (kind.op, kind.resultType, some (← mkSummand exprStx (mkConst ``Bool)))
+      | .str => pure (kind.op, kind.resultType, some (← mkSummand exprStx (mkConst ``String)))
+      | .rat => pure (kind.op, kind.resultType, some (← mkSummand exprStx (mkConst ``Rat)))
       | .probe => do          -- `COUNT(DISTINCT …)`: any column type
           let projE ← withSchemasTupleVars [(.anonymous, schema)] (fun _ => true) fun vars =>
             mkLambdaLetsFVars vars (Prod.snd <$> elabAsSql exprStx)

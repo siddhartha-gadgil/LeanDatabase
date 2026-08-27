@@ -1,5 +1,5 @@
 {"total": 351,
- "timeout": 16,
+ "timeout": 17,
  "results":
  [{"status": "ok", "id": "sf010", "error": null},
   {"status": "ok", "id": "sf035", "error": null},
@@ -10,7 +10,7 @@
   {"status": "fail",
    "id": "sf_bq001",
    "error":
-   "Application type mismatch: The argument\n  \"YYYYMMDD\"\nhas type\n  String\nbut is expected to have type\n  ℤ\nin the application\n  LeanDatabase.Scalar.toTimestamp2 a.date \"YYYYMMDD\""},
+   "Type mismatch\n  LeanDatabase.Scalar.toTimestamp2 a.date \"YYYYMMDD\"\nhas type\n  String\nbut is expected to have type\n  ℚ"},
   {"status": "fail",
    "id": "sf_bq002",
    "error":
@@ -52,10 +52,7 @@
    "error":
    "Failed to parse SQL query: <input>:1:715: expected 'FROM'\n--- input ---\nWITH agg_by_seconds AS (SELECT «trip_seconds», COUNT(*) AS row_cnt, SUM(«fare») AS fare_sum, COUNT(«fare») AS fare_cnt FROM «CHICAGO».«CHICAGO_TAXI_TRIPS».«TAXI_TRIPS» WHERE NOT «trip_seconds» IS NULL AND «trip_seconds» >= 0 AND «trip_seconds» <= 3600 GROUP BY «trip_seconds»), with_cumulative AS (SELECT «trip_seconds», row_cnt, fare_sum, fare_cnt, SUM(row_cnt) OVER (ORDER BY «trip_seconds» ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cum_end, SUM(row_cnt) OVER (ORDER BY «trip_seconds» ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) - row_cnt + 1 AS cum_start FROM agg_by_seconds), total AS (SELECT SUM(row_cnt) AS n, SUM(row_cnt) % 6 AS remainder FROM agg_by_seconds), groups    AS (SELECT 1 AS grp UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6), group_boundaries AS (SELECT g.grp, FLOOR(CAST(t.n AS DOUBLE PRECISION) / 6.0) * (g.grp - 1) + LEAST(g.grp - 1, t.remainder) + 1 AS grp_start, FLOOR(CAST(t.n AS DOUBLE PRECISION) / 6.0) * g.grp + LEAST(g.grp, t.remainder) AS grp_end FROM groups AS g CROSS JOIN total AS t), expanded AS (SELECT c.«trip_seconds», c.row_cnt, c.fare_sum, c.fare_cnt, c.cum_start, c.cum_end, gb.grp AS quantile_group, GREATEST(c.cum_start, gb.grp_start) AS overlap_start, LEAST(c.cum_end, gb.grp_end) AS overlap_end FROM with_cumulative AS c CROSS JOIN group_boundaries AS gb WHERE c.cum_start <= gb.grp_end AND c.cum_end >= gb.grp_start) SELECT ROUND(CAST(MIN(CAST(«trip_seconds» AS DOUBLE PRECISION) / 60.0) AS DECIMAL), 1) AS min_minutes, ROUND(CAST(MAX(CAST(«trip_seconds» AS DOUBLE PRECISION) / 60.0) AS DECIMAL), 1) AS max_minutes, SUM(overlap_end - overlap_start + 1) AS total_trips, CAST(SUM(CASE WHEN fare_cnt > 0 THEN CAST(fare_sum * (overlap_end - overlap_start + 1) AS DOUBLE PRECISION) / row_cnt ELSE 0 END) AS DOUBLE PRECISION) / SUM(overlap_end - overlap_start + 1) AS average_fare FROM expanded GROUP BY quantile_group ORDER BY quantile_group"},
   {"status": "ok", "id": "sf_bq023", "error": null},
-  {"status": "fail",
-   "id": "sf_bq027",
-   "error":
-   "Failed to parse SQL query: <input>:1:227: expected identifier\n--- input ---\nSELECT p.«publication_number» AS «publication_number», COUNT(CASE WHEN CAST(JSON_EXTRACT_PATH(f.value, \"category\") AS TEXT) = \"SEA\" THEN 1 END) AS «SEA_BACKWARD_CITATIONS» FROM «PATENTS».«PATENTS».«PUBLICATIONS» AS p LEFT JOIN LATERALFLATTEN(p.«citation», OUTER => TRUE) AS f(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE p.«grant_date» >= 20100101 AND p.«grant_date» <= 20181231 GROUP BY p.«publication_number» ORDER BY «SEA_BACKWARD_CITATIONS» DESC"},
+  {"status": "ok", "id": "sf_bq027", "error": null},
   {"status": "fail",
    "id": "sf_bq029",
    "error":
@@ -63,11 +60,11 @@
   {"status": "timeout",
    "id": "sf_bq030",
    "error":
-   "(deterministic) timeout at `whnf`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
+   "(deterministic) timeout at `isDefEq`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
   {"status": "fail",
    "id": "sf_bq031",
    "error":
-   "AS clause `CAST(TO_TIMESTAMP(gsod2019.year || \"-\" || gsod2019.mo || \"-\" || gsod2019.da,\"YYYY-MM-DD\")AS DATE)`: Application type mismatch: The argument\n  \"YYYY-MM-DD\"\nhas type\n  String\nbut is expected to have type\n  ℤ\nin the application\n  LeanDatabase.Scalar.toTimestamp2 (gsod2019.year || \"-\" || gsod2019.mo || \"-\" || gsod2019.da) \"YYYY-MM-DD\""},
+   "AS clause `ROUND(CAST(AVG(temp_c)OVER(ORDER BY date rows BETWEEN 7 preceding AND current row)AS DECIMAL),1)`: Function expected at\n  date\nbut this term has type\n  String\n\nNote: Expected a function because this term is being applied to the argument\n  rows"},
   {"status": "ok", "id": "sf_bq032", "error": null},
   {"status": "ok", "id": "sf_bq034", "error": null},
   {"status": "ok", "id": "sf_bq035", "error": null},
@@ -108,7 +105,7 @@
   {"status": "timeout",
    "id": "sf_bq061",
    "error":
-   "(deterministic) timeout at `whnf`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
+   "(deterministic) timeout at `isDefEq`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
   {"status": "ok", "id": "sf_bq062", "error": null},
   {"status": "fail",
    "id": "sf_bq064",
@@ -125,11 +122,8 @@
   {"status": "timeout",
    "id": "sf_bq069",
    "error":
-   "(deterministic) timeout at `whnf`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
-  {"status": "fail",
-   "id": "sf_bq071",
-   "error":
-   "Failed to parse SQL query: <input>:1:138: expected 'FROM'\n--- input ---\nSELECT z.«city» AS «city», z.«zip_code» AS «zip_code», z.«state_code» AS «STATE», COUNT(DISTINCT h.«sid») AS «HURRICANE_COUNT», STRING_AGG(DISTINCT h.«name», \", \" ORDER BY h.«name») AS «HURRICANE_NAMES» FROM «NOAA_DATA_PLUS».«NOAA_HURRICANES».«HURRICANES» AS h, «NOAA_DATA_PLUS».«GEO_US_BOUNDARIES».«ZIP_CODES» AS z WHERE h.«name» <> \"NOT_NAMED\" AND h.«longitude» BETWEEN -180 AND 180 AND h.«latitude» BETWEEN -90 AND 90 AND ST_WITHIN(ST_POINT(h.«longitude», h.«latitude»), CAST(z.«zip_code_geom» AS GEOGRAPHY)) GROUP BY z.«city», z.«zip_code», z.«state_code» ORDER BY «HURRICANE_COUNT» DESC"},
+   "(deterministic) timeout at `isDefEq`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
+  {"status": "ok", "id": "sf_bq071", "error": null},
   {"status": "timeout",
    "id": "sf_bq073",
    "error":
@@ -170,7 +164,7 @@
   {"status": "timeout",
    "id": "sf_bq088",
    "error":
-   "(deterministic) timeout at `whnf`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
+   "(deterministic) timeout at `isDefEq`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
   {"status": "fail",
    "id": "sf_bq090",
    "error":
@@ -179,10 +173,7 @@
    "id": "sf_bq092",
    "error":
    "Failed to parse SQL query: <input>:1:853: expected ')', '↑', '↥', '⇑' or term\n--- input ---\nWITH inputs AS (SELECT ARRAY_TO_STRING(i.«addresses», \",\") AS address, i.«type» AS type, -i.«value» AS amount FROM «CRYPTO».«CRYPTO_DASH».«INPUTS» AS i  JOIN «CRYPTO».«CRYPTO_DASH».«TRANSACTIONS» AS t ON i.«transaction_hash» = t.«hash» WHERE t.«block_timestamp_month» = \"2023-04-01\"), outputs AS (SELECT ARRAY_TO_STRING(o.«addresses», \",\") AS address, o.«type» AS type, o.«value» AS amount FROM «CRYPTO».«CRYPTO_DASH».«OUTPUTS» AS o  JOIN «CRYPTO».«CRYPTO_DASH».«TRANSACTIONS» AS t ON o.«transaction_hash» = t.«hash» WHERE t.«block_timestamp_month» = \"2023-04-01\"), combined AS (SELECT address, type, amount FROM inputs UNION ALL SELECT address, type, amount FROM outputs), balances AS (SELECT address, type, SUM(amount) AS balance FROM combined GROUP BY address, type) SELECT \"HIGHEST\" AS extreme, address, type, balance FROM balances WHERE balance = (SELECT MAX(balance) FROM balances) UNION ALL SELECT \"LOWEST\" AS extreme, address, type, balance FROM balances WHERE balance = (SELECT MIN(balance) FROM balances)"},
-  {"status": "fail",
-   "id": "sf_bq094",
-   "error":
-   "Failed to parse SQL query: <input>:1:391: expected 'FROM'\n--- input ---\nWITH small_dollar AS (SELECT i.«cmte_id», SUM(i.«transaction_amt») AS TOTAL_SMALL_DONATIONS FROM «FEC».«FEC».«INDIVIDUALS_2016» AS i WHERE i.«transaction_amt» > 0 AND i.«transaction_amt» < 200 GROUP BY i.«cmte_id» HAVING SUM(i.«transaction_amt») > 0 AND SUM(i.«transaction_amt») < 200), committee_candidates AS (SELECT cc.«cmte_id», COUNT(DISTINCT cc.«cand_id») AS num_candidates, STRING_AGG(DISTINCT ca.«cand_name», \", \" ORDER BY ca.«cand_name») AS candidate_names FROM «FEC».«FEC».«CANDIDATE_COMMITTEE_2016» AS cc JOIN «FEC».«FEC».«CANDIDATE_2016» AS ca ON cc.«cand_id» = ca.«cand_id» GROUP BY cc.«cmte_id») SELECT c.«cmte_nm», ccand.num_candidates, ccand.candidate_names, sd.TOTAL_SMALL_DONATIONS FROM small_dollar AS sd JOIN «FEC».«FEC».«COMMITTEE_2016» AS c ON sd.«cmte_id» = c.«cmte_id» JOIN committee_candidates AS ccand ON sd.«cmte_id» = ccand.«cmte_id» ORDER BY c.«cmte_nm»"},
+  {"status": "ok", "id": "sf_bq094", "error": null},
   {"status": "ok", "id": "sf_bq095", "error": null},
   {"status": "fail",
    "id": "sf_bq096",
@@ -197,7 +188,7 @@
   {"status": "fail",
    "id": "sf_bq103",
    "error":
-   "Failed to parse SQL query: <input>:1:1051: expected 'FROM'\n--- input ---\nWITH variant_stats AS (SELECT COUNT(*) AS num_variants, SUM(CAST(JSON_EXTRACT_PATH(alt.value, \"AC\") AS INT)) AS sum_ac, SUM(CAST(«AN» AS INT)) AS sum_an FROM «GNOMAD».«GNOMAD».«V3_GENOMES__CHR1», LATERALFLATTEN(«alternate_bases») AS alt(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE «start_position» BETWEEN 55039447 AND 55064852), gene_symbols AS (SELECT DISTINCT CAST(JSON_EXTRACT_PATH(vep.value, \"SYMBOL\") AS TEXT) AS gene_symbol FROM «GNOMAD».«GNOMAD».«V3_GENOMES__CHR1», LATERALFLATTEN(«alternate_bases») AS alt(SEQ, KEY, PATH, INDEX, VALUE, THIS), LATERALFLATTEN(JSON_EXTRACT_PATH(alt.value, \"vep\")) AS vep(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE «start_position» BETWEEN 55039447 AND 55064852 AND NOT CAST(JSON_EXTRACT_PATH(vep.value, \"SYMBOL\") AS TEXT) IS NULL AND CAST(JSON_EXTRACT_PATH(vep.value, \"SYMBOL\") AS TEXT) <> \"None\") SELECT ROUND(CAST((55064852 - 55039447) / CAST(vs.num_variants AS DOUBLE PRECISION) AS DECIMAL), 3) AS BURDEN_OF_MUTATION, vs.num_variants AS NUM_VARIANTS, vs.sum_ac AS SUM_AC, vs.sum_an AS SUM_AN, (SELECT STRING_AGG(gene_symbol, \", \" ORDER BY gene_symbol) FROM gene_symbols) AS GENES FROM variant_stats AS vs"},
+   "scalar subquery: only SUM / COUNT / COUNT(DISTINCT) are supported"},
   {"status": "fail",
    "id": "sf_bq105",
    "error":
@@ -284,10 +275,7 @@
    "id": "sf_bq161",
    "error":
    "Failed to parse SQL query: <input>:1:1034: expected 'AS'\n--- input ---\nWITH clinical_paad AS ( SELECT DISTINCT «bcr_patient_barcode» AS patient FROM «PANCANCER_ATLAS_2».«PANCANCER_ATLAS».«FILTERED_CLINICAL_PANCAN_PATIENT_WITH_FOLLOWUP» WHERE «acronym» = \"PAAD\"), kras_patients AS ( SELECT DISTINCT «ParticipantBarcode» AS patient FROM «PANCANCER_ATLAS_2».«PANCANCER_ATLAS».«FILTERED_MC3_MAF_V5_ONE_PER_TUMOR_SAMPLE» WHERE «Study» = \"PAAD\" AND «Hugo_Symbol» = \"KRAS\" AND «FILTER» = \"PASS\"), tp53_patients AS ( SELECT DISTINCT «ParticipantBarcode» AS patient FROM «PANCANCER_ATLAS_2».«PANCANCER_ATLAS».«FILTERED_MC3_MAF_V5_ONE_PER_TUMOR_SAMPLE» WHERE «Study» = \"PAAD\" AND «Hugo_Symbol» = \"TP53\" AND «FILTER» = \"PASS\"), both_mutations AS ( SELECT c.patient FROM clinical_paad AS c  JOIN kras_patients AS k ON c.patient = k.patient  JOIN tp53_patients AS t ON c.patient = t.patient), neither_mutation AS ( SELECT c.patient FROM clinical_paad AS c WHERE c.patient NOT IN (SELECT patient FROM kras_patients) AND c.patient NOT IN (SELECT patient FROM tp53_patients)) SELECT (SELECT COUNT(*) FROM both_mutations) - (SELECT COUNT(*) FROM neither_mutation) AS OUTPUT"},
-  {"status": "fail",
-   "id": "sf_bq162",
-   "error":
-   "Failed to parse SQL query: <input>:1:1701: expected 'FROM'\n--- input ---\nWITH level2_data AS ( SELECT DISTINCT m.«Imaging_Assay_Type», p.«HTAN_CENTER», p.«HTAN_DATA_FILE_ID», p.«ENTITYID», \"Level2\" AS data_level FROM «HTAN_1».«HTAN_VERSIONED».«ID_PROVENANCE_R5» AS p  JOIN «HTAN_1».«HTAN_VERSIONED».«IMAGING_LEVEL2_METADATA_R5» AS m ON p.«ENTITYID» = m.«entityId» WHERE p.«HTAN_CENTER» = \"HTAN WUSTL\" AND NOT p.«COMPONENT» IS NULL AND NOT p.«COMPONENT» LIKE \"%Auxiliary%\" AND NOT p.«COMPONENT» LIKE \"%OtherAssay%\" AND NOT p.«COMPONENT» LIKE \"%Level1%\" AND NOT p.«COMPONENT» LIKE \"%ElectronMicroscopy%\" AND p.«COMPONENT» LIKE \"%Imaging%\"), level3_data AS ( SELECT DISTINCT l2.«Imaging_Assay_Type», l2.«HTAN_CENTER», \"Level3\" AS data_level FROM level2_data AS l2  JOIN «HTAN_1».«HTAN_VERSIONED».«ID_PROVENANCE_R5» AS child ON child.«HTAN_PARENT_DATA_FILE_ID» = l2.«HTAN_DATA_FILE_ID» WHERE NOT child.«COMPONENT» IS NULL AND NOT child.«COMPONENT» LIKE \"%Auxiliary%\" AND NOT child.«COMPONENT» LIKE \"%OtherAssay%\" AND child.«COMPONENT» LIKE \"%Level3%\"), level4_data AS ( SELECT DISTINCT l2.«Imaging_Assay_Type», l2.«HTAN_CENTER», \"Level4\" AS data_level FROM level2_data AS l2  JOIN «HTAN_1».«HTAN_VERSIONED».«ID_PROVENANCE_R5» AS child ON child.«HTAN_PARENT_DATA_FILE_ID» = l2.«HTAN_DATA_FILE_ID» WHERE NOT child.«COMPONENT» IS NULL AND NOT child.«COMPONENT» LIKE \"%Auxiliary%\" AND NOT child.«COMPONENT» LIKE \"%OtherAssay%\" AND child.«COMPONENT» LIKE \"%Level4%\"), all_levels AS (SELECT «Imaging_Assay_Type», «HTAN_CENTER», data_level FROM level2_data UNION SELECT «Imaging_Assay_Type», «HTAN_CENTER», data_level FROM level3_data UNION SELECT «Imaging_Assay_Type», «HTAN_CENTER», data_level FROM level4_data) SELECT «Imaging_Assay_Type», «HTAN_CENTER» AS «HTAN_Center», STRING_AGG(DISTINCT data_level, \", \" ORDER BY data_level) AS «AVAILABLE_DATA_LEVELS» FROM all_levels GROUP BY «Imaging_Assay_Type», «HTAN_CENTER» ORDER BY «Imaging_Assay_Type»"},
+  {"status": "ok", "id": "sf_bq162", "error": null},
   {"status": "ok", "id": "sf_bq169", "error": null},
   {"status": "ok", "id": "sf_bq170", "error": null},
   {"status": "ok", "id": "sf_bq171", "error": null},
@@ -339,8 +327,7 @@
   {"status": "ok", "id": "sf_bq212", "error": null},
   {"status": "fail",
    "id": "sf_bq214",
-   "error":
-   "Application type mismatch: The argument\n  \"YYYYMMDD\"\nhas type\n  String\nbut is expected to have type\n  ℤ\nin the application\n  LeanDatabase.Scalar.toTimestamp2 (LeanDatabase.Scalar.intToStr citing.filing_date) \"YYYYMMDD\""},
+   "error": "Unknown identifier `c.embedding_v1`"},
   {"status": "ok", "id": "sf_bq215", "error": null},
   {"status": "fail",
    "id": "sf_bq217",
@@ -457,7 +444,7 @@
   {"status": "timeout",
    "id": "sf_bq323",
    "error":
-   "(deterministic) timeout at `isDefEq`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
+   "(deterministic) timeout at `whnf`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
   {"status": "timeout",
    "id": "sf_bq324",
    "error":
@@ -465,10 +452,7 @@
   {"status": "ok", "id": "sf_bq325", "error": null},
   {"status": "ok", "id": "sf_bq326", "error": null},
   {"status": "ok", "id": "sf_bq327", "error": null},
-  {"status": "fail",
-   "id": "sf_bq328",
-   "error":
-   "Failed to parse SQL query: <input>:1:309: expected end of input\n--- input ---\nSELECT c.«region» FROM «WORLD_BANK».«WORLD_BANK_WDI».«INDICATORS_DATA» AS i JOIN «WORLD_BANK».«WORLD_BANK_WDI».«COUNTRY_SUMMARY» AS c ON i.«country_code» = c.«country_code» WHERE i.«indicator_code» = \"NY.GDP.MKTP.KD\" AND NOT c.«region» IS NULL AND c.«region» <> \"\" GROUP BY c.«region» ORDER BY PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY i.«value») DESC LIMIT 1"},
+  {"status": "ok", "id": "sf_bq328", "error": null},
   {"status": "ok", "id": "sf_bq330", "error": null},
   {"status": "ok", "id": "sf_bq331", "error": null},
   {"status": "ok", "id": "sf_bq333", "error": null},
@@ -504,10 +488,7 @@
    "error":
    "Failed to parse SQL query: <input>:1:468: expected ')'\n--- input ---\nWITH orders_with_dates AS (SELECT «user_id», TO_TIMESTAMP(CAST(«created_at» AS DOUBLE PRECISION) / 1000000) AS order_ts FROM «THELOOK_ECOMMERCE».«THELOOK_ECOMMERCE».«ORDERS»), first_purchase AS (SELECT «user_id», MIN(order_ts) AS first_order_ts FROM orders_with_dates GROUP BY «user_id» HAVING DATE_TRUNC(\"MONTH\", MIN(order_ts)) = \"2020-01-01\"), cohort_size AS (SELECT COUNT(*) AS total_users FROM first_purchase), returning_users AS (SELECT CAST(EXTRACT(year FROM AGE(CAST(DATE_TRUNC(\"MONTH\", o.order_ts) AS TIMESTAMP), CAST(DATE_TRUNC(\"MONTH\", fp.first_order_ts) AS TIMESTAMP))) * 12 + EXTRACT(month FROM AGE(CAST(DATE_TRUNC(\"MONTH\", o.order_ts) AS TIMESTAMP), CAST(DATE_TRUNC(\"MONTH\", fp.first_order_ts) AS TIMESTAMP))) AS BIGINT) AS month_since_first_order, COUNT(DISTINCT o.«user_id») AS new_user FROM orders_with_dates AS o JOIN first_purchase AS fp ON o.«user_id» = fp.«user_id» WHERE DATE_TRUNC(\"MONTH\", o.order_ts) > DATE_TRUNC(\"MONTH\", fp.first_order_ts) AND o.order_ts < \"2021-01-01\" GROUP BY month_since_first_order) SELECT CAST(\"2020-01-01\" AS DATE) AS COHORT, r.month_since_first_order AS MONTH_SINCE_FIRST_ORDER, r.new_user AS NEW_USER, cs.total_users AS COHORT_USER, ROUND(r.new_user / CAST(cs.total_users AS DOUBLE PRECISION), 6) AS COHORT_USERS_PERCENTAGE FROM returning_users AS r CROSS JOIN cohort_size AS cs ORDER BY r.month_since_first_order"},
   {"status": "ok", "id": "sf_bq362", "error": null},
-  {"status": "fail",
-   "id": "sf_bq363",
-   "error":
-   "Failed to parse SQL query: <input>:1:271: expected 'FROM'\n--- input ---\nWITH duration_minutes AS (SELECT DISTINCT FLOOR(CAST(«trip_seconds» AS DOUBLE PRECISION) / 60.0) AS trip_min FROM «CHICAGO».«CHICAGO_TAXI_TRIPS».«TAXI_TRIPS» WHERE FLOOR(CAST(«trip_seconds» AS DOUBLE PRECISION) / 60.0) BETWEEN 1 AND 50), ntiled AS (SELECT trip_min, NTILE(10) OVER (ORDER BY trip_min) AS quantile_group FROM duration_minutes), groups AS (SELECT quantile_group, MIN(trip_min) AS min_min, MAX(trip_min) AS max_min FROM ntiled GROUP BY quantile_group) SELECT LPAD(CAST(CAST(g.min_min AS INT) AS VARCHAR), 2, \"0\") || \"m to \" || LPAD(CAST(CAST(g.max_min AS INT) AS VARCHAR), 2, \"0\") || \"m\" AS TIME_RANGE, COUNT(*) AS TOTAL_TRIPS, ROUND(CAST(AVG(t.«fare») AS DECIMAL), 2) AS AVERAGE_FARE FROM «CHICAGO».«CHICAGO_TAXI_TRIPS».«TAXI_TRIPS» AS t JOIN groups AS g ON FLOOR(CAST(t.«trip_seconds» AS DOUBLE PRECISION) / 60.0) BETWEEN g.min_min AND g.max_min WHERE FLOOR(CAST(t.«trip_seconds» AS DOUBLE PRECISION) / 60.0) BETWEEN 1 AND 50 GROUP BY g.quantile_group, g.min_min, g.max_min ORDER BY TIME_RANGE"},
+  {"status": "ok", "id": "sf_bq363", "error": null},
   {"status": "fail",
    "id": "sf_bq370",
    "error":
@@ -523,11 +504,11 @@
   {"status": "fail",
    "id": "sf_bq373",
    "error":
-   "Failed to parse SQL query: <input>:1:520: expected 'FROM'\n--- input ---\nWITH customer_total AS (SELECT i.«CustomerID», SUM(il.«ExtendedPrice») AS total_spending FROM «WIDE_WORLD_IMPORTERS».«WIDE_WORLD_IMPORTERS».«SALES_INVOICES» AS i JOIN «WIDE_WORLD_IMPORTERS».«WIDE_WORLD_IMPORTERS».«SALES_INVOICELINES» AS il ON i.«InvoiceID» = il.«InvoiceID» WHERE i.«InvoiceDate» >= \"2014-01-01\" AND i.«InvoiceDate» < \"2015-01-01\" GROUP BY i.«CustomerID»), avg_monthly AS (SELECT «CustomerID», CAST(total_spending AS DOUBLE PRECISION) / 12 AS avg_monthly_spend FROM customer_total) SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY avg_monthly_spend) AS MEDIAN_AVG_MONTHLY_SPEND FROM avg_monthly"},
+   "Application type mismatch: The argument\n  avg_monthly_spend\nhas type\n  Bool\nbut is expected to have type\n  ℚ\nin the application\n  LeanDatabase.Scalar.pctTag \"cont\" 0.5 avg_monthly_spend"},
   {"status": "timeout",
    "id": "sf_bq374",
    "error":
-   "(deterministic) timeout at `elaborator`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
+   "(deterministic) timeout at `isDefEq`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
   {"status": "ok", "id": "sf_bq375", "error": null},
   {"status": "ok", "id": "sf_bq379", "error": null},
   {"status": "ok", "id": "sf_bq380", "error": null},
@@ -555,10 +536,10 @@
    "error":
    "Type mismatch\n  s.stop_id\nhas type\n  String\nbut is expected to have type\n  ℤ"},
   {"status": "ok", "id": "sf_bq402", "error": null},
-  {"status": "fail",
+  {"status": "timeout",
    "id": "sf_bq403",
    "error":
-   "Failed to parse SQL query: <input>:1:112: expected ')'\n--- input ---\nSELECT year_filed AS «YEAR_FILED», abs_diff AS «DIFFERENCE» FROM (SELECT 2012 AS year_filed, ABS(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY «totrevenue») - PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY «totfuncexpns»)) AS abs_diff FROM «IRS_990».«IRS_990».«IRS_990_2012» UNION ALL SELECT 2013, ABS(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY «totrevenue») - PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY «totfuncexpns»)) FROM «IRS_990».«IRS_990».«IRS_990_2013» UNION ALL SELECT 2014, ABS(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY «totrevenue») - PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY «totfuncexpns»)) FROM «IRS_990».«IRS_990».«IRS_990_2014» UNION ALL SELECT 2015, ABS(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY «totrevenue») - PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY «totfuncexpns»)) FROM «IRS_990».«IRS_990».«IRS_990_2015» UNION ALL SELECT 2016, ABS(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY «totrevenue») - PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY «totfuncexpns»)) FROM «IRS_990».«IRS_990».«IRS_990_2016» UNION ALL SELECT 2017, ABS(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY «totrevenue») - PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY «totfuncexpns»)) FROM «IRS_990».«IRS_990».«IRS_990_2017») AS t ORDER BY abs_diff ASC LIMIT 3"},
+   "(deterministic) timeout at `whnf`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
   {"status": "fail",
    "id": "sf_bq406",
    "error":
@@ -611,7 +592,7 @@
   {"status": "timeout",
    "id": "sf_bq456",
    "error":
-   "(deterministic) timeout at `isDefEq`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
+   "(deterministic) timeout at `whnf`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
   {"status": "fail",
    "id": "sf_bq457",
    "error":
@@ -681,11 +662,11 @@
   {"status": "fail",
    "id": "sf_ga028",
    "error":
-   "Application type mismatch: The argument\n  \"YYYYMMDD\"\nhas type\n  String\nbut is expected to have type\n  ℤ\nin the application\n  LeanDatabase.Scalar.toTimestamp2 events_20180612.event_date \"YYYYMMDD\""},
+   "Type mismatch\n  LeanDatabase.Scalar.toTimestamp2 events_20180612.event_date \"YYYYMMDD\"\nhas type\n  String\nbut is expected to have type\n  ℚ"},
   {"status": "fail",
    "id": "sf_ga030",
    "error":
-   "AS clause `CAST(TO_TIMESTAMP(events_20180612.event_date,\"YYYYMMDD\")AS DATE)`: Application type mismatch: The argument\n  \"YYYYMMDD\"\nhas type\n  String\nbut is expected to have type\n  ℤ\nin the application\n  LeanDatabase.Scalar.toTimestamp2 events_20180612.event_date \"YYYYMMDD\""},
+   "Type mismatch\n  event_dt\nhas type\n  String\nbut is expected to have type\n  ℚ"},
   {"status": "fail",
    "id": "sf_ga031",
    "error":
@@ -693,7 +674,7 @@
   {"status": "fail",
    "id": "sf_ga032",
    "error":
-   "Failed to parse SQL query: <input>:1:2550: expected 'FROM'\n--- input ---\nWITH page_events AS (SELECT e.«EVENT_TIMESTAMP», MAX(CASE WHEN CAST(JSON_EXTRACT_PATH(f.value, \"key\") AS TEXT) = \"page_title\" THEN CAST(JSON_EXTRACT_PATH(f.value, \"value\", \"string_value\") AS TEXT) END) AS page_title, MAX(CASE WHEN CAST(JSON_EXTRACT_PATH(f.value, \"key\") AS TEXT) = \"page_location\" THEN CAST(JSON_EXTRACT_PATH(f.value, \"value\", \"string_value\") AS TEXT) END) AS page_location FROM «GA4».«GA4_OBFUSCATED_SAMPLE_ECOMMERCE».«EVENTS_20210128» AS e, LATERALFLATTEN(e.«EVENT_PARAMS») AS f(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE e.«USER_PSEUDO_ID» = \"1362228.4966015575\" AND e.«EVENT_NAME» = \"page_view\" GROUP BY e.«EVENT_TIMESTAMP»), classified AS (SELECT «EVENT_TIMESTAMP», CASE WHEN ARRAY_LENGTH(SPLIT(page_location, \"/\"), 1) >= 5 AND CONTAINS(SPLIT_PART(page_location, \"/\", ARRAY_LENGTH(SPLIT(page_location, \"/\"), 1)), \"+\") AND (REPLACE(SPLIT_PART(page_location, \"/\", 5), \"+\", \" \") IN (\"Accessories\", \"Apparel\", \"Brands\", \"Campus Collection\", \"Drinkware\", \"Electronics\", \"Google Redesign\", \"Lifestyle\", \"Nest\", \"New 2015 Logo\", \"Notebooks Journals\", \"Office\", \"Shop by Brand\", \"Small Goods\", \"Stationery\", \"Wearables\") OR REPLACE(SPLIT_PART(page_location, \"/\", 6), \"+\", \" \") IN (\"Accessories\", \"Apparel\", \"Brands\", \"Campus Collection\", \"Drinkware\", \"Electronics\", \"Google Redesign\", \"Lifestyle\", \"Nest\", \"New 2015 Logo\", \"Notebooks Journals\", \"Office\", \"Shop by Brand\", \"Small Goods\", \"Stationery\", \"Wearables\")) THEN \"PDP\" WHEN ARRAY_LENGTH(SPLIT(page_location, \"/\"), 1) >= 5 AND NOT CONTAINS(SPLIT_PART(page_location, \"/\", 5), \"+\") AND NOT CONTAINS(SPLIT_PART(page_location, \"/\", 6), \"+\") AND (REPLACE(SPLIT_PART(page_location, \"/\", 5), \"+\", \" \") IN (\"Accessories\", \"Apparel\", \"Brands\", \"Campus Collection\", \"Drinkware\", \"Electronics\", \"Google Redesign\", \"Lifestyle\", \"Nest\", \"New 2015 Logo\", \"Notebooks Journals\", \"Office\", \"Shop by Brand\", \"Small Goods\", \"Stationery\", \"Wearables\") OR REPLACE(SPLIT_PART(page_location, \"/\", 6), \"+\", \" \") IN (\"Accessories\", \"Apparel\", \"Brands\", \"Campus Collection\", \"Drinkware\", \"Electronics\", \"Google Redesign\", \"Lifestyle\", \"Nest\", \"New 2015 Logo\", \"Notebooks Journals\", \"Office\", \"Shop by Brand\", \"Small Goods\", \"Stationery\", \"Wearables\")) THEN \"PLP\" ELSE page_title END AS display_name FROM page_events), ordered AS (SELECT display_name, ROW_NUMBER() OVER (ORDER BY «EVENT_TIMESTAMP») AS rn, LAG(display_name) OVER (ORDER BY «EVENT_TIMESTAMP») AS prev_name FROM classified), deduped AS (SELECT display_name, rn FROM ordered WHERE prev_name IS NULL OR display_name <> prev_name) SELECT STRING_AGG(display_name, \">>\" ORDER BY rn) AS SCREENS_ON_A_VISIT FROM deduped"},
+   "Application type mismatch: The argument\n  some (LeanDatabase.Scalar.getPath3 f.value \"value\" \"string_value\")\nhas type\n  Option String\nbut is expected to have type\n  ℚ\nin the application\n  ite (decide (LeanDatabase.Scalar.getPath f.value \"key\" = \"page_title\") = true)\n    (some (LeanDatabase.Scalar.getPath3 f.value \"value\" \"string_value\"))"},
   {"status": "fail",
    "id": "sf_local002",
    "error":
@@ -706,7 +687,7 @@
   {"status": "fail",
    "id": "sf_local017",
    "error":
-   "Failed to parse SQL query: <input>:1:608: expected 'FROM'\n--- input ---\nWITH yearly_cause_ranked AS (SELECT EXTRACT(YEAR FROM CAST(TO_TIMESTAMP(«collision_date», \"YYYY-MM-DD\") AS DATE)) AS yr, «pcf_violation_category» AS cause, COUNT(*) AS cnt, ROW_NUMBER() OVER (PARTITION BY EXTRACT(YEAR FROM CAST(TO_TIMESTAMP(«collision_date», \"YYYY-MM-DD\") AS DATE)) ORDER BY COUNT(*) DESC) AS rn FROM «CALIFORNIA_TRAFFIC_COLLISION».«CALIFORNIA_TRAFFIC_COLLISION».«COLLISIONS» WHERE NOT «pcf_violation_category» IS NULL AND «pcf_violation_category» <> \"\" GROUP BY yr, cause), top2_per_year AS (SELECT yr, cause FROM yearly_cause_ranked WHERE rn <= 2), year_cause_set AS (SELECT yr, STRING_AGG(cause, \",\" ORDER BY cause) AS cause_set FROM top2_per_year GROUP BY yr), cause_set_counts AS (SELECT cause_set, COUNT(*) AS num_years FROM year_cause_set GROUP BY cause_set ORDER BY num_years DESC), majority_set AS (SELECT cause_set FROM cause_set_counts ORDER BY num_years DESC LIMIT 1) SELECT ycs.yr AS OUTPUT FROM year_cause_set AS ycs WHERE ycs.cause_set <> (SELECT cause_set FROM majority_set) ORDER BY ycs.yr"},
+   "Failed to parse SQL query: <input>:1:972: expected ')', '↑', '↥', '⇑' or term\n--- input ---\nWITH yearly_cause_ranked AS (SELECT EXTRACT(YEAR FROM CAST(TO_TIMESTAMP(«collision_date», \"YYYY-MM-DD\") AS DATE)) AS yr, «pcf_violation_category» AS cause, COUNT(*) AS cnt, ROW_NUMBER() OVER (PARTITION BY EXTRACT(YEAR FROM CAST(TO_TIMESTAMP(«collision_date», \"YYYY-MM-DD\") AS DATE)) ORDER BY COUNT(*) DESC) AS rn FROM «CALIFORNIA_TRAFFIC_COLLISION».«CALIFORNIA_TRAFFIC_COLLISION».«COLLISIONS» WHERE NOT «pcf_violation_category» IS NULL AND «pcf_violation_category» <> \"\" GROUP BY yr, cause), top2_per_year AS (SELECT yr, cause FROM yearly_cause_ranked WHERE rn <= 2), year_cause_set AS (SELECT yr, STRING_AGG(cause, \",\" ORDER BY cause) AS cause_set FROM top2_per_year GROUP BY yr), cause_set_counts AS (SELECT cause_set, COUNT(*) AS num_years FROM year_cause_set GROUP BY cause_set ORDER BY num_years DESC), majority_set AS (SELECT cause_set FROM cause_set_counts ORDER BY num_years DESC LIMIT 1) SELECT ycs.yr AS OUTPUT FROM year_cause_set AS ycs WHERE ycs.cause_set <> (SELECT cause_set FROM majority_set) ORDER BY ycs.yr"},
   {"status": "fail",
    "id": "sf_local018",
    "error":
@@ -751,7 +732,7 @@
   {"status": "fail",
    "id": "sf_local050",
    "error":
-   "Failed to parse SQL query: <input>:1:1811: expected 'FROM'\n--- input ---\nWITH monthly_product_sales AS ( SELECT t.«calendar_year» AS yr, t.«calendar_month_number» AS month_num, s.«prod_id», SUM(s.«amount_sold») AS total_sales FROM «COMPLEX_ORACLE».«COMPLEX_ORACLE».«SALES» AS s JOIN «COMPLEX_ORACLE».«COMPLEX_ORACLE».«TIMES» AS t ON s.«time_id» = t.«time_id» JOIN «COMPLEX_ORACLE».«COMPLEX_ORACLE».«CUSTOMERS» AS cu ON s.«cust_id» = cu.«cust_id» JOIN «COMPLEX_ORACLE».«COMPLEX_ORACLE».«COUNTRIES» AS co ON cu.«country_id» = co.«country_id» JOIN «COMPLEX_ORACLE».«COMPLEX_ORACLE».«PROMOTIONS» AS p ON s.«promo_id» = p.«promo_id» JOIN «COMPLEX_ORACLE».«COMPLEX_ORACLE».«CHANNELS» AS ch ON s.«channel_id» = ch.«channel_id» WHERE co.«country_name» = \"France\" AND t.«calendar_year» IN (2019, 2020) AND p.«promo_total_id» = 1 AND ch.«channel_total_id» = 1 GROUP BY t.«calendar_year», t.«calendar_month_number», s.«prod_id»), pivoted AS (  SELECT month_num, «prod_id», MAX(CASE WHEN yr = 2019 THEN total_sales END) AS sales_2019, MAX(CASE WHEN yr = 2020 THEN total_sales END) AS sales_2020 FROM monthly_product_sales GROUP BY month_num, «prod_id» HAVING NOT MAX(CASE WHEN yr = 2019 THEN total_sales END) IS NULL AND NOT MAX(CASE WHEN yr = 2020 THEN total_sales END) IS NULL AND MAX(CASE WHEN yr = 2019 THEN total_sales END) > 0), projected AS (   SELECT month_num, «prod_id», sales_2020 * (1 + CAST((sales_2020 - sales_2019) AS DOUBLE PRECISION) / sales_2019) AS projected_2021 FROM pivoted), projected_usd AS ( SELECT p.month_num, p.«prod_id», p.projected_2021 * c.«to_us» AS projected_2021_usd FROM projected AS p JOIN «COMPLEX_ORACLE».«COMPLEX_ORACLE».«CURRENCY» AS c ON c.«country» = \"France\" AND c.«year» = 2021 AND c.«month» = p.month_num), monthly_avg AS ( SELECT month_num, AVG(projected_2021_usd) AS avg_projected_sales FROM projected_usd GROUP BY month_num)  SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY avg_projected_sales) AS median_avg_monthly_projected_sales_usd FROM monthly_avg"},
+   "Application type mismatch: The argument\n  some total_sales\nhas type\n  Option ℚ\nbut is expected to have type\n  ℚ\nin the application\n  ite (decide (yr = 2019) = true) (some total_sales)"},
   {"status": "fail",
    "id": "sf_local054",
    "error":
@@ -773,10 +754,7 @@
    "Failed to parse SQL query: <input>:1:456: expected identifier\n--- input ---\nWITH growing_cities AS ( SELECT q4_19.«cust_city» FROM (SELECT cu.«cust_city», SUM(s.«amount_sold») AS sales FROM «COMPLEX_ORACLE».«COMPLEX_ORACLE».«SALES» AS s JOIN «COMPLEX_ORACLE».«COMPLEX_ORACLE».«TIMES» AS t ON s.«time_id» = t.«time_id» JOIN «COMPLEX_ORACLE».«COMPLEX_ORACLE».«CUSTOMERS» AS cu ON s.«cust_id» = cu.«cust_id» WHERE s.«promo_id» = 999 AND t.«calendar_quarter_id» = 1772 AND cu.«country_id» = 52790 GROUP BY cu.«cust_city») AS q4_19 JOIN (SELECT cu.«cust_city», SUM(s.«amount_sold») AS sales FROM «COMPLEX_ORACLE».«COMPLEX_ORACLE».«SALES» AS s JOIN «COMPLEX_ORACLE».«COMPLEX_ORACLE».«TIMES» AS t ON s.«time_id» = t.«time_id» JOIN «COMPLEX_ORACLE».«COMPLEX_ORACLE».«CUSTOMERS» AS cu ON s.«cust_id» = cu.«cust_id» WHERE s.«promo_id» = 999 AND t.«calendar_quarter_id» = 1776 AND cu.«country_id» = 52790 GROUP BY cu.«cust_city») AS q4_20 ON q4_19.«cust_city» = q4_20.«cust_city» WHERE CAST((q4_20.sales - q4_19.sales) AS DOUBLE PRECISION) / q4_19.sales >= 0.20), product_quarter_sales  AS (SELECT s.«prod_id», t.«calendar_quarter_id», SUM(s.«amount_sold») AS prod_sales FROM «COMPLEX_ORACLE».«COMPLEX_ORACLE».«SALES» AS s JOIN «COMPLEX_ORACLE».«COMPLEX_ORACLE».«TIMES» AS t ON s.«time_id» = t.«time_id» JOIN «COMPLEX_ORACLE».«COMPLEX_ORACLE».«CUSTOMERS» AS cu ON s.«cust_id» = cu.«cust_id» WHERE s.«promo_id» = 999 AND t.«calendar_quarter_id» IN (1772, 1776) AND cu.«country_id» = 52790 AND cu.«cust_city» IN (SELECT «cust_city» FROM growing_cities) GROUP BY s.«prod_id», t.«calendar_quarter_id»), quarter_totals  AS (SELECT «calendar_quarter_id», SUM(prod_sales) AS total_sales FROM product_quarter_sales GROUP BY «calendar_quarter_id»), product_shares  AS (SELECT pq.«prod_id», MAX(CASE WHEN pq.«calendar_quarter_id» = 1772 THEN CAST(pq.prod_sales AS DOUBLE PRECISION) / qt.total_sales END) AS SHARE_2019Q4, MAX(CASE WHEN pq.«calendar_quarter_id» = 1776 THEN CAST(pq.prod_sales AS DOUBLE PRECISION) / qt.total_sales END) AS SHARE_2020Q4 FROM product_quarter_sales AS pq JOIN quarter_totals AS qt ON pq.«calendar_quarter_id» = qt.«calendar_quarter_id» GROUP BY pq.«prod_id»), product_ranked  AS (SELECT pq.«prod_id», SUM(pq.prod_sales) AS total_sales, NTILE(5) OVER (ORDER BY SUM(pq.prod_sales) DESC) AS ntile_rank FROM product_quarter_sales AS pq GROUP BY pq.«prod_id») SELECT pr.«prod_id», p.«prod_name», ABS(ps.SHARE_2020Q4 - ps.SHARE_2019Q4) AS PP_CHANGE, ps.SHARE_2019Q4, ps.SHARE_2020Q4 FROM product_ranked AS pr JOIN product_shares AS ps ON pr.«prod_id» = ps.«prod_id» JOIN «COMPLEX_ORACLE».«COMPLEX_ORACLE».«PRODUCTS» AS p ON pr.«prod_id» = p.«prod_id» WHERE pr.ntile_rank = 1 AND NOT ps.SHARE_2019Q4 IS NULL AND NOT ps.SHARE_2020Q4 IS NULL ORDER BY PP_CHANGE ASC LIMIT 1"},
   {"status": "ok", "id": "sf_local065", "error": null},
   {"status": "ok", "id": "sf_local066", "error": null},
-  {"status": "fail",
-   "id": "sf_local067",
-   "error":
-   "Failed to parse SQL query: <input>:1:592: expected 'FROM'\n--- input ---\nWITH customer_profits AS (SELECT cu.«cust_id», SUM(s.«amount_sold» - c.«unit_cost» * s.«quantity_sold») AS total_profit FROM «COMPLEX_ORACLE».«COMPLEX_ORACLE».«SALES» AS s JOIN «COMPLEX_ORACLE».«COMPLEX_ORACLE».«COSTS» AS c ON s.«prod_id» = c.«prod_id» AND s.«time_id» = c.«time_id» AND s.«channel_id» = c.«channel_id» AND s.«promo_id» = c.«promo_id» JOIN «COMPLEX_ORACLE».«COMPLEX_ORACLE».«CUSTOMERS» AS cu ON s.«cust_id» = cu.«cust_id» WHERE cu.«country_id» = 52770 AND s.«time_id» >= \"2021-12-01\" AND s.«time_id» < \"2022-01-01\" GROUP BY cu.«cust_id»), tiered AS (SELECT total_profit, NTILE(10) OVER (ORDER BY total_profit DESC) AS BUCKET FROM customer_profits) SELECT BUCKET, MAX(total_profit) AS MAX_PROFIT, MIN(total_profit) AS MIN_PROFIT FROM tiered GROUP BY BUCKET ORDER BY BUCKET"},
+  {"status": "ok", "id": "sf_local067", "error": null},
   {"status": "fail",
    "id": "sf_local068",
    "error":
@@ -796,19 +774,16 @@
   {"status": "fail",
    "id": "sf_local073",
    "error":
-   "Failed to parse SQL query: <input>:1:1209: expected ')'\n--- input ---\nWITH numbered_orders AS (SELECT ROW_NUMBER() OVER (ORDER BY «order_id», «order_time») AS row_id, «order_id», «customer_id», «pizza_id», «exclusions», «extras», «order_time» FROM «MODERN_DATA».«MODERN_DATA».«PIZZA_CLEAN_CUSTOMER_ORDERS»), orders_with_names AS (SELECT o.row_id, o.«order_id», o.«customer_id», CASE WHEN pn.«pizza_name» = \"Meatlovers\" THEN 1 ELSE 2 END AS pizza_id, pn.«pizza_name», o.«exclusions», o.«extras», o.«order_time» FROM numbered_orders AS o JOIN «MODERN_DATA».«MODERN_DATA».«PIZZA_NAMES» AS pn ON o.«pizza_id» = pn.«pizza_id»), recipe_toppings  AS (SELECT r.«pizza_id», CAST(TRIM(rt.VALUE) AS INT) AS topping_id FROM «MODERN_DATA».«MODERN_DATA».«PIZZA_RECIPES» AS r, LATERALFLATTEN(SPLIT(r.«toppings», \",\")) AS rt(SEQ, KEY, PATH, INDEX, VALUE, THIS)), order_standard_toppings  AS (SELECT o.row_id, o.«order_id», o.«customer_id», o.pizza_id, o.«pizza_name», o.«order_time», o.«exclusions», o.«extras», rt.topping_id, \"standard\" AS source FROM orders_with_names AS o JOIN recipe_toppings AS rt ON o.pizza_id = rt.«pizza_id»), order_exclusions  AS (SELECT o.row_id, CAST(TRIM(ex.VALUE) AS INT) AS excluded_topping_id FROM orders_with_names AS o, LATERALFLATTEN(SPLIT(o.«exclusions», \",\"), OUTER => TRUE) AS ex(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE NOT o.«exclusions» IS NULL AND o.«exclusions» <> \"\"), order_extras  AS (SELECT o.row_id, CAST(TRIM(ext.VALUE) AS INT) AS extra_topping_id FROM orders_with_names AS o, LATERALFLATTEN(SPLIT(o.«extras», \",\"), OUTER => TRUE) AS ext(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE NOT o.«extras» IS NULL AND o.«extras» <> \"\"), standard_minus_exclusions  AS (SELECT st.row_id, st.«order_id», st.«customer_id», st.pizza_id, st.«pizza_name», st.«order_time», st.topping_id, st.source FROM order_standard_toppings AS st LEFT JOIN order_exclusions AS ex ON st.row_id = ex.row_id AND st.topping_id = ex.excluded_topping_id WHERE ex.excluded_topping_id IS NULL), all_toppings  AS (SELECT row_id, «order_id», «customer_id», pizza_id, «pizza_name», «order_time», topping_id, source FROM standard_minus_exclusions UNION ALL SELECT o.row_id, o.«order_id», o.«customer_id», o.pizza_id, o.«pizza_name», o.«order_time», ext.extra_topping_id AS topping_id, \"extra\" AS source FROM orders_with_names AS o JOIN order_extras AS ext ON o.row_id = ext.row_id), topping_counts  AS (SELECT at.row_id, at.«order_id», at.«customer_id», at.pizza_id, at.«pizza_name», at.«order_time», at.topping_id, t.«topping_name», COUNT(*) AS cnt FROM all_toppings AS at JOIN «MODERN_DATA».«MODERN_DATA».«PIZZA_TOPPINGS» AS t ON at.topping_id = t.«topping_id» GROUP BY at.row_id, at.«order_id», at.«customer_id», at.pizza_id, at.«pizza_name», at.«order_time», at.topping_id, t.«topping_name»), formatted_toppings  AS (SELECT row_id, «order_id», «customer_id», pizza_id, «pizza_name», «order_time», topping_id, «topping_name», cnt, CASE WHEN cnt >= 2 THEN \"2x \" || «topping_name» ELSE «topping_name» END AS formatted_name, CASE WHEN cnt >= 2 THEN 0 ELSE 1 END AS sort_group FROM topping_counts), ingredient_strings  AS (SELECT row_id, «order_id», «customer_id», «pizza_name», «order_time», «pizza_name» || \": \" || STRING_AGG(formatted_name, \", \" ORDER BY sort_group, «topping_name») AS ingredients FROM formatted_toppings GROUP BY row_id, «order_id», «customer_id», «pizza_name», «order_time») SELECT row_id, «order_id», «customer_id», «pizza_name», ingredients FROM ingredient_strings ORDER BY row_id"},
+   "Failed to parse SQL query: <input>:1:2461: expected identifier\n--- input ---\nWITH numbered_orders AS (SELECT ROW_NUMBER() OVER (ORDER BY «order_id», «order_time») AS row_id, «order_id», «customer_id», «pizza_id», «exclusions», «extras», «order_time» FROM «MODERN_DATA».«MODERN_DATA».«PIZZA_CLEAN_CUSTOMER_ORDERS»), orders_with_names AS (SELECT o.row_id, o.«order_id», o.«customer_id», CASE WHEN pn.«pizza_name» = \"Meatlovers\" THEN 1 ELSE 2 END AS pizza_id, pn.«pizza_name», o.«exclusions», o.«extras», o.«order_time» FROM numbered_orders AS o JOIN «MODERN_DATA».«MODERN_DATA».«PIZZA_NAMES» AS pn ON o.«pizza_id» = pn.«pizza_id»), recipe_toppings  AS (SELECT r.«pizza_id», CAST(TRIM(rt.VALUE) AS INT) AS topping_id FROM «MODERN_DATA».«MODERN_DATA».«PIZZA_RECIPES» AS r, LATERALFLATTEN(SPLIT(r.«toppings», \",\")) AS rt(SEQ, KEY, PATH, INDEX, VALUE, THIS)), order_standard_toppings  AS (SELECT o.row_id, o.«order_id», o.«customer_id», o.pizza_id, o.«pizza_name», o.«order_time», o.«exclusions», o.«extras», rt.topping_id, \"standard\" AS source FROM orders_with_names AS o JOIN recipe_toppings AS rt ON o.pizza_id = rt.«pizza_id»), order_exclusions  AS (SELECT o.row_id, CAST(TRIM(ex.VALUE) AS INT) AS excluded_topping_id FROM orders_with_names AS o, LATERALFLATTEN(SPLIT(o.«exclusions», \",\")) AS ex(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE NOT o.«exclusions» IS NULL AND o.«exclusions» <> \"\"), order_extras  AS (SELECT o.row_id, CAST(TRIM(ext.VALUE) AS INT) AS extra_topping_id FROM orders_with_names AS o, LATERALFLATTEN(SPLIT(o.«extras», \",\")) AS ext(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE NOT o.«extras» IS NULL AND o.«extras» <> \"\"), standard_minus_exclusions  AS (SELECT st.row_id, st.«order_id», st.«customer_id», st.pizza_id, st.«pizza_name», st.«order_time», st.topping_id, st.source FROM order_standard_toppings AS st LEFT JOIN order_exclusions AS ex ON st.row_id = ex.row_id AND st.topping_id = ex.excluded_topping_id WHERE ex.excluded_topping_id IS NULL), all_toppings  AS (SELECT row_id, «order_id», «customer_id», pizza_id, «pizza_name», «order_time», topping_id, source FROM standard_minus_exclusions UNION ALL SELECT o.row_id, o.«order_id», o.«customer_id», o.pizza_id, o.«pizza_name», o.«order_time», ext.extra_topping_id AS topping_id, \"extra\" AS source FROM orders_with_names AS o JOIN order_extras AS ext ON o.row_id = ext.row_id), topping_counts  AS (SELECT at.row_id, at.«order_id», at.«customer_id», at.pizza_id, at.«pizza_name», at.«order_time», at.topping_id, t.«topping_name», COUNT(*) AS cnt FROM all_toppings AS at JOIN «MODERN_DATA».«MODERN_DATA».«PIZZA_TOPPINGS» AS t ON at.topping_id = t.«topping_id» GROUP BY at.row_id, at.«order_id», at.«customer_id», at.pizza_id, at.«pizza_name», at.«order_time», at.topping_id, t.«topping_name»), formatted_toppings  AS (SELECT row_id, «order_id», «customer_id», pizza_id, «pizza_name», «order_time», topping_id, «topping_name», cnt, CASE WHEN cnt >= 2 THEN \"2x \" || «topping_name» ELSE «topping_name» END AS formatted_name, CASE WHEN cnt >= 2 THEN 0 ELSE 1 END AS sort_group FROM topping_counts), ingredient_strings  AS (SELECT row_id, «order_id», «customer_id», «pizza_name», «order_time», «pizza_name» || \": \" || STRING_AGG(formatted_name, \", \" ORDER BY sort_group, «topping_name») AS ingredients FROM formatted_toppings GROUP BY row_id, «order_id», «customer_id», «pizza_name», «order_time») SELECT row_id, «order_id», «customer_id», «pizza_name», ingredients FROM ingredient_strings ORDER BY row_id"},
   {"status": "fail",
    "id": "sf_local074",
    "error":
-   "AS clause `DATE_TRUNC(\"MONTH\",CAST(TO_TIMESTAMP(customer_transactions.txn_date,\"YYYY-MM-DD\")AS DATE))`: Application type mismatch: The argument\n  \"YYYY-MM-DD\"\nhas type\n  String\nbut is expected to have type\n  ℤ\nin the application\n  LeanDatabase.Scalar.toTimestamp2 customer_transactions.txn_date \"YYYY-MM-DD\""},
+   "AS clause `SUM(balance_activity)OVER(PARTITION BY customer_months.customer_id ORDER BY\n    generated_month rows BETWEEN unbounded preceding AND current row)`: Unknown identifier `unbounded`"},
   {"status": "fail",
    "id": "sf_local077",
    "error":
    "AS clause `AVG(max_index_composition)OVER(ORDER BY interest_metrics._year,\n    interest_metrics._month rows BETWEEN 2 preceding AND current row)`: Function expected at\n  interest_metrics._month\nbut this term has type\n  ℚ\n\nNote: Expected a function because this term is being applied to the argument\n  rows"},
-  {"status": "fail",
-   "id": "sf_local081",
-   "error":
-   "Application type mismatch: The argument\n  \"YYYY-MM-DD\"\nhas type\n  String\nbut is expected to have type\n  ℤ\nin the application\n  LeanDatabase.Scalar.toTimestamp2 o.orderdate \"YYYY-MM-DD\""},
+  {"status": "ok", "id": "sf_local081", "error": null},
   {"status": "ok", "id": "sf_local085", "error": null},
   {"status": "ok", "id": "sf_local096", "error": null},
   {"status": "ok", "id": "sf_local098", "error": null},
@@ -827,15 +802,9 @@
    "id": "sf_local141",
    "error":
    "Failed to parse SQL query: <input>:1:384: expected identifier\n--- input ---\nSELECT CAST(s.«salespersonid» AS INT) AS «SalesPersonID», CAST(EXTRACT(YEAR FROM TO_TIMESTAMP(s.«orderdate»)) AS INT) AS «SalesYear», SUM(s.«totaldue») AS «TotalSales», CAST(q.«QuotaYear» AS INT) AS «SalesQuotaYear», q.«AnnualQuota» AS «SalesQuota», SUM(s.«totaldue») - q.«AnnualQuota» AS «Amt_Above_or_Below_Quota» FROM «ADVENTUREWORKS».«ADVENTUREWORKS».«SALESORDERHEADER» AS s JOIN (SELECT «BusinessEntityID», EXTRACT(YEAR FROM TO_TIMESTAMP(«QuotaDate»)) AS «QuotaYear», SUM(«SalesQuota») AS «AnnualQuota» FROM «ADVENTUREWORKS».«ADVENTUREWORKS».«SALESPERSONQUOTAHISTORY» GROUP BY «BusinessEntityID», «QuotaYear») AS q ON CAST(s.«salespersonid» AS INT) = q.«BusinessEntityID» AND EXTRACT(YEAR FROM TO_TIMESTAMP(s.«orderdate»)) = q.«QuotaYear» WHERE NOT s.«salespersonid» IS NULL AND s.«salespersonid» <> \"\" GROUP BY CAST(s.«salespersonid» AS INT), EXTRACT(YEAR FROM TO_TIMESTAMP(s.«orderdate»)), q.«QuotaYear», q.«AnnualQuota» ORDER BY «SalesPersonID», «SalesYear»"},
-  {"status": "fail",
-   "id": "sf_local156",
-   "error":
-   "AS clause `EXTRACT(YEAR FROM CAST(TO_TIMESTAMP(t.txn_date,\"DD-MM-YYYY\")AS DATE))`: Application type mismatch: The argument\n  \"DD-MM-YYYY\"\nhas type\n  String\nbut is expected to have type\n  ℤ\nin the application\n  LeanDatabase.Scalar.toTimestamp2 t.txn_date \"DD-MM-YYYY\""},
+  {"status": "ok", "id": "sf_local156", "error": null},
   {"status": "ok", "id": "sf_local163", "error": null},
-  {"status": "fail",
-   "id": "sf_local167",
-   "error":
-   "AS clause `CAST(TO_TIMESTAMP(lt.term_start,\"YYYY-MM-DD\")AS DATE)`: Application type mismatch: The argument\n  \"YYYY-MM-DD\"\nhas type\n  String\nbut is expected to have type\n  ℤ\nin the application\n  LeanDatabase.Scalar.toTimestamp2 lt.term_start \"YYYY-MM-DD\""},
+  {"status": "ok", "id": "sf_local167", "error": null},
   {"status": "ok", "id": "sf_local168", "error": null},
   {"status": "fail",
    "id": "sf_local169",
@@ -854,10 +823,7 @@
    "error":
    "Type mismatch\n  payment.payment_date\nhas type\n  String\nbut is expected to have type\n  ℚ"},
   {"status": "ok", "id": "sf_local197", "error": null},
-  {"status": "fail",
-   "id": "sf_local198",
-   "error":
-   "Failed to parse SQL query: <input>:1:291: expected 'FROM'\n--- input ---\nWITH country_sales AS (SELECT i.«BillingCountry», SUM(i.«Total») AS total_sales FROM «CHINOOK».«CHINOOK».«INVOICES» AS i JOIN «CHINOOK».«CHINOOK».«CUSTOMERS» AS c ON i.«CustomerId» = c.«CustomerId» GROUP BY i.«BillingCountry» HAVING COUNT(DISTINCT c.«CustomerId») > 4) SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY total_sales) AS median_total_sales FROM country_sales"},
+  {"status": "ok", "id": "sf_local198", "error": null},
   {"status": "fail",
    "id": "sf_local201",
    "error":
@@ -905,10 +871,7 @@
    "id": "sf_local284",
    "error": "Unknown identifier `«loss_rate_%»`"},
   {"status": "ok", "id": "sf_local286", "error": null},
-  {"status": "fail",
-   "id": "sf_local297",
-   "error":
-   "AS clause `DATE_TRUNC(\"MONTH\",CAST(TO_TIMESTAMP(customer_transactions.txn_date,\"YYYY-MM-DD\")AS DATE))`: Application type mismatch: The argument\n  \"YYYY-MM-DD\"\nhas type\n  String\nbut is expected to have type\n  ℤ\nin the application\n  LeanDatabase.Scalar.toTimestamp2 customer_transactions.txn_date \"YYYY-MM-DD\""},
+  {"status": "ok", "id": "sf_local297", "error": null},
   {"status": "ok", "id": "sf_local301", "error": null},
   {"status": "ok", "id": "sf_local302", "error": null},
   {"status": "ok", "id": "sf_local310", "error": null},
@@ -924,8 +887,5 @@
    "id": "sf_local356",
    "error":
    "Failed to parse SQL query: <input>:1:1556: expected identifier\n--- input ---\nWITH position_changes AS (SELECT curr.«race_id», curr.«driver_id», curr.«lap», curr.«position» AS curr_position, prev.«position» AS prev_position FROM «F1».«F1».«LAP_POSITIONS» AS curr JOIN «F1».«F1».«LAP_POSITIONS» AS prev ON curr.«race_id» = prev.«race_id» AND curr.«driver_id» = prev.«driver_id» AND curr.«lap» = prev.«lap» + 1 WHERE curr.«lap» >= 2 AND curr.«lap_type» = \"Race\" AND prev.«lap_type» = \"Race\"), overtake_pairs AS (SELECT a.«race_id», a.«lap», a.«driver_id» AS overtaker_id, b.«driver_id» AS overtaken_id FROM position_changes AS a JOIN position_changes AS b ON a.«race_id» = b.«race_id» AND a.«lap» = b.«lap» AND a.«driver_id» <> b.«driver_id» WHERE a.prev_position > b.prev_position AND a.curr_position < b.curr_position), on_track_overtakes AS (SELECT op.«race_id», op.«lap», op.overtaker_id, op.overtaken_id FROM overtake_pairs AS op WHERE NOT EXISTS(SELECT 1 FROM «F1».«F1».«PIT_STOPS» AS ps WHERE ps.«race_id» = op.«race_id» AND ps.«driver_id» = op.overtaken_id AND (ps.«lap» = op.«lap» OR ps.«lap» = op.«lap» - 1)) AND NOT EXISTS(SELECT 1 FROM «F1».«F1».«PIT_STOPS» AS ps WHERE ps.«race_id» = op.«race_id» AND ps.«driver_id» = op.overtaker_id AND ps.«lap» = op.«lap») AND NOT EXISTS(SELECT 1 FROM «F1».«F1».«RETIREMENTS» AS r WHERE r.«race_id» = op.«race_id» AND r.«driver_id» = op.overtaken_id AND r.«lap» = op.«lap»)), driver_stats AS (SELECT d.«driver_id», d.«forename» || \" \" || d.«surname» AS «full_name», COALESCE(p.cnt, 0) AS overtakes_performed, COALESCE(r.cnt, 0) AS times_overtaken FROM «F1».«F1».«DRIVERS» AS d LEFT JOIN (SELECT overtaker_id AS did, COUNT(*) AS cnt FROM on_track_overtakes GROUP BY overtaker_id) AS p ON d.«driver_id» = p.did LEFT JOIN (SELECT overtaken_id AS did, COUNT(*) AS cnt FROM on_track_overtakes GROUP BY overtaken_id) AS r ON d.«driver_id» = r.did WHERE COALESCE(p.cnt, 0) > 0 OR COALESCE(r.cnt, 0) > 0) SELECT «full_name» FROM driver_stats WHERE times_overtaken > overtakes_performed ORDER BY «full_name»"},
-  {"status": "fail",
-   "id": "sf_local358",
-   "error":
-   "AS clause `FLOOR(CAST((CAST(CURRENT_DATE AS DATE) - CAST(CAST(TO_TIMESTAMP(mst_users.birth_date,\"YYYY-MM-DD\")AS DATE)AS DATE))AS\n      DOUBLE PRECISION) /\n    (365.25 : Rat✝))`: Application type mismatch: The argument\n  \"YYYY-MM-DD\"\nhas type\n  String\nbut is expected to have type\n  ℤ\nin the application\n  LeanDatabase.Scalar.toTimestamp2 mst_users.birth_date \"YYYY-MM-DD\""}],
- "elaborates": 153}
+  {"status": "ok", "id": "sf_local358", "error": null}],
+ "elaborates": 166}

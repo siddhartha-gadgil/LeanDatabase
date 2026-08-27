@@ -107,6 +107,17 @@ def parseTypedRelFilter  (schemasStr : List (String × List (String × String)))
   let stx ← expandNames labels stx
   elabTypedRelFilterSimple schemas stx
 
+/-- Build the `STRING_AGG` summand: one string per row folding a DISTINCT marker, the delimiter, the
+element and every ORDER BY key (via the opaque `toChar`), so aggregations differing in any of these
+keep distinct summands and can't be wrongly equated (the aggregate itself is opaque). -/
+def mkStrAgg (distinct : Bool) (d e : Syntax.Term) (ks : Array Syntax.Term) : TermElabM Syntax.Term := do
+  let tc : Syntax.Term → TermElabM Syntax.Term := fun x => `($(mkIdent ``LeanDatabase.Scalar.toChar) $x)
+  let mark : Syntax.Term := ⟨Syntax.mkStrLit (if distinct then "SAD|" else "SA|")⟩
+  let mut acc ← `($mark ++ $d ++ $(← tc e))
+  for k in ks do
+    acc ← `($acc ++ $(← tc k))
+  return acc
+
 /-- Pull every aggregate call out of a term for the `GROUP BY` arm: each `AGG(expr)` is replaced by
 a fresh column name and recorded `(name, kind, expr)` in the state, to be built uniformly by
 `groupAggExprsE`. Columns and arbitrary expressions go through the same path (`SUM(age)` sums the
@@ -135,6 +146,16 @@ partial def liftAggExprs (stx : Syntax) :
     | `(AVG($e:term))   => record .avg e
     | `(STDDEV($e:term)) | `(STDDEV_POP($e:term)) | `(STDDEV_SAMP($e:term)) => record .stddev e
     | `(VARIANCE($e:term)) | `(VAR_POP($e:term)) | `(VAR_SAMP($e:term)) => record .variance e
+    | `(STRING_AGG(DISTINCT $e:term, $d:term ORDER BY $ks,*)) =>
+        do record .stringAgg (← mkStrAgg true d e ks.getElems)
+    | `(STRING_AGG($e:term, $d:term ORDER BY $ks,*)) =>
+        do record .stringAgg (← mkStrAgg false d e ks.getElems)
+    | `(STRING_AGG(DISTINCT $e:term, $d:term)) => do record .stringAgg (← mkStrAgg true d e #[])
+    | `(STRING_AGG($e:term, $d:term))          => do record .stringAgg (← mkStrAgg false d e #[])
+    | `(PERCENTILE_CONT($p:term) WITHIN GROUP (ORDER BY $e:term)) =>
+        do record .percentile (← `($(mkIdent ``LeanDatabase.Scalar.pctTag) "cont" $p $e))
+    | `(PERCENTILE_DISC($p:term) WITHIN GROUP (ORDER BY $e:term)) =>
+        do record .percentile (← `($(mkIdent ``LeanDatabase.Scalar.pctTag) "disc" $p $e))
     | `(COUNT(CASE $[WHEN $cs THEN $_vs]* END))
     | `(COUNT(CASE $[WHEN $cs THEN $_vs]* ELSE NULL END)) => do
         -- `COUNT(CASE WHEN p THEN _ [ELSE NULL] END)` counts the rows where some `p` holds — a
@@ -918,6 +939,14 @@ def normalizeSqlLiterals (s : String) : String :=
   let s := s.replace " <> ALL (" " NOT IN ("
   let s := s.replace " = ANY (" " IN ("
   let s := s.replace " = SOME (" " IN ("
+  -- `[LEFT|CROSS|INNER] JOIN LATERAL UNNEST(…)` → the comma-lateral the `LATERALFLATTEN` grammar
+  -- accepts; and drop UNNEST's trailing named args (`, OUTER => TRUE/FALSE`) that follow the input.
+  let s := s.replace "LEFT JOIN LATERAL" ", LATERAL"
+  let s := s.replace "CROSS JOIN LATERAL" ", LATERAL"
+  let s := s.replace "INNER JOIN LATERAL" ", LATERAL"
+  let s := s.replace "JOIN LATERAL" ", LATERAL"
+  let s := s.replace ", OUTER => TRUE" ""
+  let s := s.replace ", OUTER => FALSE" ""
   let s := flattenGo s.toList ""
   let s := wrapAliasGo s.toList ""
   let s := String.ofList (pathGo s.toList []).reverse
