@@ -588,6 +588,18 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       let (m, types) ← elabTypedTupleProjection [(.anonymous, combinedSchema)] cols
       pure (← mkAppM ``TypedRelation.mapByList #[filteredExpr, toExpr (names.map (·.toString)), m],
             names.zip types)
+    | `(sql_cols| * , $cols:sql_col,*) => do
+      -- `SELECT *, extra …` → expand `*` to every in-scope column, then treat as a plain column list.
+      let starCols ← combinedSchema.toArray.mapM (fun (n, _) => `(sql_col| $(mkIdent n):ident))
+      let all := starCols ++ cols.getElems
+      elabSelect (← `(sql_cols| $all:sql_col,*)) combinedSchema filteredExpr groupItems hasGroupBy having? aliasMap
+    | `(sql_cols| $t:ident . * , $cols:sql_col,*) => do
+      let pfx := t.getId
+      let picked := combinedSchema.filter (fun (name, _) => pfx.isPrefixOf name)
+      if picked.isEmpty then throwError s!"Unknown table {pfx} in `{pfx}.*`"
+      let starCols ← picked.toArray.mapM (fun (n, _) => `(sql_col| $(mkIdent n):ident))
+      let all := starCols ++ cols.getElems
+      elabSelect (← `(sql_cols| $all:sql_col,*)) combinedSchema filteredExpr groupItems hasGroupBy having? aliasMap
     | `(sql_cols| $cols:sql_col,*) => do
       let colStxs ← preprocessScalarSubqueries cols.getElems
       let colTerms := colStxs.map sqlColTerm

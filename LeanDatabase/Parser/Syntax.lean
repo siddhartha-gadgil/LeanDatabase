@@ -26,6 +26,10 @@ syntax term "AS" ident : sql_col
 syntax (priority := low) term : sql_col                            -- bare computed column, auto-named
 syntax (priority := high) "(" sql_query ")" "AS" ident : sql_col   -- scalar subquery `(SELECT AGG … ) AS name` (3.4)
 syntax sql_col,* : sql_cols
+-- `SELECT *, expr …` / `SELECT t.*, expr …` — a star followed by more columns (the plain-`*` and
+-- `sql_col,*` productions can't mix, so these carry the leftover list explicitly).
+syntax "*" "," sql_col,* : sql_cols
+syntax ident "." "*" "," sql_col,* : sql_cols
 
 /-- Auto-name for a bare (unaliased) computed column: its source text with non-ident chars dropped,
 so `SUM(amt)` → `SUMamt`. Deterministic, so both sides of an equivalence agree. -/
