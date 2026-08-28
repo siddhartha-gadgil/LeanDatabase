@@ -74,20 +74,16 @@ private def hypothesisProp
   else
     throwError "HYPOTHESIS: expected one of `predicate`/`funcdep`/`unique`/`bijection`"
 
-/-- Run `sql_equiv` on `mvar` and report whether it closed with a `sorry`-free proof. -/
+/-- Run `sql_equiv` on `mvar` and report whether it genuinely closed the goal. `sql_equiv` runs alone
+(no `sorry` fallback) and **errors** if it cannot close, so no leftover goals ⇒ a real proof — trust
+the goal list. Do NOT wrap in `withoutErrToSorry`: that would turn a failing `sql_equiv` into a
+`sorry`-closed (empty-goal) state and report a false success. Inspecting the mvar assignment was also
+wrong — `sql_equiv`'s assignment can be *delayed* and read back as `none`, rejecting valid proofs. -/
 private def proveMVar (mvar : Expr) : TermElabM Bool := do
   let tac ← `(tacticSeq| sql_equiv)
   try
-    withoutErrToSorry do
-      let (goals, _) ← Elab.runTactic mvar.mvarId! tac
-      Term.synthesizeSyntheticMVarsNoPostponing
-      match ← getExprMVarAssignment? mvar.mvarId! with
-      | some ass =>
-        let ass ← instantiateExprMVars ass
-        Term.synthesizeSyntheticMVarsNoPostponing
-        if ass.hasSorry then return false
-        pure goals.isEmpty
-      | none => pure false
+    let (goals, _) ← Elab.runTactic mvar.mvarId! tac
+    pure goals.isEmpty
   catch _ => pure false
 
 /-- Discharge `body₁ = body₂` under `props` as local assumptions (added one at a time). -/
@@ -131,6 +127,53 @@ def checkEquiv (data : Json) : TermElabM Bool := do
 
 def checkEquivCore (data : Json) : CoreM Bool := do
   checkEquiv data |>.run' {} |>.run' {}
+
+/-- Proving census: one `{schemas, first, second, dataEq}` pair → does `sql_equiv` close the goal
+`∀ tables, first ~= second` (when `dataEq`) or `first = second`? Mirrors a Problems `eq_i_j` theorem. -/
+def provePair (data : Json) : TermElabM Json := do
+  try
+    let .ok schemas := data.getObjValAs? (List Json) "schemas" | return json% {"proved": false, "error": "missing schemas"}
+    let .ok first := data.getObjValAs? String "first" | return json% {"proved": false, "error": "missing first"}
+    let .ok second := data.getObjValAs? String "second" | return json% {"proved": false, "error": "missing second"}
+    let dataEq := (data.getObjValAs? Bool "dataEq").toOption.getD true
+    let schemasStr ← schemas.mapM parseSchema
+    let (firstExpr, _) ← parseSqlQuery schemasStr first
+    let (secondExpr, _) ← parseSqlQuery schemasStr second
+    lambdaTelescope (← instantiateMVars firstExpr) fun tvars body1 => do
+      let body2 ← instantiateLambda (← instantiateMVars secondExpr) tvars
+      let goalType ← if dataEq then mkAppM ``LeanDatabase.dataEq #[body1, body2] else mkEq body1 body2
+      let ok ← proveMVar (← mkFreshExprMVar goalType)
+      return Json.mkObj [("proved", ok)]
+  catch ex => return Json.mkObj [("proved", false), ("error", Json.str (← ex.toMessageData.toString))]
+
+def provePairCore (data : Json) : CoreM Json :=
+  Core.withCurrHeartbeats (provePair data |>.run' {} |>.run' {})
+
+/-- Debug: build the pair's goal, run `sql_equiv`, and return "PROVED", the residual goal count, or
+`sql_equiv`'s failure message — so a failing pair can be diagnosed. -/
+def debugPair (data : Json) : TermElabM String := do
+  let .ok schemas := data.getObjValAs? (List Json) "schemas" | return "missing schemas"
+  let .ok first := data.getObjValAs? String "first" | return "missing first"
+  let .ok second := data.getObjValAs? String "second" | return "missing second"
+  let dataEq := (data.getObjValAs? Bool "dataEq").toOption.getD true
+  let schemasStr ← schemas.mapM parseSchema
+  let (firstExpr, _) ← parseSqlQuery schemasStr first
+  let (secondExpr, _) ← parseSqlQuery schemasStr second
+  lambdaTelescope (← instantiateMVars firstExpr) fun tvars body1 => do
+    let body2 ← instantiateLambda (← instantiateMVars secondExpr) tvars
+    let goalType ← if dataEq then mkAppM ``LeanDatabase.dataEq #[body1, body2] else mkEq body1 body2
+    let mvar ← mkFreshExprMVar goalType
+    let tac ← `(tacticSeq| sql_equiv)
+    try
+      withoutErrToSorry do
+        let (goals, _) ← Elab.runTactic mvar.mvarId! tac
+        if goals.isEmpty then return "PROVED"
+        let strs ← goals.mapM fun g => do pure (← Meta.ppGoal g).pretty
+        return s!"RESIDUAL ({goals.length} goals):\n" ++ "\n".intercalate strs
+    catch e => return s!"FAILED: {← e.toMessageData.toString}"
+
+def debugPairCore (data : Json) : CoreM String := do
+  debugPair data |>.run' {} |>.run' {}
 
 /-! ## Elaboration check (Lean-native corpus census)
 

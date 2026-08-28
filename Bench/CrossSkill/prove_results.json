@@ -1,0 +1,4 @@
+{"total": 2,
+ "results":
+ [{"proved": true, "id": "triv:1"}, {"proved": true, "id": "sf_bq020:eq_1_3"}],
+ "proved": 2}

@@ -34,3 +34,8 @@ supportInterpreter = true
 name = "elabcheck"
 root = "Bench.CrossSkill.Elabcheck"
 supportInterpreter = true
+
+[[lean_exe]]
+name = "provecheck"
+root = "Bench.CrossSkill.Provecheck"
+supportInterpreter = true

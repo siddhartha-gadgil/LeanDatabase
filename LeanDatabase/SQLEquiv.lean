@@ -124,6 +124,7 @@ macro "sql_equiv" : tactic => `(tactic|
      | (apply funext; intro _))
    all_goals (first
      | grind +locals
-     | (apply Finset.ext; sql_simp; grind +locals))))
+     | (apply Finset.ext; (try sql_simp); grind +locals)
+     | (apply Finset.ext; intro _; sql_simp; grind +locals))))
 
 end LeanDatabase.SQLEquiv

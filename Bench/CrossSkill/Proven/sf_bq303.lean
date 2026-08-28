@@ -1,0 +1,30 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 8000
+
+/-!
+# sf_bq303 — a proven cross-skill equivalence
+
+Question: From July 1, 2019 through December 31, 2019, for all users with IDs between 16712208 and 18712208 on Stack Overflow, retrieve the user ID and the tags of the relevant question for each of their contributions, including comments on both questions and answers, any answers they posted, and any questions they authored, making sure to correctly associate the comment or answer with its parent question’s tags.
+
+Two independently-written SQL answers to the same question, proved equivalent for *all*
+table contents by `sql_equiv` (not just on one instance).
+-/
+
+namespace P_sf_bq303
+
+CREATE TABLE COMMENTS («id» INT, «creation_date» INT, «post_id» INT, «user_id» INT)
+CREATE TABLE TAGS («id» INT)
+CREATE TABLE USERS («id» INT, «creation_date» INT)
+CREATE TABLE POSTS_ANSWERS («id» INT, «creation_date» INT, «owner_user_id» INT, «parent_id» INT, «tags» STRING)
+CREATE TABLE POSTS_QUESTIONS («id» INT, «creation_date» INT, «owner_user_id» INT, «parent_id» STRING, «tags» STRING)
+
+/-- Variant A:  -- sf_bq303: Retrieve user_id and tags for all contributions (questions, answers, comments) -- from July 1, 2019 through December 31, 2019 for users with IDs be
+    Variant B:  -- Contributions from July 1, 2019 through December 31, 2019 -- Users with IDs between 16712208 and 18712208 -- 4 types: comments on questions, comments on answ -/
+theorem equivalent :
+    sql%([COMMENTS_schema, TAGS_schema, USERS_schema, POSTS_ANSWERS_schema, POSTS_QUESTIONS_schema]) "/* sf_bq303: Retrieve user_id and tags for all contributions (questions, answers, comments) */ /* from July 1, 2019 through December 31, 2019 for users with IDs between 16712208 and 18712208 */ /* Date boundaries (microseconds since epoch): */ /* July 1, 2019 00:00:00 UTC = 1561939200 * 1000000 = 1561939200000000 */ /* Jan 1, 2020 00:00:00 UTC = 1577836800 * 1000000 = 1577836800000000 */ /* 1. Comments on questions: user_id from comment, tags from question */ SELECT c.\"user_id\" AS U_ID, pq.\"tags\" AS TAGS FROM \"STACKOVERFLOW\".\"STACKOVERFLOW\".\"COMMENTS\" AS c INNER JOIN \"STACKOVERFLOW\".\"STACKOVERFLOW\".\"POSTS_QUESTIONS\" AS pq ON c.\"post_id\" = pq.\"id\" WHERE c.\"user_id\" BETWEEN 16712208 AND 18712208 AND c.\"creation_date\" >= 1561939200000000 AND c.\"creation_date\" < 1577836800000000 UNION ALL /* 2. Comments on answers: user_id from comment, tags from parent question of the answer */ SELECT c.\"user_id\" AS U_ID, pq.\"tags\" AS TAGS FROM \"STACKOVERFLOW\".\"STACKOVERFLOW\".\"COMMENTS\" AS c INNER JOIN \"STACKOVERFLOW\".\"STACKOVERFLOW\".\"POSTS_ANSWERS\" AS pa ON c.\"post_id\" = pa.\"id\" INNER JOIN \"STACKOVERFLOW\".\"STACKOVERFLOW\".\"POSTS_QUESTIONS\" AS pq ON pa.\"parent_id\" = pq.\"id\" WHERE c.\"user_id\" BETWEEN 16712208 AND 18712208 AND c.\"creation_date\" >= 1561939200000000 AND c.\"creation_date\" < 1577836800000000 UNION ALL /* 3. Answers posted: owner_user_id from answer, tags from parent question */ SELECT pa.\"owner_user_id\" AS U_ID, pq.\"tags\" AS TAGS FROM \"STACKOVERFLOW\".\"STACKOVERFLOW\".\"POSTS_ANSWERS\" AS pa INNER JOIN \"STACKOVERFLOW\".\"STACKOVERFLOW\".\"POSTS_QUESTIONS\" AS pq ON pa.\"parent_id\" = pq.\"id\" WHERE pa.\"owner_user_id\" BETWEEN 16712208 AND 18712208 AND pa.\"creation_date\" >= 1561939200000000 AND pa.\"creation_date\" < 1577836800000000 UNION ALL /* 4. Questions authored: owner_user_id and tags directly from question */ SELECT pq.\"owner_user_id\" AS U_ID, pq.\"tags\" AS TAGS FROM \"STACKOVERFLOW\".\"STACKOVERFLOW\".\"POSTS_QUESTIONS\" AS pq WHERE pq.\"owner_user_id\" BETWEEN 16712208 AND 18712208 AND pq.\"creation_date\" >= 1561939200000000 AND pq.\"creation_date\" < 1577836800000000"
+      = sql%([COMMENTS_schema, TAGS_schema, USERS_schema, POSTS_ANSWERS_schema, POSTS_QUESTIONS_schema]) "/* Contributions from July 1, 2019 through December 31, 2019 */ /* Users with IDs between 16712208 and 18712208 */ /* 4 types: comments on questions, comments on answers, answers, questions */ /* Always associate with parent question's tags */ /* 1. Comments on questions (direct: comment -> question) */ SELECT c.\"user_id\" AS U_ID, q.\"tags\" AS TAGS FROM \"STACKOVERFLOW\".\"STACKOVERFLOW\".\"COMMENTS\" AS c JOIN \"STACKOVERFLOW\".\"STACKOVERFLOW\".\"POSTS_QUESTIONS\" AS q ON c.\"post_id\" = q.\"id\" WHERE c.\"user_id\" BETWEEN 16712208 AND 18712208 AND c.\"creation_date\" >= 1561939200000000 AND c.\"creation_date\" < 1577836800000000 UNION ALL /* 2. Comments on answers (two-hop: comment -> answer -> question) */ SELECT c.\"user_id\" AS U_ID, q.\"tags\" AS TAGS FROM \"STACKOVERFLOW\".\"STACKOVERFLOW\".\"COMMENTS\" AS c JOIN \"STACKOVERFLOW\".\"STACKOVERFLOW\".\"POSTS_ANSWERS\" AS a ON c.\"post_id\" = a.\"id\" JOIN \"STACKOVERFLOW\".\"STACKOVERFLOW\".\"POSTS_QUESTIONS\" AS q ON a.\"parent_id\" = q.\"id\" WHERE c.\"user_id\" BETWEEN 16712208 AND 18712208 AND c.\"creation_date\" >= 1561939200000000 AND c.\"creation_date\" < 1577836800000000 UNION ALL /* 3. Answers posted (answer -> question for tags) */ SELECT a.\"owner_user_id\" AS U_ID, q.\"tags\" AS TAGS FROM \"STACKOVERFLOW\".\"STACKOVERFLOW\".\"POSTS_ANSWERS\" AS a JOIN \"STACKOVERFLOW\".\"STACKOVERFLOW\".\"POSTS_QUESTIONS\" AS q ON a.\"parent_id\" = q.\"id\" WHERE a.\"owner_user_id\" BETWEEN 16712208 AND 18712208 AND a.\"creation_date\" >= 1561939200000000 AND a.\"creation_date\" < 1577836800000000 UNION ALL /* 4. Questions authored (question has tags directly) */ SELECT q.\"owner_user_id\" AS U_ID, q.\"tags\" AS TAGS FROM \"STACKOVERFLOW\".\"STACKOVERFLOW\".\"POSTS_QUESTIONS\" AS q WHERE q.\"owner_user_id\" BETWEEN 16712208 AND 18712208 AND q.\"creation_date\" >= 1561939200000000 AND q.\"creation_date\" < 1577836800000000" := by sql_equiv
+
+end P_sf_bq303
