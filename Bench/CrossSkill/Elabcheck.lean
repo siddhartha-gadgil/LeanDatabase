@@ -19,10 +19,11 @@ Usage: `lake exe elabcheck [corpus.json]` — prints `ELABORATES n/total`, lists
 -/
 
 unsafe def main (args : List String) : IO UInt32 := do
+  let dataset := "CrossSkill"
   enableInitializersExecution
   initSearchPath (← findSysroot)
   let env ← importModules (loadExts := true) #[{module := `Mathlib}, {module := `LeanDatabase}] {}
-  let path := args.headD "Bench/CrossSkill/corpus_pg.json"
+  let path := args.headD s!"Bench/{dataset}/corpus_pg.json"
   let content ← IO.FS.readFile path
   let .ok (.arr recs) := Json.parse content
     | do IO.eprintln s!"could not parse {path} as a JSON array"; return 1
@@ -55,7 +56,7 @@ unsafe def main (args : List String) : IO UInt32 := do
     else IO.println s!"FAIL {id}: {errStr.take 140}"
     results := results.push (Json.mkObj [("id", Json.str id), ("status", Json.str status),
       ("error", if status == "ok" then Json.null else Json.str errStr)])
-  IO.FS.writeFile "Bench/CrossSkill/elab_results.json"
+  IO.FS.writeFile s!"Bench/{dataset}/elab_results.json"
     ((Json.mkObj [("elaborates", Json.num ok), ("timeout", Json.num timeout),
                   ("total", Json.num recs.size), ("results", Json.arr results)]).pretty)
   IO.println s!"\nELABORATES: {ok}/{recs.size}  (+{timeout} timeout = {ok + timeout} resolve)"

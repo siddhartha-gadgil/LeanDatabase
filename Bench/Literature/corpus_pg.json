@@ -1,0 +1,9710 @@
+[
+ {
+  "id": "0:q0",
+  "schemas": [
+   {
+    "name": "ITP",
+    "columns": [
+     {
+      "name": "ITEMN",
+      "type": "INT"
+     },
+     {
+      "name": "PONUM",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "ITM",
+    "columns": [
+     {
+      "name": "ITEMN",
+      "type": "INT"
+     },
+     {
+      "name": "TYPE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "PUR",
+    "columns": [
+     {
+      "name": "PONUM",
+      "type": "INT"
+     },
+     {
+      "name": "ODATE",
+      "type": "INT"
+     },
+     {
+      "name": "VENDN",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT ITM.ITEMN, ITPV.VENDN FROM ITM AS ITM, (SELECT DISTINCT ITP.ITEMN, PUR.VENDN FROM ITP AS ITP, PUR AS PUR WHERE ITP.PONUM = PUR.PONUM AND PUR.ODATE > 85) AS ITPV WHERE ITM.ITEMN = ITPV.ITEMN AND ITM.ITEMN > 1 AND ITM.ITEMN < 20"
+ },
+ {
+  "id": "0:q1",
+  "schemas": [
+   {
+    "name": "ITP",
+    "columns": [
+     {
+      "name": "ITEMN",
+      "type": "INT"
+     },
+     {
+      "name": "PONUM",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "ITM",
+    "columns": [
+     {
+      "name": "ITEMN",
+      "type": "INT"
+     },
+     {
+      "name": "TYPE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "PUR",
+    "columns": [
+     {
+      "name": "PONUM",
+      "type": "INT"
+     },
+     {
+      "name": "ODATE",
+      "type": "INT"
+     },
+     {
+      "name": "VENDN",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT ITM.ITEMN, PUR.VENDN FROM ITM AS ITM, ITP AS ITP, PUR AS PUR WHERE ITP.PONUM = PUR.PONUM AND ITM.ITEMN = ITP.ITEMN AND PUR.ODATE > 85 AND ITM.ITEMN > 1 AND ITM.ITEMN < 20"
+ },
+ {
+  "id": "1:q0",
+  "schemas": [
+   {
+    "name": "R1",
+    "columns": [
+     {
+      "name": "A",
+      "type": "INT"
+     },
+     {
+      "name": "B",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "R2",
+    "columns": [
+     {
+      "name": "A",
+      "type": "INT"
+     },
+     {
+      "name": "B",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT Z.A, Z.B FROM R1 AS X, R2 AS Y, R2 AS Z WHERE X.A = Y.A AND Y.A = Z.A AND X.A = Z.A AND Y.B = Z.B"
+ },
+ {
+  "id": "1:q1",
+  "schemas": [
+   {
+    "name": "R1",
+    "columns": [
+     {
+      "name": "A",
+      "type": "INT"
+     },
+     {
+      "name": "B",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "R2",
+    "columns": [
+     {
+      "name": "A",
+      "type": "INT"
+     },
+     {
+      "name": "B",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT Z.A, Z.B FROM R1 AS X, R2 AS Y, R2 AS Z WHERE X.A = Y.A AND Y.A = Z.A AND X.A = Z.A"
+ },
+ {
+  "id": "2:q0",
+  "schemas": [
+   {
+    "name": "ITP",
+    "columns": [
+     {
+      "name": "ITEMNO",
+      "type": "INT"
+     },
+     {
+      "name": "NP",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "ITM",
+    "columns": [
+     {
+      "name": "ITEMNO",
+      "type": "INT"
+     },
+     {
+      "name": "TYPE",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT ITEMPRICE.NP, ITM.TYPE, ITM.ITEMNO FROM (SELECT DISTINCT ITP.ITEMNO AS ITN, ITP.NP AS NP FROM ITP AS ITP WHERE ITP.NP > 1000) AS ITEMPRICE, ITM AS ITM WHERE ITEMPRICE.ITN = ITM.ITEMNO"
+ },
+ {
+  "id": "2:q1",
+  "schemas": [
+   {
+    "name": "ITP",
+    "columns": [
+     {
+      "name": "ITEMNO",
+      "type": "INT"
+     },
+     {
+      "name": "NP",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "ITM",
+    "columns": [
+     {
+      "name": "ITEMNO",
+      "type": "INT"
+     },
+     {
+      "name": "TYPE",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT ITP.NP, ITM.TYPE, ITM.ITEMNO FROM ITP AS ITP, ITM AS ITM WHERE ITP.NP > 1000 AND ITP.ITEMNO = ITM.ITEMNO"
+ },
+ {
+  "id": "3:q0",
+  "schemas": [
+   {
+    "name": "ITP",
+    "columns": [
+     {
+      "name": "ITEMNO",
+      "type": "INT"
+     },
+     {
+      "name": "NP",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "ITM",
+    "columns": [
+     {
+      "name": "ITEMNO",
+      "type": "INT"
+     },
+     {
+      "name": "TYPE",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT ITM.ITEMNO, ITEMPRICE.NP FROM (SELECT DISTINCT ITP.ITEMNO AS ITN, ITP.NP AS NP FROM ITP AS ITP) AS ITEMPRICE, ITM AS ITM WHERE ITEMPRICE.ITN = ITM.ITEMNO"
+ },
+ {
+  "id": "3:q1",
+  "schemas": [
+   {
+    "name": "ITP",
+    "columns": [
+     {
+      "name": "ITEMNO",
+      "type": "INT"
+     },
+     {
+      "name": "NP",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "ITM",
+    "columns": [
+     {
+      "name": "ITEMNO",
+      "type": "INT"
+     },
+     {
+      "name": "TYPE",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT ITM.ITEMNO, ITP.NP FROM ITP AS ITP, ITM AS ITM WHERE ITP.ITEMNO = ITM.ITEMNO"
+ },
+ {
+  "id": "4:q0",
+  "schemas": [
+   {
+    "name": "ITP",
+    "columns": [
+     {
+      "name": "ITEMN",
+      "type": "INT"
+     },
+     {
+      "name": "PONUM",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "ITL",
+    "columns": [
+     {
+      "name": "ITEMN",
+      "type": "INT"
+     },
+     {
+      "name": "WKCEN",
+      "type": "INT"
+     },
+     {
+      "name": "LOCAN",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT * FROM ITP AS ITP WHERE EXISTS(SELECT * FROM ITL AS ITL WHERE ITL.ITEMN = ITP.ITEMN AND ITL.WKCEN = 468 AND ITL.LOCAN = 0)"
+ },
+ {
+  "id": "4:q1",
+  "schemas": [
+   {
+    "name": "ITP",
+    "columns": [
+     {
+      "name": "ITEMN",
+      "type": "INT"
+     },
+     {
+      "name": "PONUM",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "ITL",
+    "columns": [
+     {
+      "name": "ITEMN",
+      "type": "INT"
+     },
+     {
+      "name": "WKCEN",
+      "type": "INT"
+     },
+     {
+      "name": "LOCAN",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT ITP.* FROM ITP AS ITP, ITL AS ITL WHERE ITP.ITEMN = ITL.ITEMN AND ITL.WKCEN = 468 AND ITL.LOCAN = 0"
+ },
+ {
+  "id": "5:q0",
+  "schemas": [
+   {
+    "name": "DEPTS",
+    "columns": [
+     {
+      "name": "DNAME",
+      "type": "INT"
+     },
+     {
+      "name": "DPROJ",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEAMS",
+    "columns": [
+     {
+      "name": "TMEMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TPROJ",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "PAYROLL",
+    "columns": [
+     {
+      "name": "EMPL",
+      "type": "INT"
+     },
+     {
+      "name": "PDEPT",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT T.TMEMBER FROM DEPTS AS D, TEAMS AS T WHERE D.DPROJ = T.TPROJ AND D.DNAME = 'SECURITY'"
+ },
+ {
+  "id": "5:q1",
+  "schemas": [
+   {
+    "name": "DEPTS",
+    "columns": [
+     {
+      "name": "DNAME",
+      "type": "INT"
+     },
+     {
+      "name": "DPROJ",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEAMS",
+    "columns": [
+     {
+      "name": "TMEMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TPROJ",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "PAYROLL",
+    "columns": [
+     {
+      "name": "EMPL",
+      "type": "INT"
+     },
+     {
+      "name": "PDEPT",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT V1.E FROM (SELECT D.DNAME AS D, D.DPROJ AS P, P.EMPL AS E FROM DEPTS AS D, PAYROLL AS P WHERE D.DNAME = P.PDEPT) AS V1, (SELECT T.TMEMBER AS E, P.PDEPT AS D, T.TPROJ AS P FROM TEAMS AS T, PAYROLL AS P WHERE T.TMEMBER = P.EMPL) AS V2 WHERE V1.D = 'SECURITY' AND V1.P = V2.P AND V1.E = V2.E AND V1.D = V2.D"
+ },
+ {
+  "id": "6:q0",
+  "schemas": [
+   {
+    "name": "PAYROLL",
+    "columns": [
+     {
+      "name": "SSNO",
+      "type": "INT"
+     },
+     {
+      "name": "DEPTNO",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "APPLICANT",
+    "columns": [
+     {
+      "name": "SSNO",
+      "type": "INT"
+     },
+     {
+      "name": "JOBTITILE",
+      "type": "INT"
+     },
+     {
+      "name": "OFFICENO",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT Y.* FROM PAYROLL AS X, APPLICANT AS Y WHERE X.SSNO = Y.SSNO AND X.DEPTNO = 29"
+ },
+ {
+  "id": "6:q1",
+  "schemas": [
+   {
+    "name": "PAYROLL",
+    "columns": [
+     {
+      "name": "SSNO",
+      "type": "INT"
+     },
+     {
+      "name": "DEPTNO",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "APPLICANT",
+    "columns": [
+     {
+      "name": "SSNO",
+      "type": "INT"
+     },
+     {
+      "name": "JOBTITILE",
+      "type": "INT"
+     },
+     {
+      "name": "OFFICENO",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT C.* FROM PAYROLL AS A, (SELECT Y.SSNO, Y.DEPTNO FROM PAYROLL AS Y) AS B, APPLICANT AS C WHERE A.SSNO = B.SSNO AND C.SSNO = A.SSNO AND B.DEPTNO = 29"
+ },
+ {
+  "id": "7:q0",
+  "schemas": [
+   {
+    "name": "EMP",
+    "columns": [
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT",
+      "type": "INT"
+     },
+     {
+      "name": "EMP",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPT",
+    "columns": [
+     {
+      "name": "DEPT",
+      "type": "INT"
+     },
+     {
+      "name": "LOC",
+      "type": "INT"
+     },
+     {
+      "name": "MGR",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT X.NAME AS XN FROM EMP AS X WHERE EXISTS(SELECT * FROM DEPT AS Y WHERE Y.LOC = 3 AND X.EMP = Y.MGR AND X.DEPT = Y.DEPT)"
+ },
+ {
+  "id": "7:q1",
+  "schemas": [
+   {
+    "name": "EMP",
+    "columns": [
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT",
+      "type": "INT"
+     },
+     {
+      "name": "EMP",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPT",
+    "columns": [
+     {
+      "name": "DEPT",
+      "type": "INT"
+     },
+     {
+      "name": "LOC",
+      "type": "INT"
+     },
+     {
+      "name": "MGR",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT X.NAME AS XN FROM EMP AS X, DEPT AS Y WHERE X.DEPT = Y.DEPT AND Y.LOC = 3 AND X.EMP = Y.MGR"
+ },
+ {
+  "id": "8:q0",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "A",
+      "type": "INT"
+     },
+     {
+      "name": "B",
+      "type": "INT"
+     },
+     {
+      "name": "C",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT X.B AS XB FROM R AS X WHERE X.A = 5 AND X.C < 1"
+ },
+ {
+  "id": "8:q1",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "A",
+      "type": "INT"
+     },
+     {
+      "name": "B",
+      "type": "INT"
+     },
+     {
+      "name": "C",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT X.B AS XB FROM R AS X WHERE X.A < 10"
+ },
+ {
+  "id": "9:q0",
+  "schemas": [
+   {
+    "name": "USER",
+    "columns": [
+     {
+      "name": "UID",
+      "type": "INT"
+     },
+     {
+      "name": "UNAME",
+      "type": "INT"
+     },
+     {
+      "name": "CITY",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "PICTURE",
+    "columns": [
+     {
+      "name": "UID",
+      "type": "INT"
+     },
+     {
+      "name": "SIZE",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT X.UID AS UID, X.UNAME, (SELECT COUNT(*) FROM PICTURE AS Y WHERE X.UID = Y.UID AND Y.SIZE > 1000000) AS CNT FROM USER AS X WHERE X.CITY = 3"
+ },
+ {
+  "id": "9:q1",
+  "schemas": [
+   {
+    "name": "USER",
+    "columns": [
+     {
+      "name": "UID",
+      "type": "INT"
+     },
+     {
+      "name": "UNAME",
+      "type": "INT"
+     },
+     {
+      "name": "CITY",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "PICTURE",
+    "columns": [
+     {
+      "name": "UID",
+      "type": "INT"
+     },
+     {
+      "name": "SIZE",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT X.UID AS UID, X.UNAME AS UNAME, COUNT(*) AS CNT FROM USER AS X, PICTURE AS Y WHERE X.UID = Y.UID AND Y.SIZE > 1000000 AND X.CITY = 3 GROUP BY X.UID, X.UNAME"
+ },
+ {
+  "id": "10:q0",
+  "schemas": [
+   {
+    "name": "USR",
+    "columns": [
+     {
+      "name": "USRUID",
+      "type": "INT"
+     },
+     {
+      "name": "USRNAME",
+      "type": "STRING"
+     }
+    ]
+   },
+   {
+    "name": "PIC",
+    "columns": [
+     {
+      "name": "PICUID",
+      "type": "INT"
+     },
+     {
+      "name": "PICSIZE",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT X.USRUID AS XID, X.USRNAME AS XNAME FROM USR AS X, PIC AS U, PIC AS V, PIC AS W WHERE X.USRUID = U.PICUID AND X.USRUID = V.PICUID AND X.USRUID = W.PICUID AND W.PICSIZE = V.PICSIZE AND B1(U) AND B2(V)"
+ },
+ {
+  "id": "10:q1",
+  "schemas": [
+   {
+    "name": "USR",
+    "columns": [
+     {
+      "name": "USRUID",
+      "type": "INT"
+     },
+     {
+      "name": "USRNAME",
+      "type": "STRING"
+     }
+    ]
+   },
+   {
+    "name": "PIC",
+    "columns": [
+     {
+      "name": "PICUID",
+      "type": "INT"
+     },
+     {
+      "name": "PICSIZE",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT X.USRUID AS XID, X.USRNAME AS XNAME FROM USR AS X, PIC AS U, PIC AS V WHERE X.USRUID = U.PICUID AND X.USRUID = V.PICUID AND B1(U) AND B2(V)"
+ },
+ {
+  "id": "11:q0",
+  "schemas": [
+   {
+    "name": "USR",
+    "columns": [
+     {
+      "name": "UID",
+      "type": "INT"
+     },
+     {
+      "name": "UNAME",
+      "type": "INT"
+     },
+     {
+      "name": "CITY",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "PIC",
+    "columns": [
+     {
+      "name": "UID",
+      "type": "INT"
+     },
+     {
+      "name": "SIZE",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT X.UID AS XU, X.UNAME AS XN, (SELECT COUNT(*) AS CT FROM PIC AS Y WHERE X.UID = Y.UID AND Y.SIZE > 100000) AS CNT FROM USR AS X WHERE X.CITY = 3"
+ },
+ {
+  "id": "11:q1",
+  "schemas": [
+   {
+    "name": "USR",
+    "columns": [
+     {
+      "name": "UID",
+      "type": "INT"
+     },
+     {
+      "name": "UNAME",
+      "type": "INT"
+     },
+     {
+      "name": "CITY",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "PIC",
+    "columns": [
+     {
+      "name": "UID",
+      "type": "INT"
+     },
+     {
+      "name": "SIZE",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT X.UID AS XU, X.NAME AS XN, COUNT(*) AS CNT FROM USR AS X, PIC AS Y WHERE X.UID = Y.UID AND Y.SIZE > 100000 GROUP BY X.UID, X.UNAME"
+ },
+ {
+  "id": "12:q0",
+  "schemas": [
+   {
+    "name": "PARTS",
+    "columns": [
+     {
+      "name": "PNUM",
+      "type": "INT"
+     },
+     {
+      "name": "QOH",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SUPPLY",
+    "columns": [
+     {
+      "name": "PNUM",
+      "type": "INT"
+     },
+     {
+      "name": "SHIPDATE",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT X.PNUM AS XP FROM PARTS AS X WHERE X.QOH = (SELECT COUNT(Y.SHIPDATE) AS CNT FROM SUPPLY AS Y WHERE Y.PNUM = X.PNUM AND Y.SHIPDATE < 10)"
+ },
+ {
+  "id": "12:q1",
+  "schemas": [
+   {
+    "name": "PARTS",
+    "columns": [
+     {
+      "name": "PNUM",
+      "type": "INT"
+     },
+     {
+      "name": "QOH",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SUPPLY",
+    "columns": [
+     {
+      "name": "PNUM",
+      "type": "INT"
+     },
+     {
+      "name": "SHIPDATE",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT X.PNUM AS XP FROM PARTS AS X, (SELECT Y.PNUM AS SUPPNUM, COUNT(Y.SHIPDATE) AS CT FROM SUPPLY AS Y WHERE Y.SHIPDATE < 10 GROUP BY Y.PNUM) AS TEMP WHERE X.QOH = TEMP.CT AND X.PNUM = TEMP.SUPPNUM"
+ },
+ {
+  "id": "13:q0",
+  "schemas": [
+   {
+    "name": "EMP",
+    "columns": [
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT",
+      "type": "INT"
+     },
+     {
+      "name": "EMP",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPT",
+    "columns": [
+     {
+      "name": "DEPT",
+      "type": "INT"
+     },
+     {
+      "name": "LOC",
+      "type": "INT"
+     },
+     {
+      "name": "MGR",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT X.NAME AS XN FROM EMP AS X WHERE EXISTS(SELECT * FROM DEPT AS Y WHERE Y.LOC = 3 AND X.EMP = Y.MGR AND X.DEPT = Y.DEPT)"
+ },
+ {
+  "id": "13:q1",
+  "schemas": [
+   {
+    "name": "EMP",
+    "columns": [
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT",
+      "type": "INT"
+     },
+     {
+      "name": "EMP",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPT",
+    "columns": [
+     {
+      "name": "DEPT",
+      "type": "INT"
+     },
+     {
+      "name": "LOC",
+      "type": "INT"
+     },
+     {
+      "name": "MGR",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT X.NAME AS XN FROM EMP AS X"
+ },
+ {
+  "id": "14:q0",
+  "schemas": [
+   {
+    "name": "A",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     },
+     {
+      "name": "YA",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "B",
+    "columns": [
+     {
+      "name": "YB",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT X.X AS AX FROM A AS X, B AS Y WHERE X.YA = Y.YB"
+ },
+ {
+  "id": "14:q1",
+  "schemas": [
+   {
+    "name": "A",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     },
+     {
+      "name": "YA",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "B",
+    "columns": [
+     {
+      "name": "YB",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "(SELECT X.X AS AX FROM A AS X, A AS Y, B AS Z WHERE X.X = Y.X AND X.YA = Z.YB) UNION ALL (SELECT 1 AS AX FROM A AS X WHERE 1 = 0)"
+ },
+ {
+  "id": "15:q0",
+  "schemas": [
+   {
+    "name": "A",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     },
+     {
+      "name": "YA",
+      "type": "INT"
+     },
+     {
+      "name": "YX",
+      "type": "STRING"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT X.X AS AX FROM A AS X WHERE X.YX = 'HELLO'"
+ },
+ {
+  "id": "15:q1",
+  "schemas": [
+   {
+    "name": "A",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     },
+     {
+      "name": "YA",
+      "type": "INT"
+     },
+     {
+      "name": "YX",
+      "type": "STRING"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT X.X AS AX FROM A AS X WHERE X.YX = 'HELLO HI'"
+ },
+ {
+  "id": "16:q0",
+  "schemas": [
+   {
+    "name": "R1",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     },
+     {
+      "name": "Y",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "R2",
+    "columns": [
+     {
+      "name": "Y",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT X.X AS X FROM R1 AS X, R2 AS Y WHERE X.Y = Y.Y AND X.X = 1"
+ },
+ {
+  "id": "16:q1",
+  "schemas": [
+   {
+    "name": "R1",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     },
+     {
+      "name": "Y",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "R2",
+    "columns": [
+     {
+      "name": "Y",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT X.X AS X FROM R1 AS X, R1 AS Y, R2 AS Z WHERE X.X = Y.X AND X.Y = Z.Y AND X.X = 1"
+ },
+ {
+  "id": "17:q0",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "A1",
+      "type": "INT"
+     },
+     {
+      "name": "A2",
+      "type": "INT"
+     },
+     {
+      "name": "A3",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT * FROM R AS X WHERE X.A1 = X.A2 AND X.A2 = X.A3"
+ },
+ {
+  "id": "17:q1",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "A1",
+      "type": "INT"
+     },
+     {
+      "name": "A2",
+      "type": "INT"
+     },
+     {
+      "name": "A3",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT * FROM R AS X WHERE X.A1 = X.A2 AND X.A1 = X.A3"
+ },
+ {
+  "id": "18:q0",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT X.* FROM R AS X, R AS Y"
+ },
+ {
+  "id": "18:q1",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT X.* FROM R AS X"
+ },
+ {
+  "id": "19:q0",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "A",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT Y.A AS A FROM R AS X, R AS Y WHERE X.A = Y.A"
+ },
+ {
+  "id": "19:q1",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "A",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT X.A AS A FROM R AS X"
+ },
+ {
+  "id": "20:q0",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "A1",
+      "type": "INT"
+     },
+     {
+      "name": "A2",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT Y.A1 AS A1, Y.A2 AS A2 FROM R AS X, R AS Y WHERE X.A1 = Y.A1 AND X.A2 = Y.A2"
+ },
+ {
+  "id": "20:q1",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "A1",
+      "type": "INT"
+     },
+     {
+      "name": "A2",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT X.A1 AS A1, X.A2 AS A2 FROM R AS X"
+ },
+ {
+  "id": "21:q0",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "A",
+      "type": "INT"
+     },
+     {
+      "name": "B",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT X.A, SUM(X.A + X.B) FROM R AS X GROUP BY X.A"
+ },
+ {
+  "id": "21:q1",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "A",
+      "type": "INT"
+     },
+     {
+      "name": "B",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT Y.A, SUM(Y.A + Y.B) FROM R AS Y GROUP BY Y.A"
+ },
+ {
+  "id": "22:q0",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT * FROM (SELECT * FROM R AS X WHERE B1(X)) AS Y WHERE B2(Y)"
+ },
+ {
+  "id": "22:q1",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT * FROM (SELECT * FROM R AS X WHERE B2(X)) AS Y WHERE B1(Y)"
+ },
+ {
+  "id": "23:q0",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT * FROM R AS X WHERE B1(X) AND B2(X)"
+ },
+ {
+  "id": "23:q1",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT * FROM (SELECT * FROM R AS X WHERE B1(X)) AS Y WHERE B2(Y)"
+ },
+ {
+  "id": "24:q0",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "A",
+      "type": "INT"
+     },
+     {
+      "name": "B",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT COUNT(*) AS A FROM R AS X"
+ },
+ {
+  "id": "24:q1",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "A",
+      "type": "INT"
+     },
+     {
+      "name": "B",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT COUNT(Y.B) FROM R AS Y"
+ },
+ {
+  "id": "25:q0",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT * FROM R AS X WHERE B1(X) OR B2(X)"
+ },
+ {
+  "id": "25:q1",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT * FROM ((SELECT * FROM R AS X WHERE B1(X)) UNION ALL (SELECT * FROM R AS Y WHERE B2(Y))) AS X"
+ },
+ {
+  "id": "26:q0",
+  "schemas": [
+   {
+    "name": "DEPT",
+    "columns": [
+     {
+      "name": "DEPTNO",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DEPT.NAME AS DNAME, COUNT(*) AS C FROM DEPT AS DEPT GROUP BY DEPT.NAME HAVING DEPT.NAME = 10"
+ },
+ {
+  "id": "26:q1",
+  "schemas": [
+   {
+    "name": "DEPT",
+    "columns": [
+     {
+      "name": "DEPTNO",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT T2.DNAME, T2.CNT AS C FROM (SELECT DEPT0.NAME AS DNAME, COUNT(*) AS CNT FROM DEPT AS DEPT0 GROUP BY DEPT0.NAME) AS T2 WHERE T2.DNAME = 10"
+ },
+ {
+  "id": "27:q0",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT * FROM (SELECT * FROM R AS X WHERE B(X)) AS Y WHERE B(Y)"
+ },
+ {
+  "id": "27:q1",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT * FROM R AS X WHERE B(X)"
+ },
+ {
+  "id": "28:q0",
+  "schemas": [
+   {
+    "name": "A",
+    "columns": [
+     {
+      "name": "C",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT * FROM A AS X WHERE EXISTS(SELECT * FROM A AS Y WHERE X.C = Y.C)"
+ },
+ {
+  "id": "28:q1",
+  "schemas": [
+   {
+    "name": "A",
+    "columns": [
+     {
+      "name": "C",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT * FROM A AS X"
+ },
+ {
+  "id": "29:q0",
+  "schemas": [
+   {
+    "name": "A",
+    "columns": [
+     {
+      "name": "A1",
+      "type": "INT"
+     },
+     {
+      "name": "A2",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "B",
+    "columns": [
+     {
+      "name": "B1",
+      "type": "INT"
+     },
+     {
+      "name": "B2",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT X.A1 AS A1, X.A2 AS A2, Y.B1 AS B1, Y.B2 AS B2 FROM A AS X, B AS Y WHERE X.A1 = Y.B1"
+ },
+ {
+  "id": "29:q1",
+  "schemas": [
+   {
+    "name": "A",
+    "columns": [
+     {
+      "name": "A1",
+      "type": "INT"
+     },
+     {
+      "name": "A2",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "B",
+    "columns": [
+     {
+      "name": "B1",
+      "type": "INT"
+     },
+     {
+      "name": "B2",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT Y.A1 AS A1, Y.A2 AS A2, X.B1 AS B1, X.B2 AS B2 FROM B AS X, A AS Y WHERE Y.A1 = X.B1"
+ },
+ {
+  "id": "31:q0",
+  "schemas": [
+   {
+    "name": "R1",
+    "columns": [
+     {
+      "name": "A",
+      "type": "INT"
+     },
+     {
+      "name": "B",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "R2",
+    "columns": [
+     {
+      "name": "A",
+      "type": "INT"
+     },
+     {
+      "name": "B",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT X.B AS XB, Y.B AS YB FROM R1 AS X, R2 AS Y"
+ },
+ {
+  "id": "31:q1",
+  "schemas": [
+   {
+    "name": "R1",
+    "columns": [
+     {
+      "name": "A",
+      "type": "INT"
+     },
+     {
+      "name": "B",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "R2",
+    "columns": [
+     {
+      "name": "A",
+      "type": "INT"
+     },
+     {
+      "name": "B",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT X1.XB AS XB, Y1.YB AS YB FROM (SELECT X.B AS XB FROM R1 AS X) AS X1, (SELECT Y.B AS YB FROM R2 AS Y) AS Y1"
+ },
+ {
+  "id": "33:q0",
+  "schemas": [
+   {
+    "name": "A",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "B",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT * FROM A AS X, (SELECT * FROM B AS Y WHERE B0(Y)) AS Z WHERE B1(X, Z)"
+ },
+ {
+  "id": "33:q1",
+  "schemas": [
+   {
+    "name": "A",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "B",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT * FROM A AS X, B AS Y WHERE B1(X, Y) AND B0(Y)"
+ },
+ {
+  "id": "34:q0",
+  "schemas": [
+   {
+    "name": "X",
+    "columns": [
+     {
+      "name": "A",
+      "type": "INT"
+     },
+     {
+      "name": "K",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "Y",
+    "columns": [
+     {
+      "name": "A",
+      "type": "INT"
+     },
+     {
+      "name": "K",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT X.A AS A FROM X AS X, Y AS Y WHERE X.K = Y.K"
+ },
+ {
+  "id": "34:q1",
+  "schemas": [
+   {
+    "name": "X",
+    "columns": [
+     {
+      "name": "A",
+      "type": "INT"
+     },
+     {
+      "name": "K",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "Y",
+    "columns": [
+     {
+      "name": "A",
+      "type": "INT"
+     },
+     {
+      "name": "K",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT X1.A AS X1A FROM (SELECT X.A AS A, X.K AS K FROM X AS X) AS X1, Y AS Y WHERE X1.K = Y.K"
+ },
+ {
+  "id": "35:q0",
+  "schemas": [
+   {
+    "name": "R1",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "R2",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT * FROM R1 AS X, (SELECT * FROM R2 AS Y WHERE B(Y)) AS Z"
+ },
+ {
+  "id": "35:q1",
+  "schemas": [
+   {
+    "name": "R1",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "R2",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT * FROM R1 AS X, R2 AS Y WHERE B(Y)"
+ },
+ {
+  "id": "36:q0",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "A",
+      "type": "INT"
+     },
+     {
+      "name": "B",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT X.A + X.B, CAST(X.A AS DOUBLE PRECISION) / NULLIF(X.B, 0) AS A FROM R AS X"
+ },
+ {
+  "id": "36:q1",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "A",
+      "type": "INT"
+     },
+     {
+      "name": "B",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT Y.A + Y.B, CAST(Y.A AS DOUBLE PRECISION) / NULLIF(Y.B, 0) AS A FROM R AS Y"
+ },
+ {
+  "id": "37:q0",
+  "schemas": [
+   {
+    "name": "A",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT * FROM A AS X UNION ALL SELECT * FROM A AS X WHERE FALSE"
+ },
+ {
+  "id": "37:q1",
+  "schemas": [
+   {
+    "name": "A",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT * FROM A AS X"
+ },
+ {
+  "id": "38:q0",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT C.DEPT_NAME, SUM(C.CREDITS) FROM COURSE AS C INNER JOIN DEPARTMENT AS D ON (C.DEPT_NAME = D.DEPT_NAME) GROUP BY C.DEPT_NAME HAVING SUM(C.CREDITS) > 10 AND COUNT(DISTINCT C.CREDITS) > 5"
+ },
+ {
+  "id": "38:q1",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT C.DEPT_NAME, SUM(C.CREDITS) FROM COURSE AS C INNER JOIN DEPARTMENT AS D ON (C.DEPT_NAME = D.DEPT_NAME) GROUP BY C.DEPT_NAME HAVING SUM(C.CREDITS) > 10 AND COUNT(DISTINCT C.CREDITS) > 8"
+ },
+ {
+  "id": "39:q0",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT C.DEPT_NAME, AVG(I.SALARY) FROM COURSE AS C INNER JOIN DEPARTMENT AS D ON (C.DEPT_NAME = D.DEPT_NAME) INNER JOIN TEACHES AS T ON (C.COURSE_ID = T.COURSE_ID) INNER JOIN INSTRUCTOR AS I ON (D.DEPT_NAME = I.DEPT_NAME) GROUP BY C.DEPT_NAME HAVING AVG(I.SALARY) > 50000 AND COUNT(DISTINCT I.SALARY) = 4"
+ },
+ {
+  "id": "39:q1",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT C.DEPT_NAME, AVG(I.SALARY) FROM COURSE AS C INNER JOIN DEPARTMENT AS D ON (C.DEPT_NAME = D.DEPT_NAME) INNER JOIN TEACHES AS T ON (C.COURSE_ID = T.COURSE_ID) INNER JOIN INSTRUCTOR AS I ON (D.DEPT_NAME = I.DEPT_NAME) GROUP BY C.DEPT_NAME HAVING AVG(I.SALARY) > 50000 AND COUNT(DISTINCT I.SALARY) > 4"
+ },
+ {
+  "id": "40:q0",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT STUDENT.ID FROM COURSE NATURAL JOIN DEPARTMENT NATURAL JOIN STUDENT NATURAL JOIN TAKES NATURAL JOIN SECTION GROUP BY STUDENT.ID, STUDENT.DEPT_NAME HAVING COUNT(DEPT_NAME) > 1"
+ },
+ {
+  "id": "40:q1",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT STUDENT.ID FROM COURSE NATURAL JOIN DEPARTMENT NATURAL JOIN STUDENT NATURAL JOIN TAKES NATURAL JOIN SECTION GROUP BY STUDENT.ID, STUDENT.DEPT_NAME HAVING COUNT(DEPT_NAME) >= 2"
+ },
+ {
+  "id": "41:q0",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT DEPT_NAME FROM COURSE WHERE CREDITS = (SELECT MAX(CREDITS) FROM COURSE NATURAL JOIN DEPARTMENT WHERE TITLE = 'CS' GROUP BY DEPT_NAME HAVING COUNT(DISTINCT COURSE_ID) > 4)"
+ },
+ {
+  "id": "41:q1",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DEPT_NAME FROM COURSE WHERE CREDITS = (SELECT MAX(CREDITS) FROM COURSE NATURAL JOIN DEPARTMENT WHERE TITLE = 'CS' GROUP BY DEPT_NAME HAVING COUNT(DISTINCT COURSE_ID) > 4)"
+ },
+ {
+  "id": "42:q0",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT STUDENT.ID, STUDENT.NAME FROM STUDENT JOIN (SELECT TAKES.ID, S.TIME_SLOT_ID, S.YEAR FROM TAKES JOIN SECTION AS S ON TAKES.COURSE_ID = S.COURSE_ID AND TAKES.SEC_ID = S.SEC_ID GROUP BY TAKES.ID, S.TIME_SLOT_ID, S.YEAR HAVING COUNT(S.TIME_SLOT_ID) > 1) AS A ON STUDENT.ID = A.ID GROUP BY STUDENT.ID, STUDENT.NAME HAVING COUNT(DISTINCT STUDENT.ID) > 2"
+ },
+ {
+  "id": "42:q1",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT STUDENT.ID, STUDENT.NAME FROM STUDENT JOIN (SELECT TAKES.ID, S.TIME_SLOT_ID, S.YEAR FROM TAKES JOIN SECTION AS S ON TAKES.COURSE_ID = S.COURSE_ID AND TAKES.SEC_ID = S.SEC_ID GROUP BY TAKES.ID, S.TIME_SLOT_ID, S.YEAR HAVING SUM(S.TIME_SLOT_ID) > 1) AS A ON STUDENT.ID = A.ID GROUP BY STUDENT.ID, STUDENT.NAME HAVING COUNT(DISTINCT STUDENT.ID) > 2"
+ },
+ {
+  "id": "43:q0",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT SUM(T) AS SU FROM (SELECT YEAR AS T FROM TEACHES NATURAL JOIN INSTRUCTOR GROUP BY YEAR, COURSE_ID HAVING COUNT(ID) > 4) AS TEMP GROUP BY T"
+ },
+ {
+  "id": "43:q1",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT SUM(T) AS SU FROM (SELECT YEAR AS T FROM TEACHES NATURAL JOIN INSTRUCTOR GROUP BY YEAR HAVING COUNT(ID) > 4) AS TEMP GROUP BY T"
+ },
+ {
+  "id": "44:q0",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "WITH S AS (SELECT ID, TIME_SLOT_ID, YEAR FROM TAKES NATURAL JOIN SECTION GROUP BY ID, TIME_SLOT_ID, YEAR HAVING COUNT(TIME_SLOT_ID) > 4) SELECT DISTINCT ID, NAME FROM S NATURAL JOIN STUDENT"
+ },
+ {
+  "id": "44:q1",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "WITH S AS (SELECT ID, TIME_SLOT_ID, YEAR FROM TAKES NATURAL JOIN SECTION GROUP BY ID, TIME_SLOT_ID, YEAR HAVING COUNT(TIME_SLOT_ID) > 5) SELECT DISTINCT ID, NAME FROM S NATURAL JOIN STUDENT"
+ },
+ {
+  "id": "45:q0",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT DEPT_NAME FROM COURSE JOIN (SELECT MAX(CREDITS) AS MAX_CREDITS FROM COURSE) AS A ON COURSE.CREDITS = A.MAX_CREDITS"
+ },
+ {
+  "id": "45:q1",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT DEPT_NAME FROM COURSE JOIN (SELECT MAX(CREDITS) AS MAX_CREDITS FROM COURSE GROUP BY DEPT_NAME) AS A ON COURSE.CREDITS = A.MAX_CREDITS"
+ },
+ {
+  "id": "46:q0",
+  "schemas": [
+   {
+    "name": "MONTHS",
+    "columns": [
+     {
+      "name": "MID",
+      "type": "INT"
+     },
+     {
+      "name": "MONTH",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "WEEKDAYS",
+    "columns": [
+     {
+      "name": "DID",
+      "type": "INT"
+     },
+     {
+      "name": "DAY_OF_WEEK",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "CARRIERS",
+    "columns": [
+     {
+      "name": "CID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "FLIGHTS",
+    "columns": [
+     {
+      "name": "FID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "MONTH_ID",
+      "type": "INT"
+     },
+     {
+      "name": "DAY_OF_MONTH",
+      "type": "INT"
+     },
+     {
+      "name": "CARRIER_ID",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT C.NAME FROM CARRIERS AS C JOIN FLIGHTS AS F ON C.CID = F.CARRIER_ID GROUP BY C.NAME, F.YEAR, F.MONTH_ID, F.DAY_OF_MONTH HAVING COUNT(F.FID) > 1000"
+ },
+ {
+  "id": "46:q1",
+  "schemas": [
+   {
+    "name": "MONTHS",
+    "columns": [
+     {
+      "name": "MID",
+      "type": "INT"
+     },
+     {
+      "name": "MONTH",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "WEEKDAYS",
+    "columns": [
+     {
+      "name": "DID",
+      "type": "INT"
+     },
+     {
+      "name": "DAY_OF_WEEK",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "CARRIERS",
+    "columns": [
+     {
+      "name": "CID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "FLIGHTS",
+    "columns": [
+     {
+      "name": "FID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "MONTH_ID",
+      "type": "INT"
+     },
+     {
+      "name": "DAY_OF_MONTH",
+      "type": "INT"
+     },
+     {
+      "name": "CARRIER_ID",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT C.NAME FROM CARRIERS AS C JOIN FLIGHTS AS F ON C.CID = F.CARRIER_ID GROUP BY C.NAME, F.DAY_OF_MONTH HAVING COUNT(C.CID) > 1000"
+ },
+ {
+  "id": "47:q0",
+  "schemas": [
+   {
+    "name": "MONTHS",
+    "columns": [
+     {
+      "name": "MID",
+      "type": "INT"
+     },
+     {
+      "name": "MONTH",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "WEEKDAYS",
+    "columns": [
+     {
+      "name": "DID",
+      "type": "INT"
+     },
+     {
+      "name": "DAY_OF_WEEK",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "CARRIERS",
+    "columns": [
+     {
+      "name": "CID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "FLIGHTS",
+    "columns": [
+     {
+      "name": "FID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "MONTH_ID",
+      "type": "INT"
+     },
+     {
+      "name": "DAY_OF_MONTH",
+      "type": "INT"
+     },
+     {
+      "name": "CARRIER_ID",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT C.NAME FROM CARRIERS AS C JOIN FLIGHTS AS F ON C.CID = F.CARRIER_ID GROUP BY C.CID, C.NAME, F.YEAR, F.MONTH_ID, F.DAY_OF_MONTH HAVING COUNT(F.FID) > 1000"
+ },
+ {
+  "id": "47:q1",
+  "schemas": [
+   {
+    "name": "MONTHS",
+    "columns": [
+     {
+      "name": "MID",
+      "type": "INT"
+     },
+     {
+      "name": "MONTH",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "WEEKDAYS",
+    "columns": [
+     {
+      "name": "DID",
+      "type": "INT"
+     },
+     {
+      "name": "DAY_OF_WEEK",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "CARRIERS",
+    "columns": [
+     {
+      "name": "CID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "FLIGHTS",
+    "columns": [
+     {
+      "name": "FID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "MONTH_ID",
+      "type": "INT"
+     },
+     {
+      "name": "DAY_OF_MONTH",
+      "type": "INT"
+     },
+     {
+      "name": "CARRIER_ID",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT C.NAME FROM CARRIERS AS C JOIN FLIGHTS AS F ON C.CID = F.CARRIER_ID GROUP BY C.NAME, F.DAY_OF_MONTH HAVING COUNT(F.FID) > 1000"
+ },
+ {
+  "id": "49:q0",
+  "schemas": [
+   {
+    "name": "MONTHS",
+    "columns": [
+     {
+      "name": "MID",
+      "type": "INT"
+     },
+     {
+      "name": "MONTH",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "WEEKDAYS",
+    "columns": [
+     {
+      "name": "DID",
+      "type": "INT"
+     },
+     {
+      "name": "DAY_OF_WEEK",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "CARRIERS",
+    "columns": [
+     {
+      "name": "CID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "FLIGHTS",
+    "columns": [
+     {
+      "name": "FID",
+      "type": "INT"
+     },
+     {
+      "name": "ORIGIN_CITY",
+      "type": "INT"
+     },
+     {
+      "name": "DEST_CITY",
+      "type": "INT"
+     },
+     {
+      "name": "ACTUAL_TIME",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT F.ORIGIN_CITY, F.DEST_CITY, F.ACTUAL_TIME FROM FLIGHTS AS F JOIN (SELECT A.ORIGIN_CITY, MAX(A.ACTUAL_TIME) AS MAX_TIME FROM FLIGHTS AS A GROUP BY A.ORIGIN_CITY) AS X ON F.ORIGIN_CITY = X.ORIGIN_CITY AND F.ACTUAL_TIME = X.MAX_TIME"
+ },
+ {
+  "id": "49:q1",
+  "schemas": [
+   {
+    "name": "MONTHS",
+    "columns": [
+     {
+      "name": "MID",
+      "type": "INT"
+     },
+     {
+      "name": "MONTH",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "WEEKDAYS",
+    "columns": [
+     {
+      "name": "DID",
+      "type": "INT"
+     },
+     {
+      "name": "DAY_OF_WEEK",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "CARRIERS",
+    "columns": [
+     {
+      "name": "CID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "FLIGHTS",
+    "columns": [
+     {
+      "name": "FID",
+      "type": "INT"
+     },
+     {
+      "name": "ORIGIN_CITY",
+      "type": "INT"
+     },
+     {
+      "name": "DEST_CITY",
+      "type": "INT"
+     },
+     {
+      "name": "ACTUAL_TIME",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT F1.ORIGIN_CITY, F1.DEST_CITY, F1.ACTUAL_TIME FROM FLIGHTS AS F1 JOIN FLIGHTS AS F2 ON F1.ORIGIN_CITY = F2.ORIGIN_CITY GROUP BY F1.ORIGIN_CITY, F1.DEST_CITY, F1.ACTUAL_TIME HAVING F1.ACTUAL_TIME = MAX(F2.ACTUAL_TIME)"
+ },
+ {
+  "id": "50:q0",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT C.DEPT_NAME, SUM(C.CREDITS) FROM COURSE AS C INNER JOIN DEPARTMENT AS D ON (C.DEPT_NAME = D.DEPT_NAME) GROUP BY C.DEPT_NAME HAVING SUM(C.CREDITS) > 10 AND COUNT(C.CREDITS) > 5"
+ },
+ {
+  "id": "50:q1",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT C.DEPT_NAME, SUM(C.CREDITS) FROM COURSE AS C INNER JOIN DEPARTMENT AS D ON (C.DEPT_NAME = D.DEPT_NAME) GROUP BY C.DEPT_NAME HAVING SUM(C.CREDITS) > 10 AND COUNT(C.CREDITS) > 8"
+ },
+ {
+  "id": "51:q0",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT C.DEPT_NAME, SUM(I.SALARY) FROM COURSE AS C INNER JOIN DEPARTMENT AS D ON (C.DEPT_NAME = D.DEPT_NAME) INNER JOIN INSTRUCTOR AS I ON (D.DEPT_NAME = I.DEPT_NAME) GROUP BY C.DEPT_NAME HAVING SUM(I.SALARY) > 100 AND MAX(I.SALARY) < 75"
+ },
+ {
+  "id": "51:q1",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT C.DEPT_NAME, SUM(I.SALARY) FROM COURSE AS C INNER JOIN DEPARTMENT AS D ON (C.DEPT_NAME = D.DEPT_NAME) INNER JOIN INSTRUCTOR AS I ON (D.DEPT_NAME = I.DEPT_NAME) GROUP BY C.DEPT_NAME HAVING SUM(I.SALARY) >= 100 AND MAX(I.SALARY) < 75"
+ },
+ {
+  "id": "52:q0",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT C.DEPT_NAME, SUM(D.BUDGET) FROM COURSE AS C INNER JOIN DEPARTMENT AS D ON (C.DEPT_NAME = D.DEPT_NAME) INNER JOIN TEACHES AS T ON (C.COURSE_ID = T.COURSE_ID) GROUP BY C.DEPT_NAME HAVING SUM(D.BUDGET) > 100000 AND COUNT(D.BUDGET) > 10"
+ },
+ {
+  "id": "52:q1",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT C.DEPT_NAME, SUM(D.BUDGET) FROM COURSE AS C INNER JOIN DEPARTMENT AS D ON (C.DEPT_NAME = D.DEPT_NAME) INNER JOIN TEACHES AS T ON (C.COURSE_ID = T.COURSE_ID) GROUP BY C.DEPT_NAME HAVING SUM(D.BUDGET) > 100000 AND COUNT(DISTINCT D.BUDGET) > 10"
+ },
+ {
+  "id": "53:q0",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT C.DEPT_NAME, AVG(I.SALARY) FROM COURSE AS C INNER JOIN DEPARTMENT AS D ON (C.DEPT_NAME = D.DEPT_NAME) INNER JOIN TEACHES AS T ON (C.COURSE_ID = T.COURSE_ID) INNER JOIN INSTRUCTOR AS I ON (D.DEPT_NAME = I.DEPT_NAME) GROUP BY C.DEPT_NAME HAVING AVG(I.SALARY) > 50000 AND COUNT(DISTINCT I.SALARY) = 4"
+ },
+ {
+  "id": "53:q1",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT C.DEPT_NAME, AVG(I.SALARY) FROM COURSE AS C INNER JOIN DEPARTMENT AS D ON (C.DEPT_NAME = D.DEPT_NAME) INNER JOIN TEACHES AS T ON (C.COURSE_ID = T.COURSE_ID) INNER JOIN INSTRUCTOR AS I ON (D.DEPT_NAME = I.DEPT_NAME) GROUP BY C.DEPT_NAME HAVING AVG(I.SALARY) > 50000 AND COUNT(DISTINCT I.SALARY) > 4"
+ },
+ {
+  "id": "54:q0",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT T.SEMESTER, SUM(C.CREDITS) FROM DEPARTMENT AS D INNER JOIN TEACHES AS T ON (D.BUDGET = T.YEAR + 4) INNER JOIN COURSE AS C ON (C.DEPT_NAME = D.DEPT_NAME) GROUP BY T.SEMESTER HAVING AVG(C.CREDITS) > 2 AND COUNT(D.BUILDING) = 2"
+ },
+ {
+  "id": "54:q1",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT T.SEMESTER, SUM(C.CREDITS) FROM DEPARTMENT AS D INNER JOIN TEACHES AS T ON (D.BUDGET = T.YEAR + 4) INNER JOIN COURSE AS C ON (C.DEPT_NAME = D.DEPT_NAME) GROUP BY T.SEMESTER HAVING AVG(C.CREDITS) > 2 AND COUNT(D.BUILDING) >= 2"
+ },
+ {
+  "id": "55:q0",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT ID FROM COURSE NATURAL JOIN DEPARTMENT NATURAL JOIN STUDENT NATURAL JOIN TAKES NATURAL JOIN SECTION GROUP BY ID, DEPT_NAME HAVING COUNT(DEPT_NAME) > 1"
+ },
+ {
+  "id": "55:q1",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT ID FROM COURSE NATURAL JOIN DEPARTMENT NATURAL JOIN STUDENT NATURAL JOIN TAKES NATURAL JOIN SECTION GROUP BY ID, DEPT_NAME HAVING COUNT(DEPT_NAME) >= 2"
+ },
+ {
+  "id": "56:q0",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT DEPT_NAME FROM COURSE WHERE CREDITS = (SELECT MAX(CREDITS) FROM COURSE NATURAL JOIN DEPARTMENT WHERE TITLE = 'CS' GROUP BY DEPT_NAME HAVING COUNT(COURSE_ID) > 2)"
+ },
+ {
+  "id": "56:q1",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DEPT_NAME FROM COURSE WHERE CREDITS = (SELECT MAX(CREDITS) FROM COURSE NATURAL JOIN DEPARTMENT WHERE TITLE = 'CS' GROUP BY DEPT_NAME HAVING COUNT(COURSE_ID) > 2)"
+ },
+ {
+  "id": "57:q0",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT STUDENT.ID, STUDENT.NAME FROM STUDENT JOIN (SELECT TAKES.ID, S.TIME_SLOT_ID, S.YEAR FROM TAKES JOIN SECTION AS S ON TAKES.COURSE_ID = S.COURSE_ID AND TAKES.SEC_ID = S.SEC_ID GROUP BY TAKES.ID, S.TIME_SLOT_ID, S.YEAR HAVING COUNT(S.TIME_SLOT_ID) > 1) AS A ON STUDENT.ID = A.ID GROUP BY STUDENT.ID, STUDENT.NAME HAVING COUNT(DISTINCT STUDENT.ID) > 2"
+ },
+ {
+  "id": "57:q1",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT STUDENT.ID, STUDENT.NAME FROM STUDENT JOIN (SELECT TAKES.ID, S.TIME_SLOT_ID, S.YEAR FROM TAKES JOIN SECTION AS S ON TAKES.COURSE_ID = S.COURSE_ID AND TAKES.SEC_ID = S.SEC_ID GROUP BY TAKES.ID, S.TIME_SLOT_ID, S.YEAR HAVING SUM(S.TIME_SLOT_ID) > 1) AS A ON STUDENT.ID = A.ID GROUP BY STUDENT.ID, STUDENT.NAME HAVING COUNT(DISTINCT STUDENT.ID) > 2"
+ },
+ {
+  "id": "58:q0",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT SUM(T) AS SU FROM (SELECT YEAR AS T FROM TEACHES NATURAL JOIN INSTRUCTOR GROUP BY YEAR, COURSE_ID HAVING COUNT(ID) > 4) AS TEMP GROUP BY T"
+ },
+ {
+  "id": "58:q1",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT SUM(T) AS SU FROM (SELECT YEAR AS T FROM TEACHES NATURAL JOIN INSTRUCTOR GROUP BY YEAR HAVING COUNT(ID) > 4) AS TEMP GROUP BY T"
+ },
+ {
+  "id": "59:q0",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT COURSE_ID, TITLE FROM COURSE"
+ },
+ {
+  "id": "59:q1",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT COURSE_ID, TITLE FROM COURSE WHERE CREDITS > 3"
+ },
+ {
+  "id": "60:q0",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT COURSE.COURSE_ID, COURSE.TITLE, TEACHES.ID FROM COURSE NATURAL JOIN TEACHES WHERE COURSE.COURSE_ID = TEACHES.COURSE_ID AND TEACHES.YEAR = 2010"
+ },
+ {
+  "id": "60:q1",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT COURSE.COURSE_ID, COURSE.TITLE, TEACHES.ID FROM COURSE NATURAL JOIN TEACHES WHERE COURSE.COURSE_ID >= TEACHES.COURSE_ID AND TEACHES.YEAR = 2010"
+ },
+ {
+  "id": "61:q0",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT INSTRUCTOR.ID, INSTRUCTOR.NAME, TEACHES.COURSE_ID FROM INSTRUCTOR LEFT OUTER JOIN TEACHES ON INSTRUCTOR.ID > TEACHES.ID"
+ },
+ {
+  "id": "61:q1",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT INSTRUCTOR.ID, INSTRUCTOR.NAME, TEACHES.COURSE_ID FROM INSTRUCTOR, TEACHES WHERE INSTRUCTOR.ID = TEACHES.ID"
+ },
+ {
+  "id": "62:q0",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "WITH S AS (SELECT ID, TIME_SLOT_ID, YEAR FROM TAKES NATURAL JOIN SECTION GROUP BY ID, TIME_SLOT_ID, YEAR HAVING COUNT(DISTINCT TIME_SLOT_ID) > 4) SELECT DISTINCT ID, NAME FROM S NATURAL JOIN STUDENT"
+ },
+ {
+  "id": "62:q1",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "WITH S AS (SELECT ID, TIME_SLOT_ID, YEAR FROM TAKES NATURAL JOIN SECTION GROUP BY ID, TIME_SLOT_ID, YEAR HAVING COUNT(DISTINCT TIME_SLOT_ID) > 5) SELECT DISTINCT ID, NAME FROM S NATURAL JOIN STUDENT"
+ },
+ {
+  "id": "63:q0",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT DEPT_NAME FROM COURSE WHERE CREDITS = (SELECT MAX(CREDITS) FROM COURSE)"
+ },
+ {
+  "id": "63:q1",
+  "schemas": [
+   {
+    "name": "COURSE",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "TITLE",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "CREDITS",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "DEPARTMENT",
+    "columns": [
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "BUDGET",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "INSTRUCTOR",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "SALARY",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TEACHES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "SEMESTER",
+      "type": "INT"
+     },
+     {
+      "name": "INSTRUCTOR",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "SECTION",
+    "columns": [
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "BUILDING",
+      "type": "INT"
+     },
+     {
+      "name": "ROOM_NUMBER",
+      "type": "INT"
+     },
+     {
+      "name": "TIME_SLOT_ID",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "TAKES",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "COURSE_ID",
+      "type": "INT"
+     },
+     {
+      "name": "SEC_ID",
+      "type": "INT"
+     },
+     {
+      "name": "YEAR",
+      "type": "INT"
+     },
+     {
+      "name": "GRADE",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "STUDENT",
+    "columns": [
+     {
+      "name": "ID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     },
+     {
+      "name": "DEPT_NAME",
+      "type": "INT"
+     },
+     {
+      "name": "TOT_CRED",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT DEPT_NAME FROM COURSE AS C, (SELECT MAX(CREDITS) AS MAX_CREDITS FROM COURSE GROUP BY DEPT_NAME) AS A WHERE C.CREDITS = A.MAX_CREDITS"
+ }
+]

@@ -16,10 +16,11 @@ A pair counts as PROVED only when `sql_equiv` closes it with no leftover goals a
 -/
 
 unsafe def main (args : List String) : IO UInt32 := do
+  let dataset := "CrossSkill"
   enableInitializersExecution
   initSearchPath (← findSysroot)
   let env ← importModules (loadExts := true) #[{module := `Mathlib}, {module := `LeanDatabase}] {}
-  let path := args.headD "Bench/CrossSkill/pairs.json"
+  let path := args.headD s!"Bench/{dataset}/pairs.json"
   let content ← IO.FS.readFile path
   let .ok (.arr recs) := Json.parse content
     | do IO.eprintln s!"could not parse {path} as a JSON array"; return 1
@@ -50,7 +51,7 @@ unsafe def main (args : List String) : IO UInt32 := do
     (← IO.getStdout).flush
     if ok then proved := proved + 1
     results := results.push (Json.mkObj [("id", Json.str id), ("proved", Json.bool ok)])
-  IO.FS.writeFile "Bench/CrossSkill/prove_results.json"
+  IO.FS.writeFile s!"Bench/{dataset}/prove_results.json"
     ((Json.mkObj [("proved", Json.num proved), ("total", Json.num recs.size),
                   ("results", Json.arr results)]).pretty)
   IO.println s!"\nPROVED: {proved}/{recs.size}"
