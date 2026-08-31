@@ -1,0 +1,16 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_local070_eq_0_2
+
+CREATE TABLE CITIES («city_id» INT, «city_name» STRING, «latitude» FLOAT, «longitude» FLOAT, «country_code_2» STRING, «capital» INT, «population» FLOAT, «insert_date» STRING)
+
+theorem eq (t0 : TableRel CITIES_schema) :
+    (sql%([CITIES_schema]) "WITH cn_july AS (/* Chinese cities in July 2021 */ SELECT \"insert_date\", \"city_name\", \"city_id\" FROM \"CITY_LEGISLATION\".\"CITY_LEGISLATION\".\"CITIES\" WHERE \"country_code_2\" = 'cn' AND \"insert_date\" >= '2021-07-01' AND \"insert_date\" <= '2021-07-31'), one_per_date AS (/* Exactly one record per date (smallest city_id) */ SELECT \"insert_date\", \"city_name\", ROW_NUMBER() OVER (PARTITION BY \"insert_date\" ORDER BY \"city_id\") AS rn FROM cn_july), unique_dates AS (SELECT \"insert_date\", \"city_name\" FROM one_per_date WHERE rn = 1), streaks AS (/* Gap-and-island: identify consecutive date groups */ SELECT \"insert_date\", \"city_name\", \"insert_date\" + INTERVAL '1 DAY' * -ROW_NUMBER() OVER (ORDER BY \"insert_date\") AS grp FROM unique_dates), streak_lengths AS (SELECT grp, MIN(\"insert_date\") AS start_date, MAX(\"insert_date\") AS end_date, COUNT(*) AS streak_length FROM streaks GROUP BY grp), target_streaks AS (/* Shortest and longest streaks */ SELECT grp FROM streak_lengths WHERE streak_length = (SELECT MIN(streak_length) FROM streak_lengths) UNION ALL SELECT grp FROM streak_lengths WHERE streak_length = (SELECT MAX(streak_length) FROM streak_lengths)) SELECT s.\"insert_date\" AS MOST_CONSECUTIVE_DATES, UPPER(LEFT(s.\"city_name\", 1)) || LOWER(SUBSTRING(s.\"city_name\" FROM 2)) AS CITY_NAME FROM streaks AS s INNER JOIN target_streaks AS t ON s.grp = t.grp ORDER BY s.\"insert_date\"") t0
+  ~= (sql%([CITIES_schema]) "WITH chinese_dates AS (SELECT DISTINCT CAST(\"insert_date\" AS DATE) AS dt FROM \"CITY_LEGISLATION\".\"CITY_LEGISLATION\".\"CITIES\" WHERE \"country_code_2\" = 'cn' AND \"insert_date\" >= '2021-07-01' AND \"insert_date\" <= '2021-07-31'), islands AS (SELECT dt, dt + INTERVAL '1 DAY' * -ROW_NUMBER() OVER (ORDER BY dt) AS grp FROM chinese_dates), streak_lengths AS (SELECT grp, MIN(dt) AS streak_start, MAX(dt) AS streak_end, COUNT(*) AS streak_len FROM islands GROUP BY grp), extremes AS (SELECT grp, streak_start, streak_end, streak_len FROM streak_lengths WHERE streak_len = (SELECT MAX(streak_len) FROM streak_lengths) OR streak_len = (SELECT MIN(streak_len) FROM streak_lengths)), extreme_dates AS (SELECT i.dt, i.grp FROM islands AS i JOIN extremes AS e ON i.grp = e.grp), city_per_date AS (SELECT dt, city_name FROM (SELECT ed.dt, UPPER(LEFT(c.\"city_name\", 1)) || LOWER(SUBSTRING(c.\"city_name\" FROM 2)) AS city_name, ROW_NUMBER() OVER (PARTITION BY ed.dt ORDER BY c.\"city_id\") AS _w, c.\"city_id\" FROM extreme_dates AS ed JOIN \"CITY_LEGISLATION\".\"CITY_LEGISLATION\".\"CITIES\" AS c ON CAST(c.\"insert_date\" AS DATE) = ed.dt AND c.\"country_code_2\" = 'cn') AS _t WHERE _w = 1) SELECT dt AS \"MOST_CONSECUTIVE_DATES\", city_name AS \"CITY_NAME\" FROM city_per_date ORDER BY dt") t0
+  := by first | sql_equiv | sorry
+
+end N_sf_local070_eq_0_2

@@ -8,9 +8,9 @@ namespace N_28_eq
 
 CREATE TABLE A («C» INT)
 
-theorem eq :
-    sql%([A_schema]) "SELECT * FROM A AS X WHERE EXISTS(SELECT * FROM A AS Y WHERE X.C = Y.C)"
-  = sql%([A_schema]) "SELECT * FROM A AS X"
+theorem eq (t0 : TableRel A_schema) :
+    (sql%([A_schema]) "SELECT * FROM A AS X WHERE EXISTS(SELECT * FROM A AS Y WHERE X.C = Y.C)") t0
+  ~= (sql%([A_schema]) "SELECT * FROM A AS X") t0
   := by sql_equiv
 
 end N_28_eq

@@ -1,0 +1,16 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_17_eq
+
+CREATE TABLE R («A1» INT, «A2» INT, «A3» INT)
+
+theorem eq (t0 : TableRel R_schema) :
+    (sql%([R_schema]) "SELECT DISTINCT * FROM R AS X WHERE X.A1 = X.A2 AND X.A2 = X.A3") t0
+  ~= (sql%([R_schema]) "SELECT DISTINCT * FROM R AS X WHERE X.A1 = X.A2 AND X.A1 = X.A3") t0
+  := by first | sql_equiv | sorry
+
+end N_17_eq

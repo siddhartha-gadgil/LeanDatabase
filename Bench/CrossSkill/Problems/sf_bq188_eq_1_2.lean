@@ -1,0 +1,18 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_bq188_eq_1_2
+
+CREATE TABLE EVENTS («id» INT, «user_id» INT, «sequence_number» INT, «session_id» STRING, «created_at» INT, «ip_address» STRING, «city» STRING, «state» STRING, «postal_code» STRING, «browser» STRING, «traffic_source» STRING, «uri» STRING, «event_type» STRING)
+CREATE TABLE PRODUCTS («id» INT, «cost» FLOAT, «category» STRING, «name» STRING, «brand» STRING, «retail_price» FLOAT, «department» STRING, «sku» STRING, «distribution_center_id» INT)
+CREATE TABLE ORDER_ITEMS («id» INT, «order_id» INT, «user_id» INT, «product_id» INT, «inventory_item_id» INT, «status» STRING, «created_at» INT, «shipped_at» INT, «delivered_at» INT, «returned_at» INT, «sale_price» FLOAT)
+
+theorem eq (t0 : TableRel EVENTS_schema) (t1 : TableRel PRODUCTS_schema) (t2 : TableRel ORDER_ITEMS_schema) :
+    (sql%([EVENTS_schema, PRODUCTS_schema, ORDER_ITEMS_schema]) "WITH top_category AS (SELECT p.\"category\", COUNT(*) AS total_qty FROM \"THELOOK_ECOMMERCE\".\"THELOOK_ECOMMERCE\".\"ORDER_ITEMS\" AS oi JOIN \"THELOOK_ECOMMERCE\".\"THELOOK_ECOMMERCE\".\"PRODUCTS\" AS p ON oi.\"product_id\" = p.\"id\" GROUP BY p.\"category\" ORDER BY total_qty DESC LIMIT 1), events_with_next AS (SELECT e.\"session_id\", e.\"sequence_number\", e.\"uri\", e.\"created_at\", LEAD(e.\"created_at\") OVER (PARTITION BY e.\"session_id\" ORDER BY e.\"sequence_number\") AS next_created_at FROM \"THELOOK_ECOMMERCE\".\"THELOOK_ECOMMERCE\".\"EVENTS\" AS e), product_page_times AS (SELECT ewn.\"uri\", CAST(CAST((ewn.next_created_at - ewn.\"created_at\") AS DOUBLE PRECISION) / 1000000.0 AS DOUBLE PRECISION) / 60.0 AS time_on_page_minutes FROM events_with_next AS ewn WHERE ewn.\"uri\" LIKE '/product/%' AND NOT ewn.next_created_at IS NULL) SELECT tc.\"category\" AS \"TOP_CATEGORY\", ROUND(CAST(AVG(ppt.time_on_page_minutes) AS DECIMAL), 2) AS \"AVG_MINUTES_SPENT\" FROM product_page_times AS ppt JOIN \"THELOOK_ECOMMERCE\".\"THELOOK_ECOMMERCE\".\"PRODUCTS\" AS p ON CAST(REPLACE(ppt.\"uri\", '/product/', '') AS INT) = p.\"id\" JOIN top_category AS tc ON p.\"category\" = tc.\"category\" GROUP BY tc.\"category\"") t0 t1 t2
+  ~= (sql%([EVENTS_schema, PRODUCTS_schema, ORDER_ITEMS_schema]) "WITH top_category AS (SELECT p.\"category\" FROM \"THELOOK_ECOMMERCE\".\"THELOOK_ECOMMERCE\".\"ORDER_ITEMS\" AS oi JOIN \"THELOOK_ECOMMERCE\".\"THELOOK_ECOMMERCE\".\"PRODUCTS\" AS p ON oi.\"product_id\" = p.\"id\" GROUP BY p.\"category\" ORDER BY COUNT(*) DESC LIMIT 1), events_with_next AS (SELECT e.\"id\", e.\"session_id\", e.\"created_at\", e.\"sequence_number\", e.\"event_type\", e.\"uri\", LEAD(e.\"created_at\") OVER (PARTITION BY e.\"session_id\" ORDER BY e.\"sequence_number\") AS \"next_created_at\" FROM \"THELOOK_ECOMMERCE\".\"THELOOK_ECOMMERCE\".\"EVENTS\" AS e), product_page_times AS (SELECT ewn.\"session_id\", CAST(SPLIT_PART(ewn.\"uri\", '/', 3) AS DECIMAL(38, 0)) AS \"product_id\", CAST(CAST((ewn.\"next_created_at\" - ewn.\"created_at\") AS DOUBLE PRECISION) / 1000000.0 AS DOUBLE PRECISION) / 60.0 AS \"minutes_spent\" FROM events_with_next AS ewn WHERE ewn.\"event_type\" = 'product' AND NOT ewn.\"next_created_at\" IS NULL) SELECT tc.\"category\" AS \"TOP_CATEGORY\", ROUND(CAST(AVG(ppt.\"minutes_spent\") AS DECIMAL), 2) AS \"AVG_MINUTES_SPENT\" FROM product_page_times AS ppt JOIN \"THELOOK_ECOMMERCE\".\"THELOOK_ECOMMERCE\".\"PRODUCTS\" AS p ON ppt.\"product_id\" = p.\"id\" JOIN top_category AS tc ON p.\"category\" = tc.\"category\" GROUP BY tc.\"category\"") t0 t1 t2
+  := by first | sql_equiv | sorry
+
+end N_sf_bq188_eq_1_2

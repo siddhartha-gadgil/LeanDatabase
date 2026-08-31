@@ -1,0 +1,17 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_local270_eq_0_3
+
+CREATE TABLE PACKAGING_RELATIONS («packaging_id» INT, «contains_id» INT, «qty» INT)
+CREATE TABLE PACKAGING («id» INT, «name» STRING)
+
+theorem eq (t0 : TableRel PACKAGING_RELATIONS_schema) (t1 : TableRel PACKAGING_schema) :
+    (sql%([PACKAGING_RELATIONS_schema, PACKAGING_schema]) "WITH RECURSIVE hierarchy AS (/* Anchor: start from top-level containers (not contained by anything) */ SELECT p.\"id\" AS root_id, p.\"name\" AS root_name, pr.\"contains_id\" AS current_id, pr.\"qty\" AS total_qty FROM \"ORACLE_SQL\".\"ORACLE_SQL\".\"PACKAGING\" AS p JOIN \"ORACLE_SQL\".\"ORACLE_SQL\".\"PACKAGING_RELATIONS\" AS pr ON p.\"id\" = pr.\"packaging_id\" WHERE p.\"id\" <> ALL (SELECT DISTINCT \"contains_id\" FROM \"ORACLE_SQL\".\"ORACLE_SQL\".\"PACKAGING_RELATIONS\") UNION ALL /* Recursive: traverse down, multiply quantities at each level */ SELECT h.root_id, h.root_name, pr.\"contains_id\" AS current_id, h.total_qty * pr.\"qty\" AS total_qty FROM hierarchy AS h JOIN \"ORACLE_SQL\".\"ORACLE_SQL\".\"PACKAGING_RELATIONS\" AS pr ON h.current_id = pr.\"packaging_id\"), item_totals /* Aggregate: sum quantities across all paths from root to same leaf item */ AS (SELECT h.root_name AS CONTAINER_NAME, p.\"name\" AS ITEM_NAME, SUM(h.total_qty) AS TOTAL_QUANTITY FROM hierarchy AS h JOIN \"ORACLE_SQL\".\"ORACLE_SQL\".\"PACKAGING\" AS p ON h.current_id = p.\"id\" /* Items are leaf nodes: not a parent in any relation */ WHERE h.current_id <> ALL (SELECT DISTINCT \"packaging_id\" FROM \"ORACLE_SQL\".\"ORACLE_SQL\".\"PACKAGING_RELATIONS\") GROUP BY h.root_name, p.\"name\") SELECT CONTAINER_NAME, ITEM_NAME, TOTAL_QUANTITY FROM item_totals WHERE TOTAL_QUANTITY > 500 ORDER BY TOTAL_QUANTITY DESC") t0 t1
+  ~= (sql%([PACKAGING_RELATIONS_schema, PACKAGING_schema]) "WITH RECURSIVE hierarchy AS (/* Base case: top-level containers directly contain something */ /* Top-level = packaging_id that never appears as contains_id */ SELECT pr.\"packaging_id\" AS top_level_id, pr.\"contains_id\" AS current_id, pr.\"qty\" AS total_qty FROM \"ORACLE_SQL\".\"ORACLE_SQL\".\"PACKAGING_RELATIONS\" AS pr WHERE pr.\"packaging_id\" <> ALL (SELECT DISTINCT \"contains_id\" FROM \"ORACLE_SQL\".\"ORACLE_SQL\".\"PACKAGING_RELATIONS\") UNION ALL /* Recursive case: follow the hierarchy down */ SELECT h.top_level_id, pr.\"contains_id\" AS current_id, h.total_qty * pr.\"qty\" AS total_qty FROM hierarchy AS h JOIN \"ORACLE_SQL\".\"ORACLE_SQL\".\"PACKAGING_RELATIONS\" AS pr ON h.current_id = pr.\"packaging_id\"), items /* Items are packaging entries that don't contain anything else (leaf nodes) */ AS (SELECT \"id\" FROM \"ORACLE_SQL\".\"ORACLE_SQL\".\"PACKAGING\" WHERE \"id\" <> ALL (SELECT DISTINCT \"packaging_id\" FROM \"ORACLE_SQL\".\"ORACLE_SQL\".\"PACKAGING_RELATIONS\")) SELECT tp.\"name\" AS container_name, ip.\"name\" AS item_name, SUM(h.total_qty) AS total_quantity FROM hierarchy AS h JOIN items AS i ON h.current_id = i.\"id\" JOIN \"ORACLE_SQL\".\"ORACLE_SQL\".\"PACKAGING\" AS tp ON h.top_level_id = tp.\"id\" JOIN \"ORACLE_SQL\".\"ORACLE_SQL\".\"PACKAGING\" AS ip ON h.current_id = ip.\"id\" GROUP BY tp.\"name\", ip.\"name\" HAVING SUM(h.total_qty) > 500 ORDER BY total_quantity DESC") t0 t1
+  := by first | sql_equiv | sorry
+
+end N_sf_local270_eq_0_3

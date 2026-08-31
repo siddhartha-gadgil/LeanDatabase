@@ -8,9 +8,9 @@ namespace N_21_eq
 
 CREATE TABLE R («A» INT, «B» INT)
 
-theorem eq :
-    sql%([R_schema]) "SELECT X.A, SUM(X.A + X.B) FROM R AS X GROUP BY X.A"
-  = sql%([R_schema]) "SELECT Y.A, SUM(Y.A + Y.B) FROM R AS Y GROUP BY Y.A"
+theorem eq (t0 : TableRel R_schema) :
+    (sql%([R_schema]) "SELECT X.A, SUM(X.A + X.B) FROM R AS X GROUP BY X.A") t0
+  ~= (sql%([R_schema]) "SELECT Y.A, SUM(Y.A + Y.B) FROM R AS Y GROUP BY Y.A") t0
   := by sql_equiv
 
 end N_21_eq

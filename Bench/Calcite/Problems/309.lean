@@ -4,7 +4,7 @@ open LeanDatabase Lean
 set_option maxHeartbeats 1000000
 set_option maxRecDepth 1000000
 
-namespace Calcite_309
+namespace N_309_eq
 
 CREATE TABLE EMP («EMPNO» INT, «DEPTNO» INT, «ENAME» STRING, «JOB» STRING, «MGR» INT, «HIREDATE» INT, «SAL» INT, «COMM» INT, «SLACKER» BOOL)
 CREATE TABLE DEPT («DEPTNO» INT, «NAME» STRING)
@@ -13,9 +13,9 @@ CREATE TABLE EMPNULLABLES («EMPNO» INT, «DEPTNO» INT, «ENAME» STRING, «JO
 CREATE TABLE EMPNULLABLES_20 («EMPNO» INT, «DEPTNO» INT, «ENAME» STRING, «JOB» STRING, «MGR» INT, «HIREDATE» INT, «SAL» INT, «COMM» INT, «SLACKER» BOOL)
 CREATE TABLE EMP_B («EMPNO» INT, «DEPTNO» INT, «ENAME» STRING, «JOB» STRING, «MGR» INT, «HIREDATE» INT, «SAL» INT, «COMM» INT, «SLACKER» BOOL, «BIRTHDATE» INT)
 
-theorem eq :
-    sql%([EMP_schema, DEPT_schema, BONUS_schema, EMPNULLABLES_schema, EMPNULLABLES_20_schema, EMP_B_schema]) "SELECT * FROM (SELECT * FROM (VALUES (30, 3)) AS t(EXPR$0, EXPR$1) INTERSECT SELECT * FROM (VALUES (10, 1), (30, 3)) AS t1(X, Y) WHERE X > 50) AS t INTERSECT SELECT * FROM (VALUES (30, 3)) AS t(EXPR$0, EXPR$1)"
-  = sql%([EMP_schema, DEPT_schema, BONUS_schema, EMPNULLABLES_schema, EMPNULLABLES_20_schema, EMP_B_schema]) "SELECT * FROM (VALUES (NULL, NULL)) AS t(EXPR$0, EXPR$1) WHERE 1 = 0"
+theorem eq (t0 : TableRel EMP_schema) (t1 : TableRel DEPT_schema) (t2 : TableRel BONUS_schema) (t3 : TableRel EMPNULLABLES_schema) (t4 : TableRel EMPNULLABLES_20_schema) (t5 : TableRel EMP_B_schema) :
+    (sql%([EMP_schema, DEPT_schema, BONUS_schema, EMPNULLABLES_schema, EMPNULLABLES_20_schema, EMP_B_schema]) "SELECT * FROM (SELECT * FROM (VALUES (30, 3)) AS t(EXPR$0, EXPR$1) INTERSECT SELECT * FROM (VALUES (10, 1), (30, 3)) AS t1(X, Y) WHERE X > 50) AS t INTERSECT SELECT * FROM (VALUES (30, 3)) AS t(EXPR$0, EXPR$1)") t0 t1 t2 t3 t4 t5
+  ~= (sql%([EMP_schema, DEPT_schema, BONUS_schema, EMPNULLABLES_schema, EMPNULLABLES_20_schema, EMP_B_schema]) "SELECT * FROM (VALUES (NULL, NULL)) AS t(EXPR$0, EXPR$1) WHERE 1 = 0") t0 t1 t2 t3 t4 t5
   := by first | sql_equiv | sorry
 
-end Calcite_309
+end N_309_eq

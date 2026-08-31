@@ -8,9 +8,9 @@ namespace N_25_eq
 
 CREATE TABLE R («X» INT)
 
-theorem eq :
-    sql%([R_schema]) "SELECT DISTINCT * FROM R AS X WHERE B1(X) OR B2(X)"
-  = sql%([R_schema]) "SELECT DISTINCT * FROM ((SELECT * FROM R AS X WHERE B1(X)) UNION ALL (SELECT * FROM R AS Y WHERE B2(Y))) AS X"
+theorem eq (t0 : TableRel R_schema) :
+    (sql%([R_schema]) "SELECT DISTINCT * FROM R AS X WHERE B1(X) OR B2(X)") t0
+  ~= (sql%([R_schema]) "SELECT DISTINCT * FROM ((SELECT * FROM R AS X WHERE B1(X)) UNION ALL (SELECT * FROM R AS Y WHERE B2(Y))) AS X") t0
   := by sql_equiv
 
 end N_25_eq

@@ -1,0 +1,17 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_bq235_eq_1_3
+
+CREATE TABLE INPATIENT_CHARGES_2014 («provider_id» STRING, «provider_name» STRING, «provider_street_address» STRING, «provider_city» STRING, «provider_state» STRING, «provider_zipcode» STRING, «drg_definition» STRING, «hospital_referral_region_description» STRING, «total_discharges» INT, «average_covered_charges» FLOAT, «average_total_payments» FLOAT, «average_medicare_payments» FLOAT)
+CREATE TABLE OUTPATIENT_CHARGES_2014 («provider_id» STRING, «provider_name» STRING, «provider_street_address» STRING, «provider_city» STRING, «provider_state» STRING, «provider_zipcode» STRING, «apc» STRING, «hospital_referral_region» STRING, «outpatient_services» INT, «average_estimated_submitted_charges» FLOAT, «average_total_payments» FLOAT)
+
+theorem eq (t0 : TableRel INPATIENT_CHARGES_2014_schema) (t1 : TableRel OUTPATIENT_CHARGES_2014_schema) :
+    (sql%([INPATIENT_CHARGES_2014_schema, OUTPATIENT_CHARGES_2014_schema]) "SELECT i.\"provider_name\" AS \"Provider_Name\" FROM (SELECT \"provider_id\", \"provider_name\", AVG(\"average_covered_charges\") AS avg_inp FROM \"CMS_DATA\".\"CMS_MEDICARE\".\"INPATIENT_CHARGES_2014\" GROUP BY \"provider_id\", \"provider_name\") AS i JOIN (SELECT \"provider_id\", AVG(\"average_estimated_submitted_charges\") AS avg_out FROM \"CMS_DATA\".\"CMS_MEDICARE\".\"OUTPATIENT_CHARGES_2014\" GROUP BY \"provider_id\") AS o ON i.\"provider_id\" = o.\"provider_id\" ORDER BY (i.avg_inp + o.avg_out) DESC LIMIT 1") t0 t1
+  ~= (sql%([INPATIENT_CHARGES_2014_schema, OUTPATIENT_CHARGES_2014_schema]) "WITH inpatient_avg AS (SELECT \"provider_id\", \"provider_name\", AVG(\"average_total_payments\") AS avg_inpatient_cost FROM \"CMS_DATA\".\"CMS_MEDICARE\".\"INPATIENT_CHARGES_2014\" GROUP BY \"provider_id\", \"provider_name\"), outpatient_avg AS (SELECT \"provider_id\", \"provider_name\", AVG(\"average_total_payments\") AS avg_outpatient_cost FROM \"CMS_DATA\".\"CMS_MEDICARE\".\"OUTPATIENT_CHARGES_2014\" GROUP BY \"provider_id\", \"provider_name\") SELECT i.\"provider_name\" AS Provider_Name FROM inpatient_avg AS i JOIN outpatient_avg AS o ON i.\"provider_id\" = o.\"provider_id\" ORDER BY (i.avg_inpatient_cost + o.avg_outpatient_cost) DESC LIMIT 1") t0 t1
+  := by first | sql_equiv | sorry
+
+end N_sf_bq235_eq_1_3

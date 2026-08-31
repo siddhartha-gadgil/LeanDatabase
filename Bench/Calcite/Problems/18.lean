@@ -4,7 +4,7 @@ open LeanDatabase Lean
 set_option maxHeartbeats 1000000
 set_option maxRecDepth 1000000
 
-namespace Calcite_18
+namespace N_18_eq
 
 CREATE TABLE EMP («EMPNO» INT, «DEPTNO» INT, «ENAME» STRING, «JOB» STRING, «MGR» INT, «HIREDATE» INT, «SAL» INT, «COMM» INT, «SLACKER» BOOL)
 CREATE TABLE DEPT («DEPTNO» INT, «NAME» STRING)
@@ -13,9 +13,9 @@ CREATE TABLE EMPNULLABLES («EMPNO» INT, «DEPTNO» INT, «ENAME» STRING, «JO
 CREATE TABLE EMPNULLABLES_20 («EMPNO» INT, «DEPTNO» INT, «ENAME» STRING, «JOB» STRING, «MGR» INT, «HIREDATE» INT, «SAL» INT, «COMM» INT, «SLACKER» BOOL)
 CREATE TABLE EMP_B («EMPNO» INT, «DEPTNO» INT, «ENAME» STRING, «JOB» STRING, «MGR» INT, «HIREDATE» INT, «SAL» INT, «COMM» INT, «SLACKER» BOOL, «BIRTHDATE» INT)
 
-theorem eq :
-    sql%([EMP_schema, DEPT_schema, BONUS_schema, EMPNULLABLES_schema, EMPNULLABLES_20_schema, EMP_B_schema]) "SELECT t.EXPR$0, 2 + 3 AS $f1, MAX(t.FIVE) FROM EMP, (VALUES (4, 5)) AS t(EXPR$0, FIVE) GROUP BY t.EXPR$0, 2 + 3"
-  = sql%([EMP_schema, DEPT_schema, BONUS_schema, EMPNULLABLES_schema, EMPNULLABLES_20_schema, EMP_B_schema]) "SELECT t2.EXPR$0, 2 + 3, MAX(t2.FIVE) FROM EMP AS EMP0, (VALUES (4, 5)) AS t2(EXPR$0, FIVE) GROUP BY t2.EXPR$0"
+theorem eq (t0 : TableRel EMP_schema) (t1 : TableRel DEPT_schema) (t2 : TableRel BONUS_schema) (t3 : TableRel EMPNULLABLES_schema) (t4 : TableRel EMPNULLABLES_20_schema) (t5 : TableRel EMP_B_schema) :
+    (sql%([EMP_schema, DEPT_schema, BONUS_schema, EMPNULLABLES_schema, EMPNULLABLES_20_schema, EMP_B_schema]) "SELECT t.EXPR$0, 2 + 3 AS $f1, MAX(t.FIVE) FROM EMP, (VALUES (4, 5)) AS t(EXPR$0, FIVE) GROUP BY t.EXPR$0, 2 + 3") t0 t1 t2 t3 t4 t5
+  ~= (sql%([EMP_schema, DEPT_schema, BONUS_schema, EMPNULLABLES_schema, EMPNULLABLES_20_schema, EMP_B_schema]) "SELECT t2.EXPR$0, 2 + 3, MAX(t2.FIVE) FROM EMP AS EMP0, (VALUES (4, 5)) AS t2(EXPR$0, FIVE) GROUP BY t2.EXPR$0") t0 t1 t2 t3 t4 t5
   := by first | sql_equiv | sorry
 
-end Calcite_18
+end N_18_eq

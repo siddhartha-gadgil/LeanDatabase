@@ -9,9 +9,9 @@ namespace N_35_eq
 CREATE TABLE R1 («X» INT)
 CREATE TABLE R2 («X» INT)
 
-theorem eq :
-    sql%([R1_schema, R2_schema]) "SELECT * FROM R1 AS X, (SELECT * FROM R2 AS Y WHERE B(Y)) AS Z"
-  = sql%([R1_schema, R2_schema]) "SELECT * FROM R1 AS X, R2 AS Y WHERE B(Y)"
+theorem eq (t0 : TableRel R1_schema) (t1 : TableRel R2_schema) :
+    (sql%([R1_schema, R2_schema]) "SELECT * FROM R1 AS X, (SELECT * FROM R2 AS Y WHERE B(Y)) AS Z") t0 t1
+  ~= (sql%([R1_schema, R2_schema]) "SELECT * FROM R1 AS X, R2 AS Y WHERE B(Y)") t0 t1
   := by sql_equiv
 
 end N_35_eq

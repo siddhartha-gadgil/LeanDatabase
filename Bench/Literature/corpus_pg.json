@@ -399,7 +399,7 @@
      },
      {
       "name": "PDEPT",
-      "type": "INT"
+      "type": "STRING"
      }
     ]
    }
@@ -414,7 +414,7 @@
     "columns": [
      {
       "name": "DNAME",
-      "type": "INT"
+      "type": "STRING"
      },
      {
       "name": "DPROJ",
@@ -444,7 +444,7 @@
      },
      {
       "name": "PDEPT",
-      "type": "INT"
+      "type": "STRING"
      }
     ]
    }

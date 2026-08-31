@@ -4,7 +4,7 @@ open LeanDatabase Lean
 set_option maxHeartbeats 1000000
 set_option maxRecDepth 1000000
 
-namespace Calcite_350
+namespace N_350_eq
 
 CREATE TABLE EMP («EMPNO» INT, «DEPTNO» INT, «ENAME» STRING, «JOB» STRING, «MGR» INT, «HIREDATE» INT, «SAL» INT, «COMM» INT, «SLACKER» BOOL)
 CREATE TABLE DEPT («DEPTNO» INT, «NAME» STRING)
@@ -13,9 +13,9 @@ CREATE TABLE EMPNULLABLES («EMPNO» INT, «DEPTNO» INT, «ENAME» STRING, «JO
 CREATE TABLE EMPNULLABLES_20 («EMPNO» INT, «DEPTNO» INT, «ENAME» STRING, «JOB» STRING, «MGR» INT, «HIREDATE» INT, «SAL» INT, «COMM» INT, «SLACKER» BOOL)
 CREATE TABLE EMP_B («EMPNO» INT, «DEPTNO» INT, «ENAME» STRING, «JOB» STRING, «MGR» INT, «HIREDATE» INT, «SAL» INT, «COMM» INT, «SLACKER» BOOL, «BIRTHDATE» INT)
 
-theorem eq :
-    sql%([EMP_schema, DEPT_schema, BONUS_schema, EMPNULLABLES_schema, EMPNULLABLES_20_schema, EMP_B_schema]) "SELECT EMPNO, (((SELECT DEPTNO FROM EMP WHERE EMPNO < 20))) AS D FROM EMP"
-  = sql%([EMP_schema, DEPT_schema, BONUS_schema, EMPNULLABLES_schema, EMPNULLABLES_20_schema, EMP_B_schema]) "SELECT EMP1.EMPNO, t4.$f0 AS D FROM EMP AS EMP1 LEFT JOIN (SELECT SINGLE_VALUE(DEPTNO) AS $f0 FROM EMP WHERE EMPNO < 20) AS t4 ON TRUE"
+theorem eq (t0 : TableRel EMP_schema) (t1 : TableRel DEPT_schema) (t2 : TableRel BONUS_schema) (t3 : TableRel EMPNULLABLES_schema) (t4 : TableRel EMPNULLABLES_20_schema) (t5 : TableRel EMP_B_schema) :
+    (sql%([EMP_schema, DEPT_schema, BONUS_schema, EMPNULLABLES_schema, EMPNULLABLES_20_schema, EMP_B_schema]) "SELECT EMPNO, (((SELECT DEPTNO FROM EMP WHERE EMPNO < 20))) AS D FROM EMP") t0 t1 t2 t3 t4 t5
+  ~= (sql%([EMP_schema, DEPT_schema, BONUS_schema, EMPNULLABLES_schema, EMPNULLABLES_20_schema, EMP_B_schema]) "SELECT EMP1.EMPNO, t4.$f0 AS D FROM EMP AS EMP1 LEFT JOIN (SELECT SINGLE_VALUE(DEPTNO) AS $f0 FROM EMP WHERE EMPNO < 20) AS t4 ON TRUE") t0 t1 t2 t3 t4 t5
   := by first | sql_equiv | sorry
 
-end Calcite_350
+end N_350_eq

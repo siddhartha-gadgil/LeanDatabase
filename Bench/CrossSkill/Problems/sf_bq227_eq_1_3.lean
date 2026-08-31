@@ -1,0 +1,16 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_bq227_eq_1_3
+
+CREATE TABLE CRIME_BY_LSOA («lsoa_code» STRING, «borough» STRING, «major_category» STRING, «minor_category» STRING, «value» INT, «year» INT, «month» INT)
+
+theorem eq (t0 : TableRel CRIME_BY_LSOA_schema) :
+    (sql%([CRIME_BY_LSOA_schema]) "WITH top5 AS (SELECT \"minor_category\", ROW_NUMBER() OVER (ORDER BY SUM(\"value\") DESC) AS rn FROM \"LONDON\".\"LONDON_CRIME\".\"CRIME_BY_LSOA\" WHERE \"year\" = 2008 GROUP BY \"minor_category\" ORDER BY SUM(\"value\") DESC LIMIT 5), yearly_total AS (SELECT \"year\", SUM(\"value\") AS total FROM \"LONDON\".\"LONDON_CRIME\".\"CRIME_BY_LSOA\" GROUP BY \"year\"), category_yearly AS (SELECT c.\"year\", t.rn, SUM(c.\"value\") AS cat_total FROM \"LONDON\".\"LONDON_CRIME\".\"CRIME_BY_LSOA\" AS c INNER JOIN top5 AS t ON c.\"minor_category\" = t.\"minor_category\" GROUP BY c.\"year\", t.rn) SELECT cy.\"year\" AS \"year\", ROUND(CAST(100.0 * MAX(CASE WHEN cy.rn = 1 THEN cy.cat_total END) AS DOUBLE PRECISION) / yt.total, 2) AS \"Category 1\", ROUND(CAST(100.0 * MAX(CASE WHEN cy.rn = 2 THEN cy.cat_total END) AS DOUBLE PRECISION) / yt.total, 2) AS \"Category 2\", ROUND(CAST(100.0 * MAX(CASE WHEN cy.rn = 3 THEN cy.cat_total END) AS DOUBLE PRECISION) / yt.total, 2) AS \"Category 3\", ROUND(CAST(100.0 * MAX(CASE WHEN cy.rn = 4 THEN cy.cat_total END) AS DOUBLE PRECISION) / yt.total, 2) AS \"Category 4\", ROUND(CAST(100.0 * MAX(CASE WHEN cy.rn = 5 THEN cy.cat_total END) AS DOUBLE PRECISION) / yt.total, 2) AS \"Category 5\" FROM category_yearly AS cy JOIN yearly_total AS yt ON cy.\"year\" = yt.\"year\" GROUP BY cy.\"year\", yt.total ORDER BY cy.\"year\"") t0
+  ~= (sql%([CRIME_BY_LSOA_schema]) "WITH top5 AS (SELECT \"minor_category\", SUM(\"value\") AS total_crimes FROM \"LONDON\".\"LONDON_CRIME\".\"CRIME_BY_LSOA\" WHERE \"year\" = 2008 GROUP BY \"minor_category\" ORDER BY total_crimes DESC LIMIT 5), ranked AS (SELECT \"minor_category\", ROW_NUMBER() OVER (ORDER BY total_crimes DESC) AS rn FROM top5), yearly_totals AS (SELECT \"year\", SUM(\"value\") AS total FROM \"LONDON\".\"LONDON_CRIME\".\"CRIME_BY_LSOA\" GROUP BY \"year\"), yearly_category AS (SELECT c.\"year\", r.rn, SUM(c.\"value\") AS cat_total FROM \"LONDON\".\"LONDON_CRIME\".\"CRIME_BY_LSOA\" AS c JOIN ranked AS r ON c.\"minor_category\" = r.\"minor_category\" GROUP BY c.\"year\", r.rn) SELECT yt.\"year\", ROUND(MAX(CASE WHEN yc.rn = 1 THEN CAST(yc.cat_total * 100.0 AS DOUBLE PRECISION) / yt.total END), 2) AS \"Category 1\", ROUND(MAX(CASE WHEN yc.rn = 2 THEN CAST(yc.cat_total * 100.0 AS DOUBLE PRECISION) / yt.total END), 2) AS \"Category 2\", ROUND(MAX(CASE WHEN yc.rn = 3 THEN CAST(yc.cat_total * 100.0 AS DOUBLE PRECISION) / yt.total END), 2) AS \"Category 3\", ROUND(MAX(CASE WHEN yc.rn = 4 THEN CAST(yc.cat_total * 100.0 AS DOUBLE PRECISION) / yt.total END), 2) AS \"Category 4\", ROUND(MAX(CASE WHEN yc.rn = 5 THEN CAST(yc.cat_total * 100.0 AS DOUBLE PRECISION) / yt.total END), 2) AS \"Category 5\" FROM yearly_totals AS yt JOIN yearly_category AS yc ON yt.\"year\" = yc.\"year\" GROUP BY yt.\"year\" ORDER BY yt.\"year\"") t0
+  := by first | sql_equiv | sorry
+
+end N_sf_bq227_eq_1_3

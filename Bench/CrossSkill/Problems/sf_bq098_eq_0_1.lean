@@ -1,0 +1,17 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_bq098_eq_0_1
+
+CREATE TABLE TAXI_ZONE_GEOM («zone_id» STRING, «zone_name» STRING, «borough» STRING, «zone_geom» STRING)
+CREATE TABLE TLC_YELLOW_TRIPS_2016 («vendor_id» STRING, «pickup_datetime» INT, «dropoff_datetime» INT, «passenger_count» INT, «trip_distance» INT, «rate_code» STRING, «store_and_fwd_flag» STRING, «payment_type» STRING, «fare_amount» INT, «extra» INT, «mta_tax» INT, «tip_amount» INT, «tolls_amount» INT, «imp_surcharge» INT, «airport_fee» INT, «total_amount» INT, «pickup_location_id» STRING, «dropoff_location_id» STRING, «data_file_year» INT, «data_file_month» INT)
+
+theorem eq (t0 : TableRel TAXI_ZONE_GEOM_schema) (t1 : TableRel TLC_YELLOW_TRIPS_2016_schema) :
+    (sql%([TAXI_ZONE_GEOM_schema, TLC_YELLOW_TRIPS_2016_schema]) "WITH filtered_trips AS (SELECT t.\"pickup_location_id\", t.\"tip_amount\", t.\"total_amount\" FROM \"NEW_YORK_PLUS\".\"NEW_YORK_TAXI_TRIPS\".\"TLC_YELLOW_TRIPS_2016\" AS t WHERE t.\"pickup_datetime\" >= 1451606400000000 AND t.\"pickup_datetime\" < 1452211200000000 AND t.\"dropoff_datetime\" >= 1451606400000000 AND t.\"dropoff_datetime\" < 1452211200000000 AND t.\"dropoff_datetime\" > t.\"pickup_datetime\" AND t.\"passenger_count\" > 0 AND t.\"trip_distance\" >= 0 AND t.\"tip_amount\" >= 0 AND t.\"tolls_amount\" >= 0 AND t.\"mta_tax\" >= 0 AND t.\"fare_amount\" >= 0 AND t.\"total_amount\" >= 0), trips_with_borough AS (SELECT z.\"borough\" AS pickup_borough, CASE WHEN ft.\"total_amount\" = 0 THEN 0 ELSE CAST(ft.\"tip_amount\" * 100.0 AS DOUBLE PRECISION) / ft.\"total_amount\" END AS tip_rate FROM filtered_trips AS ft JOIN \"NEW_YORK_PLUS\".\"NEW_YORK_TAXI_TRIPS\".\"TAXI_ZONE_GEOM\" AS z ON ft.\"pickup_location_id\" = z.\"zone_id\") SELECT pickup_borough, CAST(100.0 * SUM(CASE WHEN tip_rate = 0 THEN 1 ELSE 0 END) AS DOUBLE PRECISION) / COUNT(*) AS percentage_no_tip FROM trips_with_borough GROUP BY pickup_borough ORDER BY percentage_no_tip DESC") t0 t1
+  ~= (sql%([TAXI_ZONE_GEOM_schema, TLC_YELLOW_TRIPS_2016_schema]) "SELECT z.\"borough\" AS pickup_borough, ROUND(CAST(CAST(SUM(CASE WHEN (CASE WHEN t.\"total_amount\" > 0 THEN CAST(t.\"tip_amount\" * 100.0 AS DOUBLE PRECISION) / t.\"total_amount\" ELSE 0 END) = 0 THEN 1 ELSE 0 END) * 100.0 AS DOUBLE PRECISION) / COUNT(*) AS DECIMAL), 6) AS percentage_no_tip FROM \"NEW_YORK_PLUS\".\"NEW_YORK_TAXI_TRIPS\".\"TLC_YELLOW_TRIPS_2016\" AS t JOIN \"NEW_YORK_PLUS\".\"NEW_YORK_TAXI_TRIPS\".\"TAXI_ZONE_GEOM\" AS z ON t.\"pickup_location_id\" = z.\"zone_id\" WHERE CAST('1970-01-01' AS TIMESTAMP) + INTERVAL '1 MICROSECOND' * t.\"pickup_datetime\" >= '2016-01-01' AND CAST('1970-01-01' AS TIMESTAMP) + INTERVAL '1 MICROSECOND' * t.\"pickup_datetime\" < '2016-01-08' AND CAST('1970-01-01' AS TIMESTAMP) + INTERVAL '1 MICROSECOND' * t.\"dropoff_datetime\" >= '2016-01-01' AND CAST('1970-01-01' AS TIMESTAMP) + INTERVAL '1 MICROSECOND' * t.\"dropoff_datetime\" < '2016-01-08' AND t.\"dropoff_datetime\" > t.\"pickup_datetime\" AND t.\"passenger_count\" > 0 AND t.\"trip_distance\" >= 0 AND t.\"tip_amount\" >= 0 AND t.\"tolls_amount\" >= 0 AND t.\"mta_tax\" >= 0 AND t.\"fare_amount\" >= 0 AND t.\"total_amount\" >= 0 GROUP BY z.\"borough\" ORDER BY percentage_no_tip DESC") t0 t1
+  := by first | sql_equiv | sorry
+
+end N_sf_bq098_eq_0_1

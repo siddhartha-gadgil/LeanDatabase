@@ -1,0 +1,16 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_bq005_eq_0_1
+
+CREATE TABLE BLOCKS («block_height» INT, «block_timestamp» STRING, «block_timestamp_truncated» INT, «block_hash» STRING, «proposer_address» STRING, «last_commit_hash» STRING, «data_hash» STRING, «validators_hash» STRING, «next_validators_hash» STRING, «consensus_hash» STRING, «app_hash» STRING, «last_results_hash» STRING, «evidence_hash» STRING, «signatures» STRING)
+
+theorem eq (t0 : TableRel BLOCKS_schema) :
+    (sql%([BLOCKS_schema]) "WITH numbered AS (SELECT \"number\", \"timestamp\", ROW_NUMBER() OVER (ORDER BY \"number\") AS rn FROM \"CRYPTO\".\"CRYPTO_BITCOIN\".\"BLOCKS\" WHERE \"number\" > 0), intervals AS (SELECT CAST(TO_TIMESTAMP_NTZ(CAST(a.\"timestamp\" AS DOUBLE PRECISION) / 1000000) AS DATE) AS DATE, CAST((a.\"timestamp\" - b.\"timestamp\") AS DOUBLE PRECISION) / 1000000.0 AS block_interval_seconds FROM numbered AS a JOIN numbered AS b ON a.rn = b.rn + 1 WHERE CAST(TO_TIMESTAMP_NTZ(CAST(a.\"timestamp\" AS DOUBLE PRECISION) / 1000000) AS DATE) >= '2023-01-01' AND CAST(TO_TIMESTAMP_NTZ(CAST(a.\"timestamp\" AS DOUBLE PRECISION) / 1000000) AS DATE) < '2024-01-01') SELECT DATE, AVG(block_interval_seconds) AS MEAN_BLOCK_INTERVAL FROM intervals GROUP BY DATE ORDER BY DATE LIMIT 10") t0
+  ~= (sql%([BLOCKS_schema]) "WITH numbered AS (SELECT \"number\", \"timestamp\", CAST(TO_TIMESTAMP(CAST(\"timestamp\" AS DOUBLE PRECISION) / 1000000) AS DATE) AS block_date, ROW_NUMBER() OVER (ORDER BY \"number\") AS rn FROM \"CRYPTO\".\"CRYPTO_BITCOIN\".\"BLOCKS\" WHERE \"number\" > 0 /* exclude genesis block */) SELECT b.block_date AS \"DATE\", AVG(CAST((b.\"timestamp\" - a.\"timestamp\") AS DOUBLE PRECISION) / 1000000) AS \"MEAN_BLOCK_INTERVAL\" FROM numbered AS a JOIN numbered AS b ON b.rn = a.rn + 1 WHERE EXTRACT(YEAR FROM b.block_date) = 2023 GROUP BY b.block_date ORDER BY b.block_date LIMIT 10") t0
+  := by first | sql_equiv | sorry
+
+end N_sf_bq005_eq_0_1

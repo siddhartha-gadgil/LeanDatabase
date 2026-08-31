@@ -8,9 +8,9 @@ namespace N_37_eq
 
 CREATE TABLE A («X» INT)
 
-theorem eq :
-    sql%([A_schema]) "SELECT * FROM A AS X UNION ALL SELECT * FROM A AS X WHERE FALSE"
-  = sql%([A_schema]) "SELECT * FROM A AS X"
+theorem eq (t0 : TableRel A_schema) :
+    (sql%([A_schema]) "SELECT * FROM A AS X UNION ALL SELECT * FROM A AS X WHERE FALSE") t0
+  ~= (sql%([A_schema]) "SELECT * FROM A AS X") t0
   := by sql_equiv
 
 end N_37_eq

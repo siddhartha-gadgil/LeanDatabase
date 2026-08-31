@@ -1,0 +1,17 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_bq195_eq_1_3
+
+CREATE TABLE TRANSACTIONS («block_height» INT, «block_timestamp» STRING, «block_timestamp_truncated» INT, «txhash» STRING, «transaction_type» STRING, «gas_wanted» INT, «gas_used» INT, «sender» STRING, «fee» STRING, «memo» STRING)
+CREATE TABLE TRACES («transaction_hash» STRING, «transaction_index» INT, «from_address» STRING, «to_address» STRING, «value» INT, «input» STRING, «output» STRING, «trace_type» STRING, «call_type» STRING, «reward_type» STRING, «gas» INT, «gas_used» INT, «subtraces» INT, «trace_address» STRING, «error» STRING, «status» INT, «block_timestamp» INT, «block_number» INT, «block_hash» STRING, «trace_id» STRING)
+
+theorem eq (t0 : TableRel TRANSACTIONS_schema) (t1 : TableRel TRACES_schema) :
+    (sql%([TRANSACTIONS_schema, TRACES_schema]) "WITH trace_values AS (SELECT \"to_address\" AS address, CAST(\"value\" AS DECIMAL(38, 9)) AS value_change FROM \"CRYPTO\".\"CRYPTO_ETHEREUM\".\"TRACES\" WHERE \"block_timestamp\" < 1630454400000000 AND \"status\" = 1 AND (\"call_type\" IS NULL OR \"call_type\" = 'call') AND NOT \"to_address\" IS NULL UNION ALL SELECT \"from_address\" AS address, -CAST(\"value\" AS DECIMAL(38, 9)) AS value_change FROM \"CRYPTO\".\"CRYPTO_ETHEREUM\".\"TRACES\" WHERE \"block_timestamp\" < 1630454400000000 AND \"status\" = 1 AND (\"call_type\" IS NULL OR \"call_type\" = 'call') AND NOT \"from_address\" IS NULL UNION ALL SELECT \"from_address\" AS address, -CAST(\"gas_price\" AS DECIMAL(38, 9)) * CAST(\"receipt_gas_used\" AS DECIMAL(38, 9)) AS value_change FROM \"CRYPTO\".\"CRYPTO_ETHEREUM\".\"TRANSACTIONS\" WHERE \"block_timestamp\" < 1630454400000000 AND \"receipt_status\" = 1 AND NOT \"from_address\" IS NULL) SELECT address AS ADDRESS, CAST(SUM(value_change) AS DECIMAL(38, 9)) AS BALANCE FROM trace_values GROUP BY address ORDER BY BALANCE DESC LIMIT 10") t0 t1
+  ~= (sql%([TRANSACTIONS_schema, TRACES_schema]) "WITH trace_balances AS (SELECT \"address\", SUM(\"value\") AS \"balance\" FROM (/* Value received via traces (to_address) */ SELECT \"to_address\" AS \"address\", \"value\" FROM \"CRYPTO\".\"CRYPTO_ETHEREUM\".\"TRACES\" WHERE \"status\" = 1 AND (\"call_type\" IS NULL OR \"call_type\" = 'call') AND \"block_timestamp\" < 1630454400000000 AND NOT \"to_address\" IS NULL UNION ALL /* Value sent via traces (from_address) - negative */ SELECT \"from_address\" AS \"address\", -\"value\" FROM \"CRYPTO\".\"CRYPTO_ETHEREUM\".\"TRACES\" WHERE \"status\" = 1 AND (\"call_type\" IS NULL OR \"call_type\" = 'call') AND \"block_timestamp\" < 1630454400000000 AND NOT \"from_address\" IS NULL) AS t GROUP BY \"address\"), gas_fees AS (/* Gas fees paid by from_address in transactions */ SELECT \"from_address\" AS \"address\", -SUM(\"gas_price\" * \"receipt_gas_used\") AS \"gas_balance\" FROM \"CRYPTO\".\"CRYPTO_ETHEREUM\".\"TRANSACTIONS\" WHERE \"receipt_status\" = 1 AND \"block_timestamp\" < 1630454400000000 AND NOT \"from_address\" IS NULL GROUP BY \"from_address\"), combined AS (SELECT COALESCE(tb.\"address\", gf.\"address\") AS \"ADDRESS\", COALESCE(tb.\"balance\", 0) + COALESCE(gf.\"gas_balance\", 0) AS \"BALANCE\" FROM trace_balances AS tb FULL OUTER JOIN gas_fees AS gf ON tb.\"address\" = gf.\"address\") SELECT \"ADDRESS\", \"BALANCE\" FROM combined ORDER BY \"BALANCE\" DESC LIMIT 10") t0 t1
+  := by first | sql_equiv | sorry
+
+end N_sf_bq195_eq_1_3

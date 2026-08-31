@@ -1,0 +1,16 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_local169_eq_0_3
+
+CREATE TABLE LEGISLATORS_TERMS («id_bioguide» STRING, «term_number» INT, «term_id» STRING, «term_type» STRING, «term_start» STRING, «term_end» STRING, «state» STRING, «district» FLOAT, «class» FLOAT, «party» STRING, «how» STRING, «url» STRING, «address» STRING, «phone» STRING, «fax» STRING, «contact_form» STRING, «office» STRING, «state_rank» STRING, «rss_url» STRING, «caucus» STRING)
+
+theorem eq (t0 : TableRel LEGISLATORS_TERMS_schema) :
+    (sql%([LEGISLATORS_TERMS_schema]) "WITH cohort AS (SELECT \"id_bioguide\", MIN(CAST(\"term_start\" AS DATE)) AS first_start FROM \"CITY_LEGISLATION\".\"CITY_LEGISLATION\".\"LEGISLATORS_TERMS\" GROUP BY \"id_bioguide\" HAVING first_start >= '1917-01-01' AND first_start <= '1999-12-31'), cohort_size AS (SELECT COUNT(*) AS total FROM cohort), periods AS (SELECT ROW_NUMBER() OVER (ORDER BY SEQ4()) AS period FROM TABLE(GENERATOR(20))), retained AS (SELECT p.period, COUNT(DISTINCT c.\"id_bioguide\") AS cnt FROM cohort AS c CROSS JOIN periods AS p INNER JOIN \"CITY_LEGISLATION\".\"CITY_LEGISLATION\".\"LEGISLATORS_TERMS\" AS t ON t.\"id_bioguide\" = c.\"id_bioguide\" AND DATE_FROM_PARTS(CAST(EXTRACT(YEAR FROM c.first_start) AS INT) + p.period, 12, 31) >= CAST(t.\"term_start\" AS DATE) AND DATE_FROM_PARTS(CAST(EXTRACT(YEAR FROM c.first_start) AS INT) + p.period, 12, 31) <= CAST(t.\"term_end\" AS DATE) GROUP BY p.period) SELECT p.period AS \"PERIOD\", ROUND(CAST(COALESCE(r.cnt, 0) * 1.0 AS DOUBLE PRECISION) / cs.total, 6) AS \"retention rate\" FROM periods AS p CROSS JOIN cohort_size AS cs LEFT JOIN retained AS r ON p.period = r.period ORDER BY p.period") t0
+  = (sql%([LEGISLATORS_TERMS_schema]) "WITH cohort AS (/* Find each legislator's first term start date */ SELECT \"id_bioguide\", MIN(CAST(\"term_start\" AS DATE)) AS first_start FROM \"CITY_LEGISLATION\".\"CITY_LEGISLATION\".\"LEGISLATORS_TERMS\" GROUP BY \"id_bioguide\" HAVING MIN(CAST(\"term_start\" AS DATE)) >= '1917-01-01' AND MIN(CAST(\"term_start\" AS DATE)) <= '1999-12-31'), periods AS (/* Generate periods 1-20 */ SELECT ROW_NUMBER() OVER (ORDER BY SEQ4()) AS period FROM TABLE(GENERATOR(20))), cohort_periods AS (/* Cross join cohort with periods to get check dates */ SELECT c.\"id_bioguide\", c.first_start, p.period, DATE_FROM_PARTS(EXTRACT(YEAR FROM c.first_start) + p.period, 12, 31) AS check_date /* Check date is Dec 31 of (first_start_year + period) */ FROM cohort AS c CROSS JOIN periods AS p), retained AS (/* Check if legislator is in office on check_date */ SELECT cp.\"id_bioguide\", cp.period, cp.check_date, MAX(CASE WHEN CAST(t.\"term_start\" AS DATE) <= cp.check_date AND CAST(t.\"term_end\" AS DATE) >= cp.check_date THEN 1 ELSE 0 END) AS in_office FROM cohort_periods AS cp LEFT JOIN \"CITY_LEGISLATION\".\"CITY_LEGISLATION\".\"LEGISLATORS_TERMS\" AS t ON cp.\"id_bioguide\" = t.\"id_bioguide\" GROUP BY cp.\"id_bioguide\", cp.period, cp.check_date) SELECT r.period AS \"PERIOD\", ROUND(CAST(CAST(SUM(r.in_office) * 1.0 AS DOUBLE PRECISION) / (SELECT COUNT(*) FROM cohort) AS DECIMAL), 6) AS \"retention rate\" FROM retained AS r GROUP BY r.period ORDER BY r.period") t0
+  := by first | sql_equiv | sorry
+
+end N_sf_local169_eq_0_3

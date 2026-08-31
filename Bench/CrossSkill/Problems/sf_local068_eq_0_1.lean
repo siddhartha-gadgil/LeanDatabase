@@ -1,0 +1,16 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_local068_eq_0_1
+
+CREATE TABLE CITIES («city_id» INT, «city_name» STRING, «latitude» FLOAT, «longitude» FLOAT, «country_code_2» STRING, «capital» INT, «population» FLOAT, «insert_date» STRING)
+
+theorem eq (t0 : TableRel CITIES_schema) :
+    (sql%([CITIES_schema]) "WITH monthly_counts AS (SELECT EXTRACT(YEAR FROM CAST(TO_TIMESTAMP(\"insert_date\", 'YYYY-MM-DD') AS DATE)) AS YEAR, EXTRACT(MONTH FROM CAST(TO_TIMESTAMP(\"insert_date\", 'YYYY-MM-DD') AS DATE)) AS month_num, COUNT(*) AS CITIES_INSERTED FROM \"CITY_LEGISLATION\".\"CITY_LEGISLATION\".\"CITIES\" WHERE EXTRACT(MONTH FROM CAST(TO_TIMESTAMP(\"insert_date\", 'YYYY-MM-DD') AS DATE)) IN (4, 5, 6) AND EXTRACT(YEAR FROM CAST(TO_TIMESTAMP(\"insert_date\", 'YYYY-MM-DD') AS DATE)) IN (2021, 2022, 2023) GROUP BY YEAR, month_num), with_running AS (SELECT YEAR, month_num, CITIES_INSERTED, SUM(CITIES_INSERTED) OVER (PARTITION BY month_num ORDER BY YEAR ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS RUNNING_TOTAL FROM monthly_counts), with_lag AS (SELECT YEAR, month_num, CITIES_INSERTED, RUNNING_TOTAL, LAG(CITIES_INSERTED) OVER (PARTITION BY month_num ORDER BY YEAR) AS prev_monthly, LAG(RUNNING_TOTAL) OVER (PARTITION BY month_num ORDER BY YEAR) AS prev_running FROM with_running) SELECT YEAR, CASE month_num WHEN 4 THEN 'April' WHEN 5 THEN 'May' WHEN 6 THEN 'June' END AS MONTH_NAME, CITIES_INSERTED, RUNNING_TOTAL, CAST((CITIES_INSERTED - prev_monthly) AS DOUBLE PRECISION) / prev_monthly * 100 AS YEAR_OVER_YEAR, CAST((RUNNING_TOTAL - prev_running) AS DOUBLE PRECISION) / prev_running * 100 AS TOTAL_YEAR_OVER_YEAR FROM with_lag WHERE YEAR IN (2022, 2023) ORDER BY YEAR, month_num") t0
+  = (sql%([CITIES_schema]) "WITH monthly_counts AS (SELECT EXTRACT(YEAR FROM CAST(TO_TIMESTAMP(\"insert_date\", 'YYYY-MM-DD') AS DATE)) AS yr, EXTRACT(MONTH FROM CAST(TO_TIMESTAMP(\"insert_date\", 'YYYY-MM-DD') AS DATE)) AS mn, COUNT(*) AS cities_inserted FROM \"CITY_LEGISLATION\".\"CITY_LEGISLATION\".\"CITIES\" WHERE EXTRACT(MONTH FROM CAST(TO_TIMESTAMP(\"insert_date\", 'YYYY-MM-DD') AS DATE)) IN (4, 5, 6) AND EXTRACT(YEAR FROM CAST(TO_TIMESTAMP(\"insert_date\", 'YYYY-MM-DD') AS DATE)) IN (2021, 2022, 2023) GROUP BY yr, mn), with_running AS (SELECT yr, mn, cities_inserted, SUM(cities_inserted) OVER (PARTITION BY mn ORDER BY yr ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_total FROM monthly_counts), with_lag AS (SELECT yr, mn, cities_inserted, running_total, LAG(cities_inserted) OVER (PARTITION BY mn ORDER BY yr) AS prev_cities_inserted, LAG(running_total) OVER (PARTITION BY mn ORDER BY yr) AS prev_running_total FROM with_running) SELECT yr AS YEAR, CASE mn WHEN 4 THEN 'April' WHEN 5 THEN 'May' WHEN 6 THEN 'June' END AS MONTH_NAME, cities_inserted AS CITIES_INSERTED, running_total AS RUNNING_TOTAL, CAST((cities_inserted - prev_cities_inserted) * 100.0 AS DOUBLE PRECISION) / prev_cities_inserted AS YEAR_OVER_YEAR, CAST((running_total - prev_running_total) * 100.0 AS DOUBLE PRECISION) / prev_running_total AS TOTAL_YEAR_OVER_YEAR FROM with_lag WHERE NOT prev_cities_inserted IS NULL ORDER BY yr, mn") t0
+  := by first | sql_equiv | sorry
+
+end N_sf_local068_eq_0_1

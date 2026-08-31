@@ -1,0 +1,16 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_bq230_eq_0_1
+
+CREATE TABLE CROPS («source_desc» STRING, «sector_desc» STRING, «group_desc» STRING, «commodity_desc» STRING, «class_desc» STRING, «prodn_practice_desc» STRING, «util_practice_desc» STRING, «statisticcat_desc» STRING, «unit_desc» STRING, «short_desc» STRING, «domain_desc» STRING, «domaincat_desc» STRING, «agg_level_desc» STRING, «state_ansi» INT, «state_fips_code» INT, «state_alpha» STRING, «state_name» STRING, «asd_code» INT, «asd_desc» STRING, «county_ansi» INT, «county_code» INT, «county_name» STRING, «region_desc» STRING, «zip_5» INT, «watershed_code» INT, «watershed_desc» STRING, «congr_district_code» INT, «country_code» INT, «country_name» STRING, «location_desc» STRING, «year» INT, «freq_desc» STRING, «begin_code» INT, «end_code» INT, «reference_period_desc» STRING, «week_ending» STRING, «load_time» INT, «value» FLOAT, «value_suppression_code» STRING, «cv_percent» FLOAT, «cv_suppression_code» STRING)
+
+theorem eq (t0 : TableRel CROPS_schema) :
+    (sql%([CROPS_schema]) "WITH corn AS (SELECT \"state_name\", SUM(\"value\") AS CORN_PRODUCTION FROM \"USDA_NASS_AGRICULTURE\".\"USDA_NASS_AGRICULTURE\".\"CROPS\" WHERE \"commodity_desc\" = 'CORN' AND \"group_desc\" = 'FIELD CROPS' AND \"statisticcat_desc\" = 'PRODUCTION' AND \"agg_level_desc\" = 'STATE' AND \"unit_desc\" = 'BU' AND \"year\" = 2022 AND NOT \"value\" IS NULL GROUP BY \"state_name\"), mushrooms AS (SELECT \"state_name\", SUM(\"value\") AS MUSHROOM_PRODUCTION FROM \"USDA_NASS_AGRICULTURE\".\"USDA_NASS_AGRICULTURE\".\"CROPS\" WHERE \"commodity_desc\" = 'MUSHROOMS' AND \"group_desc\" = 'HORTICULTURE' AND \"statisticcat_desc\" = 'PRODUCTION' AND \"agg_level_desc\" = 'STATE' AND \"year\" = 2022 AND NOT \"value\" IS NULL GROUP BY \"state_name\") SELECT COALESCE(c.\"state_name\", m.\"state_name\") AS state_name, COALESCE(c.CORN_PRODUCTION, 0) AS CORN_PRODUCTION, COALESCE(m.MUSHROOM_PRODUCTION, 0) AS MUSHROOM_PRODUCTION FROM corn AS c FULL OUTER JOIN mushrooms AS m ON c.\"state_name\" = m.\"state_name\" ORDER BY state_name") t0
+  = (sql%([CROPS_schema]) "WITH corn AS (SELECT \"state_name\", SUM(\"value\") AS CORN_PRODUCTION FROM \"USDA_NASS_AGRICULTURE\".\"USDA_NASS_AGRICULTURE\".\"CROPS\" WHERE \"commodity_desc\" = 'CORN' AND \"group_desc\" = 'FIELD CROPS' AND \"statisticcat_desc\" = 'PRODUCTION' AND \"agg_level_desc\" = 'STATE' AND \"year\" = 2022 AND \"unit_desc\" = 'BU' AND NOT \"value\" IS NULL GROUP BY \"state_name\"), mushrooms AS (SELECT \"state_name\", SUM(\"value\") AS MUSHROOM_PRODUCTION FROM \"USDA_NASS_AGRICULTURE\".\"USDA_NASS_AGRICULTURE\".\"CROPS\" WHERE \"commodity_desc\" = 'MUSHROOMS' AND \"group_desc\" = 'HORTICULTURE' AND \"statisticcat_desc\" = 'PRODUCTION' AND \"agg_level_desc\" = 'STATE' AND \"year\" = 2022 AND NOT \"value\" IS NULL GROUP BY \"state_name\") SELECT COALESCE(c.\"state_name\", m.\"state_name\") AS state_name, COALESCE(c.CORN_PRODUCTION, 0) AS CORN_PRODUCTION, COALESCE(m.MUSHROOM_PRODUCTION, 0) AS MUSHROOM_PRODUCTION FROM corn AS c FULL OUTER JOIN mushrooms AS m ON c.\"state_name\" = m.\"state_name\" ORDER BY state_name") t0
+  := by first | sql_equiv | sorry
+
+end N_sf_bq230_eq_0_1

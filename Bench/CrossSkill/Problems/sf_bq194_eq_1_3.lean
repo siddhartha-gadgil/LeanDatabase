@@ -1,0 +1,16 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_bq194_eq_1_3
+
+CREATE TABLE SAMPLE_CONTENTS («id» STRING, «size» INT, «content» STRING, «binary» BOOL, «copies» INT, «sample_repo_name» STRING, «sample_ref» STRING, «sample_path» STRING, «sample_mode» INT, «sample_symlink_target» STRING)
+
+theorem eq (t0 : TableRel SAMPLE_CONTENTS_schema) :
+    (sql%([SAMPLE_CONTENTS_schema]) "WITH python_ipynb_imports AS (SELECT CAST(f.VALUE AS TEXT) AS lib FROM \"GITHUB_REPOS\".\"GITHUB_REPOS\".\"SAMPLE_CONTENTS\" AS sc, LATERAL UNNEST(input => REGEXP_EXTRACT_ALL(sc.\"content\", 'import\\s+([a-zA-Z0-9_]+)', 1, 'ce', 1, 1)) AS f(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE LOWER(sc.\"sample_path\") LIKE '%.py' OR LOWER(sc.\"sample_path\") LIKE '%.ipynb'), r_imports AS (SELECT CAST(f.VALUE AS TEXT) AS lib FROM \"GITHUB_REPOS\".\"GITHUB_REPOS\".\"SAMPLE_CONTENTS\" AS sc, LATERAL UNNEST(input => REGEXP_EXTRACT_ALL(sc.\"content\", '(library|require)\\(([a-zA-Z0-9_]+)', 2, 'ce', 1, 1)) AS f(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE LOWER(sc.\"sample_path\") LIKE '%.r' OR LOWER(sc.\"sample_path\") LIKE '%.rmd'), all_imports AS (SELECT lib FROM python_ipynb_imports UNION ALL SELECT lib FROM r_imports), ranked AS (SELECT lib AS LIBRARY_OR_MODULE, COUNT(*) AS TIMES_IMPORTED_OR_LOADED, ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) AS rn FROM all_imports GROUP BY lib) SELECT LIBRARY_OR_MODULE, TIMES_IMPORTED_OR_LOADED FROM ranked WHERE rn = 2") t0
+  ~= (sql%([SAMPLE_CONTENTS_schema]) "WITH raw_lines AS (SELECT \"sample_path\", \"sample_repo_name\", TRIM(CAST(f.value AS TEXT)) AS line FROM \"GITHUB_REPOS\".\"GITHUB_REPOS\".\"SAMPLE_CONTENTS\", LATERAL SPLIT_TO_TABLE(\"content\", ' ') AS f WHERE (\"sample_path\" LIKE '%.py' OR \"sample_path\" LIKE '%.ipynb' OR \"sample_path\" LIKE '%.r' OR \"sample_path\" LIKE '%.R' OR \"sample_path\" LIKE '%.Rmd' OR \"sample_path\" LIKE '%.rmd')), imports AS (/* Python: \"import X\" or \"import X, Y, Z\" - split by comma */ SELECT TRIM(SPLIT_PART(TRIM(CAST(s.value AS TEXT)), ' as ', 1)) AS raw_lib FROM raw_lines, LATERAL SPLIT_TO_TABLE(REGEXP_EXTRACT(line, '\\bimport\\s+(.+)$', 1, 1, 'e', 0), ',') AS s WHERE line ~ '\\bimport\\s+\\S+' AND NOT line ~ '\\bfrom\\s+\\S+\\s+import' UNION ALL /* Python: \"from X import Y\" */ SELECT REGEXP_EXTRACT(line, '\\bfrom\\s+(\\S+)\\s+import', 1, 1, 'e', 0) AS raw_lib FROM raw_lines WHERE line ~ '\\bfrom\\s+\\S+\\s+import' UNION ALL /* R: library(X) */ SELECT TRIM(REGEXP_EXTRACT(line, 'library\\(([^)]+)\\)', 1, 1, 'e', 0)) AS raw_lib FROM raw_lines WHERE line ~ 'library\\([^)]+\\)' UNION ALL /* R: require(X) */ SELECT TRIM(REGEXP_EXTRACT(line, 'require\\(([^)]+)\\)', 1, 1, 'e', 0)) AS raw_lib FROM raw_lines WHERE line ~ 'require\\([^)]+\\)'), top_level AS (SELECT TRIM(SPLIT_PART(raw_lib, '.', 1)) AS library FROM imports WHERE NOT raw_lib IS NULL AND TRIM(raw_lib) <> ''), ranked AS (SELECT library, COUNT(*) AS num_imports, ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) AS rn FROM top_level GROUP BY library) SELECT library AS LIBRARY_OR_MODULE, num_imports AS TIMES_IMPORTED_OR_LOADED FROM ranked WHERE rn = 2") t0
+  := by first | sql_equiv | sorry
+
+end N_sf_bq194_eq_1_3

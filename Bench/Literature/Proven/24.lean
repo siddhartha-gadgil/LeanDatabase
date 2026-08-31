@@ -8,9 +8,9 @@ namespace N_24_eq
 
 CREATE TABLE R («A» INT, «B» INT)
 
-theorem eq :
-    sql%([R_schema]) "SELECT COUNT(*) AS A FROM R AS X"
-  = sql%([R_schema]) "SELECT COUNT(Y.B) FROM R AS Y"
+theorem eq (t0 : TableRel R_schema) :
+    (sql%([R_schema]) "SELECT COUNT(*) AS A FROM R AS X") t0
+  ~= (sql%([R_schema]) "SELECT COUNT(Y.B) FROM R AS Y") t0
   := by sql_equiv
 
 end N_24_eq

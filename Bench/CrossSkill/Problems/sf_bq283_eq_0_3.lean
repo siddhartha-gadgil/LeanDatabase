@@ -1,0 +1,17 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_bq283_eq_0_3
+
+CREATE TABLE BIKESHARE_TRIPS («trip_id» STRING, «subscriber_type» STRING, «bike_id» STRING, «bike_type» STRING, «start_time» INT, «start_station_id» INT, «start_station_name» STRING, «end_station_id» STRING, «end_station_name» STRING, «duration_minutes» INT)
+CREATE TABLE BIKESHARE_STATIONS («station_id» INT, «name» STRING, «status» STRING, «location» STRING, «address» STRING, «alternate_name» STRING, «city_asset_number» INT, «property_type» STRING, «number_of_docks» INT, «power_type» STRING, «footprint_length» INT, «footprint_width» FLOAT, «notes» STRING, «council_district» INT, «image» STRING, «modified_date» INT)
+
+theorem eq (t0 : TableRel BIKESHARE_TRIPS_schema) (t1 : TableRel BIKESHARE_STATIONS_schema) :
+    (sql%([BIKESHARE_TRIPS_schema, BIKESHARE_STATIONS_schema]) "WITH active_station_trips AS (SELECT t.\"start_station_id\" AS START_STATION_ID, COUNT(*) AS TOTAL_TRIPS, AVG(t.\"duration_minutes\") AS AVG_DURATION_MINUTES FROM \"AUSTIN\".\"AUSTIN_BIKESHARE\".\"BIKESHARE_TRIPS\" AS t INNER JOIN \"AUSTIN\".\"AUSTIN_BIKESHARE\".\"BIKESHARE_STATIONS\" AS s ON t.\"start_station_id\" = s.\"station_id\" WHERE s.\"status\" = 'active' GROUP BY t.\"start_station_id\"), total AS (SELECT SUM(TOTAL_TRIPS) AS overall_trips FROM active_station_trips), ranked AS (SELECT a.START_STATION_ID, a.TOTAL_TRIPS, a.AVG_DURATION_MINUTES, (CAST(a.TOTAL_TRIPS * 100.0 AS DOUBLE PRECISION) / t.overall_trips) AS PERCENTAGE_OF_TOTAL_TRIPS, DENSE_RANK() OVER (ORDER BY a.TOTAL_TRIPS DESC) AS rnk FROM active_station_trips AS a CROSS JOIN total AS t) SELECT START_STATION_ID, TOTAL_TRIPS, AVG_DURATION_MINUTES, PERCENTAGE_OF_TOTAL_TRIPS FROM ranked WHERE rnk <= 15 ORDER BY rnk") t0 t1
+  = (sql%([BIKESHARE_TRIPS_schema, BIKESHARE_STATIONS_schema]) "WITH active_station_trips AS (SELECT t.\"start_station_id\" AS START_STATION_ID, COUNT(*) AS TOTAL_TRIPS, AVG(t.\"duration_minutes\") AS AVG_DURATION_MINUTES FROM \"AUSTIN\".\"AUSTIN_BIKESHARE\".\"BIKESHARE_TRIPS\" AS t INNER JOIN \"AUSTIN\".\"AUSTIN_BIKESHARE\".\"BIKESHARE_STATIONS\" AS s ON t.\"start_station_id\" = s.\"station_id\" WHERE s.\"status\" = 'active' GROUP BY t.\"start_station_id\"), total AS (SELECT SUM(TOTAL_TRIPS) AS overall_total FROM active_station_trips), ranked AS (SELECT a.START_STATION_ID, a.TOTAL_TRIPS, a.AVG_DURATION_MINUTES, (CAST(a.TOTAL_TRIPS * 100.0 AS DOUBLE PRECISION) / t.overall_total) AS PERCENTAGE_OF_TOTAL_TRIPS, DENSE_RANK() OVER (ORDER BY a.TOTAL_TRIPS DESC) AS rnk FROM active_station_trips AS a CROSS JOIN total AS t) SELECT START_STATION_ID, TOTAL_TRIPS, AVG_DURATION_MINUTES, PERCENTAGE_OF_TOTAL_TRIPS FROM ranked WHERE rnk <= 15 ORDER BY rnk") t0 t1
+  := by first | sql_equiv | sorry
+
+end N_sf_bq283_eq_0_3

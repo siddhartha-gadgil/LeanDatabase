@@ -1,0 +1,18 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_local156_eq_1_2
+
+CREATE TABLE BITCOIN_PRICES («ticker» STRING, «market_date» STRING, «price» FLOAT, «open» FLOAT, «high» FLOAT, «low» FLOAT, «volume» STRING, «change» STRING)
+CREATE TABLE BITCOIN_TRANSACTIONS («txn_id» INT, «member_id» STRING, «ticker» STRING, «txn_date» STRING, «txn_type» STRING, «quantity» FLOAT, «percentage_fee» FLOAT, «txn_time» STRING)
+CREATE TABLE BITCOIN_MEMBERS («member_id» STRING, «first_name» STRING, «region» STRING)
+
+theorem eq (t0 : TableRel BITCOIN_PRICES_schema) (t1 : TableRel BITCOIN_TRANSACTIONS_schema) (t2 : TableRel BITCOIN_MEMBERS_schema) :
+    (sql%([BITCOIN_PRICES_schema, BITCOIN_TRANSACTIONS_schema, BITCOIN_MEMBERS_schema]) "WITH avg_prices AS (SELECT m.\"region\" AS REGION, CAST(EXTRACT(YEAR FROM CAST(TO_TIMESTAMP(t.\"txn_date\", 'DD-MM-YYYY') AS DATE)) AS INT) AS YEAR_START, ROUND(CAST(SUM(t.\"quantity\" * p.\"price\") AS DOUBLE PRECISION) / SUM(t.\"quantity\"), 2) AS BTC_DCA FROM \"BANK_SALES_TRADING\".\"BANK_SALES_TRADING\".\"BITCOIN_TRANSACTIONS\" AS t JOIN \"BANK_SALES_TRADING\".\"BANK_SALES_TRADING\".\"BITCOIN_MEMBERS\" AS m ON t.\"member_id\" = m.\"member_id\" JOIN \"BANK_SALES_TRADING\".\"BANK_SALES_TRADING\".\"BITCOIN_PRICES\" AS p ON t.\"ticker\" = p.\"ticker\" AND CAST(TO_TIMESTAMP(t.\"txn_date\", 'DD-MM-YYYY') AS DATE) = CAST(TO_TIMESTAMP(p.\"market_date\", 'DD-MM-YYYY') AS DATE) WHERE t.\"txn_type\" = 'BUY' AND t.\"ticker\" = 'BTC' GROUP BY m.\"region\", YEAR_START), with_lag AS (SELECT YEAR_START, REGION, BTC_DCA, RANK() OVER (PARTITION BY YEAR_START ORDER BY BTC_DCA ASC) AS DCA_RANKING, LAG(BTC_DCA) OVER (PARTITION BY REGION ORDER BY YEAR_START) AS prev_dca, DENSE_RANK() OVER (PARTITION BY REGION ORDER BY YEAR_START) AS yr_rank FROM avg_prices) SELECT YEAR_START, REGION, BTC_DCA, DCA_RANKING, ROUND((CAST((BTC_DCA - prev_dca) AS DOUBLE PRECISION) / prev_dca) * 100, 2) AS DCA_PERCENTAGE_CHANGE FROM with_lag WHERE yr_rank > 1 ORDER BY REGION, YEAR_START") t0 t1 t2
+  ~= (sql%([BITCOIN_PRICES_schema, BITCOIN_TRANSACTIONS_schema, BITCOIN_MEMBERS_schema]) "WITH base AS (SELECT CAST(SUBSTRING(t.\"txn_date\" FROM 7 FOR 4) AS INT) AS year_start, m.\"region\" AS region, t.\"quantity\" * p.\"price\" AS dollar_amount, t.\"quantity\" AS quantity FROM \"BANK_SALES_TRADING\".\"BANK_SALES_TRADING\".\"BITCOIN_TRANSACTIONS\" AS t JOIN \"BANK_SALES_TRADING\".\"BANK_SALES_TRADING\".\"BITCOIN_MEMBERS\" AS m ON t.\"member_id\" = m.\"member_id\" JOIN \"BANK_SALES_TRADING\".\"BANK_SALES_TRADING\".\"BITCOIN_PRICES\" AS p ON t.\"ticker\" = p.\"ticker\" AND t.\"txn_date\" = p.\"market_date\" WHERE t.\"ticker\" = 'BTC' AND t.\"txn_type\" = 'BUY'), annual_dca AS (SELECT year_start, region, ROUND(CAST(SUM(dollar_amount) AS DOUBLE PRECISION) / SUM(quantity), 2) AS btc_dca FROM base GROUP BY year_start, region), with_lag AS (SELECT year_start, region, btc_dca, LAG(btc_dca) OVER (PARTITION BY region ORDER BY year_start) AS prev_dca FROM annual_dca), first_year AS (SELECT region, MIN(year_start) AS min_year FROM annual_dca GROUP BY region), filtered AS (SELECT w.year_start, w.region, w.btc_dca, ROUND((CAST((w.btc_dca - w.prev_dca) AS DOUBLE PRECISION) / w.prev_dca) * 100, 2) AS dca_percentage_change FROM with_lag AS w JOIN first_year AS f ON w.region = f.region WHERE w.year_start > f.min_year) SELECT year_start AS \"YEAR_START\", region AS \"REGION\", btc_dca AS \"BTC_DCA\", RANK() OVER (PARTITION BY year_start ORDER BY btc_dca ASC) AS \"DCA_RANKING\", dca_percentage_change AS \"DCA_PERCENTAGE_CHANGE\" FROM filtered ORDER BY region, year_start") t0 t1 t2
+  := by first | sql_equiv | sorry
+
+end N_sf_local156_eq_1_2

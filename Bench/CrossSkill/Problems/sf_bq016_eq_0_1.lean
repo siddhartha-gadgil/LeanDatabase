@@ -1,0 +1,18 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_bq016_eq_0_1
+
+CREATE TABLE DEPENDENCIES («SnapshotAt» INT, «System» STRING, «Name» STRING, «Version» STRING, «Dependency» STRING, «MinimumDepth» INT)
+CREATE TABLE SNAPSHOTS («Time» INT)
+CREATE TABLE PACKAGEVERSIONS («SnapshotAt» INT, «System» STRING, «Name» STRING, «Version» STRING, «Licenses» STRING, «Links» STRING, «Advisories» STRING, «VersionInfo» STRING, «Hashes» STRING, «DependenciesProcessed» BOOL, «DependencyError» BOOL, «UpstreamPublishedAt» INT, «Registries» STRING, «SLSAProvenance» STRING, «UpstreamIdentifiers» STRING, «Purl» STRING)
+
+theorem eq (t0 : TableRel DEPENDENCIES_schema) (t1 : TableRel SNAPSHOTS_schema) (t2 : TableRel PACKAGEVERSIONS_schema) :
+    (sql%([DEPENDENCIES_schema, SNAPSHOTS_schema, PACKAGEVERSIONS_schema]) "WITH release_versions AS (/* Get all NPM release versions with their ordinals */ /* Deduplicate across snapshots by taking MAX ordinal per Name+Version */ SELECT \"Name\", \"Version\", MAX(CAST(JSON_EXTRACT_PATH(\"VersionInfo\", 'Ordinal') AS INT)) AS ordinal FROM \"DEPS_DEV_V1\".\"DEPS_DEV_V1\".\"PACKAGEVERSIONS\" WHERE \"System\" = 'NPM' AND CAST(JSON_EXTRACT_PATH(\"VersionInfo\", 'IsRelease') AS BOOLEAN) = TRUE GROUP BY \"Name\", \"Version\"), highest_release AS (/* For each package, find the version with the highest ordinal */ SELECT \"Name\", \"Version\" FROM (SELECT \"Name\", \"Version\", ROW_NUMBER() OVER (PARTITION BY \"Name\" ORDER BY ordinal DESC) AS rn FROM release_versions) WHERE rn = 1), dep_data AS (/* Get distinct dependencies for the highest release versions */ SELECT DISTINCT CAST(JSON_EXTRACT_PATH(d.\"Dependency\", 'Name') AS TEXT) AS dep_name, CAST(JSON_EXTRACT_PATH(d.\"Dependency\", 'Version') AS TEXT) AS dep_version, d.\"Name\" AS source_package FROM \"DEPS_DEV_V1\".\"DEPS_DEV_V1\".\"DEPENDENCIES\" AS d INNER JOIN highest_release AS hr ON d.\"System\" = 'NPM' AND d.\"Name\" = hr.\"Name\" AND d.\"Version\" = hr.\"Version\") SELECT dep_name AS DEP_NAME, dep_version AS DEP_VERSION, COUNT(*) AS FREQ FROM dep_data GROUP BY dep_name, dep_version ORDER BY FREQ DESC LIMIT 1") t0 t1 t2
+  = (sql%([DEPENDENCIES_schema, SNAPSHOTS_schema, PACKAGEVERSIONS_schema]) "/* For each NPM package, find the highest release version (max Ordinal where IsRelease=TRUE) */ /* from PACKAGEVERSIONS, then join to deduplicated DEPENDENCIES to get all dependency */ /* relationships, and count the most frequently appearing dependency (Name + Version). */ WITH all_releases AS (SELECT DISTINCT \"Name\", \"Version\", CAST(JSON_EXTRACT_PATH(\"VersionInfo\", 'Ordinal') AS INT) AS ordinal FROM \"DEPS_DEV_V1\".\"DEPS_DEV_V1\".\"PACKAGEVERSIONS\" WHERE \"System\" = 'NPM' AND CAST(JSON_EXTRACT_PATH(\"VersionInfo\", 'IsRelease') AS BOOLEAN) = TRUE), highest_release AS (SELECT \"Name\", \"Version\", ROW_NUMBER() OVER (PARTITION BY \"Name\" ORDER BY ordinal DESC) AS rn FROM all_releases), deps_dedup AS (SELECT DISTINCT \"Name\", \"Version\", CAST(JSON_EXTRACT_PATH(\"Dependency\", 'Name') AS VARCHAR) AS dep_name, CAST(JSON_EXTRACT_PATH(\"Dependency\", 'Version') AS VARCHAR) AS dep_version FROM \"DEPS_DEV_V1\".\"DEPS_DEV_V1\".\"DEPENDENCIES\" WHERE \"System\" = 'NPM') SELECT dd.dep_name AS DEP_NAME, dd.dep_version AS DEP_VERSION, COUNT(*) AS FREQ FROM highest_release AS hr JOIN deps_dedup AS dd ON dd.\"Name\" = hr.\"Name\" AND dd.\"Version\" = hr.\"Version\" WHERE hr.rn = 1 GROUP BY dd.dep_name, dd.dep_version ORDER BY FREQ DESC LIMIT 1") t0 t1 t2
+  := by first | sql_equiv | sorry
+
+end N_sf_bq016_eq_0_1

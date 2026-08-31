@@ -1,0 +1,17 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_bq049_eq_0_1
+
+CREATE TABLE POPULATION_BY_ZIP_2010 («geo_id» STRING, «zipcode» STRING, «population» INT, «minimum_age» INT, «maximum_age» INT, «gender» STRING)
+CREATE TABLE SALES («invoice_and_item_number» STRING, «date» STRING, «store_number» STRING, «store_name» STRING, «address» STRING, «city» STRING, «zip_code» STRING, «store_location» STRING, «county_number» STRING, «county» STRING, «category» STRING, «category_name» STRING, «vendor_number» STRING, «vendor_name» STRING, «item_number» STRING, «item_description» STRING, «pack» INT, «bottle_volume_ml» INT, «state_bottle_cost» FLOAT, «state_bottle_retail» FLOAT, «bottles_sold» INT, «sale_dollars» FLOAT, «volume_sold_liters» FLOAT, «volume_sold_gallons» FLOAT)
+
+theorem eq (t0 : TableRel POPULATION_BY_ZIP_2010_schema) (t1 : TableRel SALES_schema) :
+    (sql%([POPULATION_BY_ZIP_2010_schema, SALES_schema]) "WITH bourbon_sales AS (SELECT REPLACE(\"zip_code\", '.0', '') AS zip_code, EXTRACT(MONTH FROM \"date\") AS month, SUM(\"sale_dollars\") AS total_sales FROM \"IOWA_LIQUOR_SALES_PLUS\".\"IOWA_LIQUOR_SALES\".\"SALES\" WHERE UPPER(\"county\") = 'DUBUQUE' AND LOWER(\"category_name\") LIKE '%bourbon%' AND EXTRACT(YEAR FROM \"date\") = 2022 GROUP BY REPLACE(\"zip_code\", '.0', ''), EXTRACT(MONTH FROM \"date\")), zip_total_sales AS (SELECT zip_code, SUM(total_sales) AS annual_total FROM bourbon_sales GROUP BY zip_code), zip_ranked AS (SELECT zip_code, annual_total, RANK() OVER (ORDER BY annual_total DESC) AS rnk FROM zip_total_sales), third_zip AS (SELECT zip_code FROM zip_ranked WHERE rnk = 3), population_21plus AS (SELECT \"zipcode\" AS zip_code, SUM(\"population\") AS pop_21plus FROM \"IOWA_LIQUOR_SALES_PLUS\".\"CENSUS_BUREAU_USA\".\"POPULATION_BY_ZIP_2010\" WHERE \"minimum_age\" >= 21 GROUP BY \"zipcode\") SELECT bs.zip_code AS ZIP_CODE, bs.month AS MONTH, ROUND(CAST(bs.total_sales AS DOUBLE PRECISION) / p.pop_21plus, 2) AS PER_CAPITA_SALES FROM bourbon_sales AS bs JOIN third_zip AS tz ON bs.zip_code = tz.zip_code JOIN population_21plus AS p ON bs.zip_code = p.zip_code ORDER BY bs.month") t0 t1
+  ~= (sql%([POPULATION_BY_ZIP_2010_schema, SALES_schema]) "WITH bourbon_sales AS (SELECT CASE WHEN \"zip_code\" LIKE '%.0' THEN REPLACE(\"zip_code\", '.0', '') ELSE \"zip_code\" END AS clean_zip, \"date\", \"sale_dollars\" FROM \"IOWA_LIQUOR_SALES_PLUS\".\"IOWA_LIQUOR_SALES\".\"SALES\" WHERE UPPER(\"county\") = 'DUBUQUE' AND LOWER(\"category_name\") LIKE '%bourbon%' AND EXTRACT(YEAR FROM \"date\") = 2022), zip_ranking AS (SELECT clean_zip, SUM(\"sale_dollars\") AS total_sales, RANK() OVER (ORDER BY SUM(\"sale_dollars\") DESC) AS rnk FROM bourbon_sales GROUP BY clean_zip), third_zip AS (SELECT clean_zip FROM zip_ranking WHERE rnk = 3), pop_21_plus AS (SELECT \"zipcode\", SUM(\"population\") AS pop_21 FROM \"IOWA_LIQUOR_SALES_PLUS\".\"CENSUS_BUREAU_USA\".\"POPULATION_BY_ZIP_2010\" WHERE \"minimum_age\" >= 21 GROUP BY \"zipcode\") SELECT bs.clean_zip AS ZIP_CODE, EXTRACT(MONTH FROM bs.\"date\") AS MONTH, ROUND(CAST(SUM(bs.\"sale_dollars\") AS DOUBLE PRECISION) / MAX(p.pop_21), 2) AS PER_CAPITA_SALES FROM bourbon_sales AS bs JOIN third_zip AS tz ON bs.clean_zip = tz.clean_zip JOIN pop_21_plus AS p ON bs.clean_zip = p.\"zipcode\" GROUP BY bs.clean_zip, EXTRACT(MONTH FROM bs.\"date\") ORDER BY MONTH") t0 t1
+  := by first | sql_equiv | sorry
+
+end N_sf_bq049_eq_0_1

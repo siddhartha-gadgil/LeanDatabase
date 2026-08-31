@@ -1,0 +1,20 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_bq425_eq_2_3
+
+CREATE TABLE FORMULATIONS_23 («product_id» STRING, «ingredient» STRING, «strength» STRING, «record_id» STRING, «molregno» STRING, «formulation_id» STRING)
+CREATE TABLE RESEARCH_COMPANIES_23 («co_stem_id» STRING, «res_stem_id» STRING, «company» STRING, «country» STRING, «previous_company» STRING)
+CREATE TABLE MOLECULE_SYNONYMS_23 («molregno» STRING, «synonyms» STRING, «syn_type» STRING, «molsyn_id» STRING, «res_stem_id» STRING)
+CREATE TABLE PRODUCTS_23 («dosage_form» STRING, «route» STRING, «trade_name» STRING, «approval_date» STRING, «ad_type» STRING, «oral» STRING, «topical» STRING, «parenteral» STRING, «black_box_warning» STRING, «applicant_full_name» STRING, «innovator_company» STRING, «product_id» STRING, «nda_type» STRING)
+CREATE TABLE MOLECULE_DICTIONARY_23 («molregno» STRING, «pref_name» STRING, «chembl_id» STRING, «max_phase» STRING, «therapeutic_flag» STRING, «dosed_ingredient» STRING, «structure_type» STRING, «chebi_par_id» STRING, «molecule_type» STRING, «first_approval» STRING, «oral» STRING, «parenteral» STRING, «topical» STRING, «black_box_warning» STRING, «natural_product» STRING, «first_in_class» STRING, «chirality» STRING, «prodrug» STRING, «inorganic_flag» STRING, «usan_year» STRING, «availability_type» STRING, «usan_stem» STRING, «polymer_flag» STRING, «usan_substem» STRING, «usan_stem_definition» STRING, «indication_class» STRING, «withdrawn_flag» STRING, «withdrawn_year» STRING, «withdrawn_country» STRING, «withdrawn_reason» STRING)
+
+theorem eq (t0 : TableRel FORMULATIONS_23_schema) (t1 : TableRel RESEARCH_COMPANIES_23_schema) (t2 : TableRel MOLECULE_SYNONYMS_23_schema) (t3 : TableRel PRODUCTS_23_schema) (t4 : TableRel MOLECULE_DICTIONARY_23_schema) :
+    (sql%([FORMULATIONS_23_schema, RESEARCH_COMPANIES_23_schema, MOLECULE_SYNONYMS_23_schema, PRODUCTS_23_schema, MOLECULE_DICTIONARY_23_schema]) "WITH ranked AS (SELECT md.\"chembl_id\" AS \"MOLECULE_CHEMBL_ID\", p.\"trade_name\" AS \"trade_name\", p.\"approval_date\" AS approval_date, ROW_NUMBER() OVER (PARTITION BY md.\"chembl_id\" ORDER BY p.\"approval_date\" DESC) AS rn FROM \"EBI_CHEMBL\".\"EBI_CHEMBL\".\"RESEARCH_COMPANIES_23\" AS rc JOIN \"EBI_CHEMBL\".\"EBI_CHEMBL\".\"MOLECULE_SYNONYMS_23\" AS ms ON rc.\"res_stem_id\" = ms.\"res_stem_id\" JOIN \"EBI_CHEMBL\".\"EBI_CHEMBL\".\"MOLECULE_DICTIONARY_23\" AS md ON ms.\"molregno\" = md.\"molregno\" JOIN \"EBI_CHEMBL\".\"EBI_CHEMBL\".\"FORMULATIONS_23\" AS f ON md.\"molregno\" = f.\"molregno\" JOIN \"EBI_CHEMBL\".\"EBI_CHEMBL\".\"PRODUCTS_23\" AS p ON f.\"product_id\" = p.\"product_id\" WHERE rc.\"company\" = 'SanofiAventis') SELECT \"MOLECULE_CHEMBL_ID\", \"trade_name\", approval_date AS \"LATEST_APPROVAL_DATE\" FROM ranked WHERE rn = 1 ORDER BY \"MOLECULE_CHEMBL_ID\"") t0 t1 t2 t3 t4
+  = (sql%([FORMULATIONS_23_schema, RESEARCH_COMPANIES_23_schema, MOLECULE_SYNONYMS_23_schema, PRODUCTS_23_schema, MOLECULE_DICTIONARY_23_schema]) "WITH molecule_products AS (SELECT md.\"chembl_id\" AS \"MOLECULE_CHEMBL_ID\", p.\"trade_name\", p.\"approval_date\", ROW_NUMBER() OVER (PARTITION BY md.\"chembl_id\" ORDER BY p.\"approval_date\" DESC, p.\"trade_name\" ASC) AS rn FROM \"EBI_CHEMBL\".\"EBI_CHEMBL\".\"RESEARCH_COMPANIES_23\" AS rc JOIN \"EBI_CHEMBL\".\"EBI_CHEMBL\".\"MOLECULE_SYNONYMS_23\" AS ms ON rc.\"res_stem_id\" = ms.\"res_stem_id\" JOIN \"EBI_CHEMBL\".\"EBI_CHEMBL\".\"MOLECULE_DICTIONARY_23\" AS md ON ms.\"molregno\" = md.\"molregno\" JOIN \"EBI_CHEMBL\".\"EBI_CHEMBL\".\"FORMULATIONS_23\" AS f ON ms.\"molregno\" = f.\"molregno\" JOIN \"EBI_CHEMBL\".\"EBI_CHEMBL\".\"PRODUCTS_23\" AS p ON f.\"product_id\" = p.\"product_id\" WHERE rc.\"company\" = 'SanofiAventis') SELECT \"MOLECULE_CHEMBL_ID\", \"trade_name\", \"approval_date\" AS \"LATEST_APPROVAL_DATE\" FROM molecule_products WHERE rn = 1 ORDER BY \"MOLECULE_CHEMBL_ID\"") t0 t1 t2 t3 t4
+  := by first | sql_equiv | sorry
+
+end N_sf_bq425_eq_2_3

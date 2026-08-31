@@ -1,0 +1,19 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_bq160_eq_1_3
+
+CREATE TABLE FORUMMESSAGEVOTES («Id» INT, «ForumMessageId» INT, «FromUserId» INT, «ToUserId» INT, «VoteDate» STRING)
+CREATE TABLE FORUMTOPICS («TotalReplies» INT, «LastCommentDate» INT, «FirstForumMessageId» FLOAT, «IsSticky» BOOL, «ForumId» INT, «Title» STRING, «TotalMessages» INT, «Id» INT, «LastForumMessageId» FLOAT, «CreationDate» INT, «TotalViews» INT, «KernelId» FLOAT, «Score» INT)
+CREATE TABLE FORUMMESSAGES («Id» INT, «ForumTopicId» INT, «PostUserId» INT, «PostDate» STRING, «ReplyToForumMessageId» FLOAT, «Message» STRING, «RawMarkdown» STRING, «Medal» FLOAT, «MedalAwardDate» STRING)
+CREATE TABLE FORUMS («Id» INT, «ParentForumId» INT, «Title» STRING)
+
+theorem eq (t0 : TableRel FORUMMESSAGEVOTES_schema) (t1 : TableRel FORUMTOPICS_schema) (t2 : TableRel FORUMMESSAGES_schema) (t3 : TableRel FORUMS_schema) :
+    (sql%([FORUMMESSAGEVOTES_schema, FORUMTOPICS_schema, FORUMMESSAGES_schema, FORUMS_schema]) "SELECT TO_CHAR(TO_TIMESTAMP(CAST(ft.\"CreationDate\" AS DOUBLE PRECISION) / POWER(10, 6)), 'YYYY-MM-DD HH24:MI:SS.US') || ' UTC' AS DATE, ft.\"Title\" AS FORUMTOPICTITLE, f.\"Title\" AS PARENTFORUMTITLE, COALESCE(msg.\"reply_count\", 0) AS FORUMTOPICREPLIESCOUNT, COALESCE(msg.\"distinct_users\", 0) AS DISTINCTUSERREPLIESCOUNT, COALESCE(votes.\"total_upvotes\", 0) AS TOPICUPVOTES, COALESCE(ft.\"TotalViews\", 0) AS TOTALVIEWS FROM \"META_KAGGLE\".\"META_KAGGLE\".\"FORUMTOPICS\" AS ft JOIN \"META_KAGGLE\".\"META_KAGGLE\".\"FORUMS\" AS f ON ft.\"ForumId\" = f.\"Id\" JOIN \"META_KAGGLE\".\"META_KAGGLE\".\"FORUMS\" AS pf ON f.\"ParentForumId\" = pf.\"Id\" AND pf.\"Title\" = 'General' AND pf.\"ParentForumId\" IS NULL LEFT JOIN (SELECT \"ForumTopicId\", COUNT(*) AS \"reply_count\", COUNT(DISTINCT \"PostUserId\") AS \"distinct_users\" FROM \"META_KAGGLE\".\"META_KAGGLE\".\"FORUMMESSAGES\" GROUP BY \"ForumTopicId\") AS msg ON ft.\"Id\" = msg.\"ForumTopicId\" LEFT JOIN (SELECT fm.\"ForumTopicId\", COUNT(fmv.\"Id\") AS \"total_upvotes\" FROM \"META_KAGGLE\".\"META_KAGGLE\".\"FORUMMESSAGES\" AS fm JOIN \"META_KAGGLE\".\"META_KAGGLE\".\"FORUMMESSAGEVOTES\" AS fmv ON fm.\"Id\" = fmv.\"ForumMessageId\" GROUP BY fm.\"ForumTopicId\") AS votes ON ft.\"Id\" = votes.\"ForumTopicId\" ORDER BY ft.\"CreationDate\" ASC LIMIT 5") t0 t1 t2 t3
+  = (sql%([FORUMMESSAGEVOTES_schema, FORUMTOPICS_schema, FORUMMESSAGES_schema, FORUMS_schema]) "SELECT TO_CHAR(TO_TIMESTAMP(CAST(ft.\"CreationDate\" AS DOUBLE PRECISION) / 1000000), 'YYYY-MM-DD HH24:MI:SS.FF6') || ' UTC' AS \"DATE\", ft.\"Title\" AS \"FORUMTOPICTITLE\", f.\"Title\" AS \"PARENTFORUMTITLE\", COALESCE(COUNT(fm.\"Id\"), 0) AS \"FORUMTOPICREPLIESCOUNT\", COALESCE(COUNT(DISTINCT fm.\"PostUserId\"), 0) AS \"DISTINCTUSERREPLIESCOUNT\", COALESCE(SUM(COALESCE(vote_counts.\"UpvoteCount\", 0)), 0) AS \"TOPICUPVOTES\", COALESCE(ft.\"TotalViews\", 0) AS \"TOTALVIEWS\" FROM \"META_KAGGLE\".\"META_KAGGLE\".\"FORUMTOPICS\" AS ft JOIN \"META_KAGGLE\".\"META_KAGGLE\".\"FORUMS\" AS f ON ft.\"ForumId\" = f.\"Id\" LEFT JOIN \"META_KAGGLE\".\"META_KAGGLE\".\"FORUMMESSAGES\" AS fm ON fm.\"ForumTopicId\" = ft.\"Id\" LEFT JOIN (SELECT fmv.\"ForumMessageId\", COUNT(fmv.\"Id\") AS \"UpvoteCount\" FROM \"META_KAGGLE\".\"META_KAGGLE\".\"FORUMMESSAGEVOTES\" AS fmv GROUP BY fmv.\"ForumMessageId\") AS vote_counts ON vote_counts.\"ForumMessageId\" = fm.\"Id\" WHERE f.\"ParentForumId\" = 9 GROUP BY ft.\"Id\", ft.\"CreationDate\", ft.\"Title\", f.\"Title\", ft.\"TotalViews\" ORDER BY ft.\"CreationDate\" ASC LIMIT 5") t0 t1 t2 t3
+  := by first | sql_equiv | sorry
+
+end N_sf_bq160_eq_1_3

@@ -1,0 +1,16 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_bq375_eq_0_2
+
+CREATE TABLE SAMPLE_FILES («repo_name» STRING, «ref» STRING, «path» STRING, «mode» INT, «id» STRING, «symlink_target» STRING)
+
+theorem eq (t0 : TableRel SAMPLE_FILES_schema) :
+    (sql%([SAMPLE_FILES_schema]) "SELECT CASE WHEN \"path\" LIKE '%.py' THEN 'Python' WHEN \"path\" LIKE '%.c' THEN 'C' WHEN \"path\" LIKE '%.ipynb' THEN 'Jupyter Notebook' WHEN \"path\" LIKE '%.java' THEN 'Java' WHEN \"path\" LIKE '%.js' THEN 'JavaScript' END AS FILE_TYPE, COUNT(*) AS FILE_COUNT FROM \"GITHUB_REPOS\".\"GITHUB_REPOS\".\"SAMPLE_FILES\" WHERE (\"path\" LIKE '%.py' OR \"path\" LIKE '%.c' OR \"path\" LIKE '%.ipynb' OR \"path\" LIKE '%.java' OR \"path\" LIKE '%.js') AND REGEXP_COUNT(\"path\", '/') > 10 GROUP BY FILE_TYPE ORDER BY FILE_COUNT DESC LIMIT 1") t0
+  = (sql%([SAMPLE_FILES_schema]) "SELECT CASE WHEN \"path\" LIKE '%.py' THEN 'Python' WHEN \"path\" LIKE '%.c' THEN 'C' WHEN \"path\" LIKE '%.ipynb' THEN 'Jupyter Notebook' WHEN \"path\" LIKE '%.java' THEN 'Java' WHEN \"path\" LIKE '%.js' THEN 'JavaScript' END AS file_type, COUNT(*) AS file_count FROM \"GITHUB_REPOS\".\"GITHUB_REPOS\".\"SAMPLE_FILES\" WHERE REGEXP_COUNT(\"path\", '/') > 10 AND (\"path\" LIKE '%.py' OR \"path\" LIKE '%.c' OR \"path\" LIKE '%.ipynb' OR \"path\" LIKE '%.java' OR \"path\" LIKE '%.js') GROUP BY file_type ORDER BY file_count DESC LIMIT 1") t0
+  := by first | sql_equiv | sorry
+
+end N_sf_bq375_eq_0_2

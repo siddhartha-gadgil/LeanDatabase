@@ -1,0 +1,17 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_bq251_eq_0_3
+
+CREATE TABLE DISTRIBUTION_METADATA («metadata_version» STRING, «name» STRING, «version» STRING, «summary» STRING, «description» STRING, «description_content_type» STRING, «author» STRING, «author_email» STRING, «maintainer» STRING, «maintainer_email» STRING, «license» STRING, «keywords» STRING, «classifiers» STRING, «platform» STRING, «home_page» STRING, «download_url» STRING, «requires_python» STRING, «requires» STRING, «provides» STRING, «obsoletes» STRING, «requires_dist» STRING, «provides_dist» STRING, «obsoletes_dist» STRING, «requires_external» STRING, «project_urls» STRING, «uploaded_via» STRING, «upload_time» INT, «filename» STRING, «size» INT, «path» STRING, «python_version» STRING, «packagetype» STRING, «comment_text» STRING, «has_signature» BOOL, «md5_digest» STRING, «sha256_digest» STRING, «blake2_256_digest» STRING)
+CREATE TABLE FILE_DOWNLOADS («timestamp» INT, «country_code» STRING, «url» STRING, «project» STRING, «file» STRING, «details» STRING, «tls_protocol» STRING, «tls_cipher» STRING)
+
+theorem eq (t0 : TableRel DISTRIBUTION_METADATA_schema) (t1 : TableRel FILE_DOWNLOADS_schema) :
+    (sql%([DISTRIBUTION_METADATA_schema, FILE_DOWNLOADS_schema]) "WITH latest_versions AS (/* For packages with multiple versions, use only the most recent version based on upload time */ SELECT \"name\", \"version\", \"project_urls\", \"upload_time\", ROW_NUMBER() OVER (PARTITION BY \"name\" ORDER BY \"upload_time\" DESC) AS rn FROM \"PYPI\".\"PYPI\".\"DISTRIBUTION_METADATA\"), github_urls AS (/* Extract and clean GitHub URLs from project_urls array */ SELECT DISTINCT lv.\"name\", REGEXP_REPLACE(TRIM(SUBSTRING(CAST(f.value AS TEXT) FROM POSITION(', ' IN CAST(f.value AS TEXT)) + 2)), '/(issues|pull|blob|tree)(/.*)?$', '', 'g') AS github_url FROM latest_versions AS lv, LATERAL UNNEST(input => lv.\"project_urls\") AS f(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE lv.rn = 1 AND CAST(f.value AS TEXT) ILIKE '%github.com%'), downloads AS (/* Count downloads per project */ SELECT \"project\", COUNT(*) AS download_count FROM \"PYPI\".\"PYPI\".\"FILE_DOWNLOADS\" GROUP BY \"project\") SELECT g.github_url AS GITHUB_URL FROM github_urls AS g JOIN downloads AS d ON g.\"name\" = d.\"project\" WHERE NOT g.github_url IS NULL AND g.github_url <> '' ORDER BY d.download_count DESC LIMIT 3") t0 t1
+  ~= (sql%([DISTRIBUTION_METADATA_schema, FILE_DOWNLOADS_schema]) "WITH downloads AS (SELECT \"project\", COUNT(*) AS download_count FROM \"PYPI\".\"PYPI\".\"FILE_DOWNLOADS\" GROUP BY \"project\"), github_urls AS (SELECT DISTINCT dm.\"name\", REGEXP_EXTRACT(TRIM(SPLIT_PART(CAST(f.value AS TEXT), ', ', 2)), 'https://github\\.com/[^/]+/[^/]+', 0) AS github_url FROM \"PYPI\".\"PYPI\".\"DISTRIBUTION_METADATA\" AS dm, LATERAL UNNEST(input => dm.\"project_urls\") AS f(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE CAST(f.value AS TEXT) LIKE '%github.com%'), ranked AS (SELECT g.github_url AS GITHUB_URL, d.download_count, ROW_NUMBER() OVER (ORDER BY d.download_count DESC, g.github_url) AS rn FROM github_urls AS g JOIN downloads AS d ON g.\"name\" = d.\"project\" WHERE NOT g.github_url IS NULL GROUP BY g.github_url, d.download_count) SELECT GITHUB_URL FROM ranked WHERE rn <= 3 ORDER BY rn") t0 t1
+  := by first | sql_equiv | sorry
+
+end N_sf_bq251_eq_0_3

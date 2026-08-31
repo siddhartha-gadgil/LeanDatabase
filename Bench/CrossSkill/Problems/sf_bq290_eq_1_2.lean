@@ -1,0 +1,17 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_bq290_eq_1_2
+
+CREATE TABLE STATIONS («usaf» STRING, «wban» STRING, «name» STRING, «country» STRING, «state» STRING, «call» STRING, «lat» FLOAT, «lon» FLOAT, «elev» STRING, «begin» STRING, «end» STRING)
+CREATE TABLE GSOD2023 («stn» STRING, «wban» STRING, «date» STRING, «year» STRING, «mo» STRING, «da» STRING, «temp» FLOAT, «count_temp» INT, «dewp» FLOAT, «count_dewp» INT, «slp» FLOAT, «count_slp» INT, «stp» FLOAT, «count_stp» INT, «visib» FLOAT, «count_visib» INT, «wdsp» STRING, «count_wdsp» STRING, «mxpsd» STRING, «gust» FLOAT, «max» FLOAT, «flag_max» STRING, «min» FLOAT, «flag_min» STRING, «prcp» FLOAT, «flag_prcp» STRING, «sndp» FLOAT, «fog» STRING, «rain_drizzle» STRING, «snow_ice_pellets» STRING, «hail» STRING, «thunder» STRING, «tornado_funnel_cloud» STRING)
+
+theorem eq (t0 : TableRel STATIONS_schema) (t1 : TableRel GSOD2023_schema) :
+    (sql%([STATIONS_schema, GSOD2023_schema]) "SELECT g.\"date\" AS date, AVG(CASE WHEN s.\"country\" = 'US' THEN g.\"max\" END) - AVG(CASE WHEN s.\"country\" = 'UK' THEN g.\"max\" END) AS DIFF_MAX_TEMP, AVG(CASE WHEN s.\"country\" = 'US' THEN g.\"min\" END) - AVG(CASE WHEN s.\"country\" = 'UK' THEN g.\"min\" END) AS DIFF_MIN_TEMP, AVG(CASE WHEN s.\"country\" = 'US' THEN g.\"temp\" END) - AVG(CASE WHEN s.\"country\" = 'UK' THEN g.\"temp\" END) AS DIFF_AVG_TEMP FROM \"NOAA_DATA\".\"NOAA_GSOD\".\"GSOD2023\" AS g JOIN \"NOAA_DATA\".\"NOAA_GSOD\".\"STATIONS\" AS s ON g.\"stn\" = s.\"usaf\" AND g.\"wban\" = s.\"wban\" WHERE s.\"country\" IN ('US', 'UK') AND g.\"date\" >= '2023-10-01' AND g.\"date\" < '2023-11-01' AND g.\"temp\" <> 9999.9 AND g.\"max\" <> 9999.9 AND g.\"min\" <> 9999.9 GROUP BY g.\"date\" ORDER BY g.\"date\"") t0 t1
+  ~= (sql%([STATIONS_schema, GSOD2023_schema]) "WITH us_data AS (SELECT g.\"date\", AVG(g.\"max\") AS avg_max_temp, AVG(g.\"min\") AS avg_min_temp, AVG(g.\"temp\") AS avg_temp FROM \"NOAA_DATA\".\"NOAA_GSOD\".\"GSOD2023\" AS g JOIN \"NOAA_DATA\".\"NOAA_GSOD\".\"STATIONS\" AS s ON g.\"stn\" = s.\"usaf\" AND g.\"wban\" = s.\"wban\" WHERE s.\"country\" = 'US' AND g.\"mo\" = '10' AND g.\"temp\" <> 9999.9 AND g.\"max\" <> 9999.9 AND g.\"min\" <> 9999.9 GROUP BY g.\"date\"), uk_data AS (SELECT g.\"date\", AVG(g.\"max\") AS avg_max_temp, AVG(g.\"min\") AS avg_min_temp, AVG(g.\"temp\") AS avg_temp FROM \"NOAA_DATA\".\"NOAA_GSOD\".\"GSOD2023\" AS g JOIN \"NOAA_DATA\".\"NOAA_GSOD\".\"STATIONS\" AS s ON g.\"stn\" = s.\"usaf\" AND g.\"wban\" = s.\"wban\" WHERE s.\"country\" = 'UK' AND g.\"mo\" = '10' AND g.\"temp\" <> 9999.9 AND g.\"max\" <> 9999.9 AND g.\"min\" <> 9999.9 GROUP BY g.\"date\") SELECT u.\"date\", (u.avg_max_temp - k.avg_max_temp) AS DIFF_MAX_TEMP, (u.avg_min_temp - k.avg_min_temp) AS DIFF_MIN_TEMP, (u.avg_temp - k.avg_temp) AS DIFF_AVG_TEMP FROM us_data AS u JOIN uk_data AS k ON u.\"date\" = k.\"date\" ORDER BY u.\"date\"") t0 t1
+  := by first | sql_equiv | sorry
+
+end N_sf_bq290_eq_1_2

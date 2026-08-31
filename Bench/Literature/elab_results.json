@@ -11,10 +11,7 @@
   {"status": "ok", "id": "4:q0", "error": null},
   {"status": "ok", "id": "4:q1", "error": null},
   {"status": "ok", "id": "5:q0", "error": null},
-  {"status": "fail",
-   "id": "5:q1",
-   "error":
-   "Type mismatch\n  \"SECURITY\"\nhas type\n  String\nbut is expected to have type\n  ℤ"},
+  {"status": "ok", "id": "5:q1", "error": null},
   {"status": "ok", "id": "6:q0", "error": null},
   {"status": "ok", "id": "6:q1", "error": null},
   {"status": "ok", "id": "7:q0", "error": null},
@@ -73,14 +70,8 @@
   {"status": "ok", "id": "34:q1", "error": null},
   {"status": "ok", "id": "35:q0", "error": null},
   {"status": "ok", "id": "35:q1", "error": null},
-  {"status": "fail",
-   "id": "36:q0",
-   "error":
-   "AS clause `CAST(x.a AS DOUBLE PRECISION) / NULLIF(x.b,0)`: failed to synthesize instance of type class\n  HDiv ℚ (Option ℤ) ?m.146\n\nHint: Type class instance resolution failures can be inspected with the `set_option trace.Meta.synthInstance true` command."},
-  {"status": "fail",
-   "id": "36:q1",
-   "error":
-   "AS clause `CAST(y.a AS DOUBLE PRECISION) / NULLIF(y.b,0)`: failed to synthesize instance of type class\n  HDiv ℚ (Option ℤ) ?m.146\n\nHint: Type class instance resolution failures can be inspected with the `set_option trace.Meta.synthInstance true` command."},
+  {"status": "ok", "id": "36:q0", "error": null},
+  {"status": "ok", "id": "36:q1", "error": null},
   {"status": "ok", "id": "37:q0", "error": null},
   {"status": "ok", "id": "37:q1", "error": null},
   {"status": "ok", "id": "38:q0", "error": null},
@@ -133,4 +124,4 @@
   {"status": "ok", "id": "62:q1", "error": null},
   {"status": "ok", "id": "63:q0", "error": null},
   {"status": "ok", "id": "63:q1", "error": null}],
- "elaborates": 118}
+ "elaborates": 121}

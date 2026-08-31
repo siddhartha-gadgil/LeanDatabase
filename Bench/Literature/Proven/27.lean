@@ -8,9 +8,9 @@ namespace N_27_eq
 
 CREATE TABLE R («X» INT)
 
-theorem eq :
-    sql%([R_schema]) "SELECT * FROM (SELECT * FROM R AS X WHERE B(X)) AS Y WHERE B(Y)"
-  = sql%([R_schema]) "SELECT * FROM R AS X WHERE B(X)"
+theorem eq (t0 : TableRel R_schema) :
+    (sql%([R_schema]) "SELECT * FROM (SELECT * FROM R AS X WHERE B(X)) AS Y WHERE B(Y)") t0
+  ~= (sql%([R_schema]) "SELECT * FROM R AS X WHERE B(X)") t0
   := by sql_equiv
 
 end N_27_eq

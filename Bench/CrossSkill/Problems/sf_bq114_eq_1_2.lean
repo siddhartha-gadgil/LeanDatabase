@@ -1,0 +1,17 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_bq114_eq_1_2
+
+CREATE TABLE PM25_NONFRM_DAILY_SUMMARY («state_code» STRING, «county_code» STRING, «site_num» STRING, «parameter_code» INT, «poc» INT, «latitude» FLOAT, «longitude» FLOAT, «datum» STRING, «parameter_name» STRING, «sample_duration» STRING, «pollutant_standard» STRING, «date_local» STRING, «units_of_measure» STRING, «event_type» STRING, «observation_count» INT, «observation_percent» FLOAT, «arithmetic_mean» FLOAT, «first_max_value» FLOAT, «first_max_hour» INT, «aqi» INT, «method_code» INT, «method_name» STRING, «local_site_name» STRING, «address» STRING, «state_name» STRING, «county_name» STRING, «city_name» STRING, «cbsa_name» STRING, «date_of_last_change» STRING)
+CREATE TABLE GLOBAL_AIR_QUALITY («location» STRING, «city» STRING, «country» STRING, «pollutant» STRING, «value» FLOAT, «timestamp» INT, «unit» STRING, «source_name» STRING, «latitude» FLOAT, «longitude» FLOAT, «averaged_over_in_hours» FLOAT, «location_geom» STRING)
+
+theorem eq (t0 : TableRel PM25_NONFRM_DAILY_SUMMARY_schema) (t1 : TableRel GLOBAL_AIR_QUALITY_schema) :
+    (sql%([PM25_NONFRM_DAILY_SUMMARY_schema, GLOBAL_AIR_QUALITY_schema]) "SELECT oaq.\"city\", epa.arithmetic_mean, oaq.\"value\", CAST(TO_TIMESTAMP(CAST(oaq.\"timestamp\" AS DOUBLE PRECISION) / 1000000) AS DATE) AS timestamp, ABS(epa.arithmetic_mean - oaq.\"value\") AS f0_ FROM (SELECT ROUND(\"latitude\", 2) AS lat, ROUND(\"longitude\", 2) AS lon, AVG(\"arithmetic_mean\") AS arithmetic_mean FROM \"OPENAQ\".\"EPA_HISTORICAL_AIR_QUALITY\".\"PM25_NONFRM_DAILY_SUMMARY\" WHERE \"parameter_name\" = 'Acceptable PM2.5 AQI & Speciation Mass' AND \"units_of_measure\" = 'Micrograms/cubic meter (LC)' AND EXTRACT(YEAR FROM \"date_local\") = 1990 GROUP BY ROUND(\"latitude\", 2), ROUND(\"longitude\", 2)) AS epa INNER JOIN (SELECT \"city\", \"value\", \"timestamp\", ROUND(\"latitude\", 2) AS lat, ROUND(\"longitude\", 2) AS lon FROM \"OPENAQ\".\"OPENAQ\".\"GLOBAL_AIR_QUALITY\" WHERE \"pollutant\" = 'pm25' AND \"unit\" = 'µg/m³' AND \"country\" = 'US' AND EXTRACT(YEAR FROM TO_TIMESTAMP(CAST(\"timestamp\" AS DOUBLE PRECISION) / 1000000)) = 2020) AS oaq ON epa.lat = oaq.lat AND epa.lon = oaq.lon ORDER BY f0_ DESC LIMIT 3") t0 t1
+  ~= (sql%([PM25_NONFRM_DAILY_SUMMARY_schema, GLOBAL_AIR_QUALITY_schema]) "WITH epa AS (SELECT \"city_name\", \"arithmetic_mean\", ROUND(\"latitude\", 2) AS lat, ROUND(\"longitude\", 2) AS lon FROM \"OPENAQ\".\"EPA_HISTORICAL_AIR_QUALITY\".\"AIR_QUALITY_ANNUAL_SUMMARY\" WHERE \"year\" = 1990 AND \"units_of_measure\" = 'Micrograms/cubic meter (LC)' AND \"parameter_name\" = 'Acceptable PM2.5 AQI & Speciation Mass'), openaq AS (SELECT \"city\", \"value\", CAST(TO_TIMESTAMP(CAST(\"timestamp\" AS DOUBLE PRECISION) / 1000000) AS DATE) AS \"timestamp\", ROUND(\"latitude\", 2) AS lat, ROUND(\"longitude\", 2) AS lon FROM \"OPENAQ\".\"OPENAQ\".\"GLOBAL_AIR_QUALITY\" WHERE \"pollutant\" = 'pm25' AND EXTRACT(YEAR FROM TO_TIMESTAMP(CAST(\"timestamp\" AS DOUBLE PRECISION) / 1000000)) = 2020) SELECT openaq.\"city\" AS \"city\", epa.\"arithmetic_mean\" AS \"arithmetic_mean\", openaq.\"value\" AS \"value\", openaq.\"timestamp\" AS \"timestamp\", (epa.\"arithmetic_mean\" - openaq.\"value\") AS \"f0_\" FROM epa JOIN openaq ON epa.lat = openaq.lat AND epa.lon = openaq.lon ORDER BY \"f0_\" DESC LIMIT 3") t0 t1
+  := by first | sql_equiv | sorry
+
+end N_sf_bq114_eq_1_2

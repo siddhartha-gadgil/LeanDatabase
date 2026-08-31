@@ -1,0 +1,17 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_sf_local133_eq_0_2
+
+CREATE TABLE MUSICAL_STYLES («StyleID» INT, «StyleName» STRING)
+CREATE TABLE MUSICAL_PREFERENCES («CustomerID» INT, «StyleID» INT, «PreferenceSeq» INT)
+
+theorem eq (t0 : TableRel MUSICAL_STYLES_schema) (t1 : TableRel MUSICAL_PREFERENCES_schema) :
+    (sql%([MUSICAL_STYLES_schema, MUSICAL_PREFERENCES_schema]) "WITH style_scores AS (SELECT ms.\"StyleName\", SUM(CASE WHEN mp.\"PreferenceSeq\" = 1 THEN 3 WHEN mp.\"PreferenceSeq\" = 2 THEN 2 WHEN mp.\"PreferenceSeq\" = 3 THEN 1 ELSE 0 END) AS TOTAL_WEIGHTED_SCORE FROM \"ENTERTAINMENTAGENCY\".\"ENTERTAINMENTAGENCY\".\"MUSICAL_PREFERENCES\" AS mp JOIN \"ENTERTAINMENTAGENCY\".\"ENTERTAINMENTAGENCY\".\"MUSICAL_STYLES\" AS ms ON mp.\"StyleID\" = ms.\"StyleID\" GROUP BY ms.\"StyleName\"), avg_score AS (SELECT AVG(TOTAL_WEIGHTED_SCORE) AS AVERAGE_SCORE FROM style_scores) SELECT ss.\"StyleName\", ss.TOTAL_WEIGHTED_SCORE, ROUND(a.AVERAGE_SCORE, 4) AS AVERAGE_SCORE, ROUND(ABS(ss.TOTAL_WEIGHTED_SCORE - a.AVERAGE_SCORE), 4) AS ABSOLUTE_DIFFERENCE_FROM_AVERAGE FROM style_scores AS ss CROSS JOIN avg_score AS a ORDER BY ss.TOTAL_WEIGHTED_SCORE DESC, ss.\"StyleName\"") t0 t1
+  = (sql%([MUSICAL_STYLES_schema, MUSICAL_PREFERENCES_schema]) "WITH weighted AS (SELECT ms.\"StyleName\", SUM(CASE WHEN mp.\"PreferenceSeq\" = 1 THEN 3 WHEN mp.\"PreferenceSeq\" = 2 THEN 2 WHEN mp.\"PreferenceSeq\" = 3 THEN 1 ELSE 0 END) AS TOTAL_WEIGHTED_SCORE FROM \"ENTERTAINMENTAGENCY\".\"ENTERTAINMENTAGENCY\".\"MUSICAL_PREFERENCES\" AS mp JOIN \"ENTERTAINMENTAGENCY\".\"ENTERTAINMENTAGENCY\".\"MUSICAL_STYLES\" AS ms ON mp.\"StyleID\" = ms.\"StyleID\" GROUP BY ms.\"StyleName\"), avg_score AS (SELECT AVG(TOTAL_WEIGHTED_SCORE) AS AVERAGE_SCORE FROM weighted) SELECT w.\"StyleName\", w.TOTAL_WEIGHTED_SCORE, a.AVERAGE_SCORE, ABS(w.TOTAL_WEIGHTED_SCORE - a.AVERAGE_SCORE) AS ABSOLUTE_DIFFERENCE_FROM_AVERAGE FROM weighted AS w CROSS JOIN avg_score AS a ORDER BY w.\"StyleName\"") t0 t1
+  := by first | sql_equiv | sorry
+
+end N_sf_local133_eq_0_2
