@@ -42,14 +42,16 @@ def sqlColTerm : TSyntax `sql_col → Syntax.Term
   | `(sql_col| $col:ident) => col
   | `(sql_col| $col:term AS $_:ident) => col
   | `(sql_col| $col:term) => col
-  | _ => unreachable!
+  -- A scalar-subquery column should be preprocessed to `term AS ident` before this; if one slips
+  -- through, return a placeholder that fails elaboration cleanly rather than `panic`-ing the process.
+  | _ => ⟨mkIdent `__unexpected_scalar_subquery⟩
 
 def sqlColName : TSyntax `sql_col → Name
   | `(sql_col| $col:ident) => col.getId
   | `(sql_col| $_:term AS $x:ident) => x.getId
   | `(sql_col| ( $_:sql_query ) AS $x:ident) => x.getId
   | `(sql_col| $col:term) => autoColName col.raw
-  | _ => unreachable!
+  | _ => `__unexpected_col
 
 -- `ORDER BY` items carry an optional `ASC`/`DESC`. Under set semantics row order is not observable,
 -- so the direction is parsed then discarded — `orderBy` is the identity either way.
@@ -251,6 +253,24 @@ macro:50 x:term:51 " NOT " " IN " "(" elems:term,+ ")" : term => do
   let cmps ← elems.getElems.mapM fun e => `($x == $e)
   let chain ← cmps.foldlM (fun acc c => `($acc || $c)) (← `(false))
   `(!($chain))
+
+-- `GROUP BY ROLLUP/CUBE/GROUPING SETS(…)` — grouping-set constructs. They parse as terms (so the
+-- existing `GROUP BY term,*` accepts them) and are intercepted in `Parser/Query.lean`'s SELECT arm,
+-- which groups over the union of their columns and wraps the result in the opaque `groupSetMark`.
+syntax:max "ROLLUP" "(" term,+ ")" : term
+syntax:max "CUBE" "(" term,+ ")" : term
+declare_syntax_cat grouping_set
+syntax "(" term,* ")" : grouping_set
+syntax term : grouping_set
+syntax:max "GROUPING" &"SETS" "(" grouping_set,+ ")" : term
+-- `GROUPING(a, …)` flag scalar → opaque `groupingOf` over its args folded into a tuple.
+syntax:max "GROUPING" "(" term,+ ")" : term
+macro_rules
+  | `(GROUPING($args,*)) => do
+      let es := args.getElems
+      let mut tup : Term := es.back!
+      for i in [1:es.size] do tup ← `(($(es[es.size - 1 - i]!), $tup))
+      `($(Lean.mkIdent `LeanDatabase.Scalar.groupingOf) $tup)
 
 -- SQL `x BETWEEN a AND b` (inclusive). The inner `AND` is part of BETWEEN; the `:51` args keep the
 -- boolean `AND` macro (prec 30) from swallowing it.

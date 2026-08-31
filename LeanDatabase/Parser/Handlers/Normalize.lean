@@ -302,6 +302,18 @@ def normalizeSqlLiterals (s : String) : String :=
   let s := s.replace "FETCH FIRST " "LIMIT "
   let s := s.replace " ROWS ONLY" ""
   let s := s.replace " ROW ONLY" ""
+  -- `$` starts an antiquotation in Lean's `term` parser, so a generated column name like Calcite's
+  -- `$f0` sends name-resolution into infinite recursion. It is not a valid identifier char in our
+  -- model anyway — map it to `_` (consistent on both sides of an equivalence).
+  let s := s.replace "$" "_"
+  -- Typed literals `DATE '…'` / `TIMESTAMP '…'` / `TIME '…'` — dates/timestamps are opaque `String`s in
+  -- our model, so the type keyword is dropped and the literal is just its string.
+  let s := s.replace "TIMESTAMP '" "'"
+  let s := s.replace "DATE '" "'"
+  let s := s.replace "TIME '" "'"
+  -- `x IS [NOT] DISTINCT FROM y` is the NULL-safe (non-)equality; 2-valued it is `x <> y` / `x = y`.
+  let s := s.replace " IS NOT DISTINCT FROM " " = "
+  let s := s.replace " IS DISTINCT FROM " " <> "
   -- `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` is the SQL default frame (a no-op); strip it so
   -- the window parses. Only the default is stripped — other frames stay unparsed, never equated.
   let s := s.replace " RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW" ""

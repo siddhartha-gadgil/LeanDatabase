@@ -88,4 +88,14 @@ def SamePartition {α β : Type} (f : TypedTuple colType → α) (g : TypedTuple
     (R : TypedRelation colType) : Prop :=
   ∀ a ∈ R.rows, ∀ b ∈ R.rows, (f a = f b) ↔ (g a = g b)
 
+/-- **Referential integrity** (a foreign key): every value the child relation `R` takes on `f` also
+occurs in the parent relation `S` on `g`. This is the third IC kind VeriEQL's benchmarks carry (1588
+of them in Calcite alone), and it is what makes a join-elimination rewrite an equivalence: a join
+against the parent on a foreign key neither drops nor duplicates a child row. -/
+def ForeignKey {α : Type} {m : Nat} {parentCT : Fin m → Type}
+    [∀ i, DecidableEq (parentCT i)]
+    (f : TypedTuple colType → α) (g : TypedTuple parentCT → α)
+    (R : TypedRelation colType) (S : TypedRelation parentCT) : Prop :=
+  ∀ r ∈ R.rows, ∃ s ∈ S.rows, f r = g s
+
 end LeanDatabase

@@ -140,8 +140,20 @@ def sqlProxy (sqlType : String) : SQLTypeProxy :=
 /-- A schema as `Fin n → Type`, indexing a `List SQLTypeProxy` positionally. This is the canonical
 form every parsed query targets. -/
 @[reducible]
-def colTypeOfList (l: List SQLTypeProxy) : Fin l.length → Type :=
-  fun i => (l.get i).type
+def colTypeOfList : (l : List SQLTypeProxy) → Fin l.length → Type
+  -- Defined by *structural recursion* rather than `fun i => (l.get i).type`: `List.get` is
+  -- semireducible, so the latter does not compute at `instances` transparency, and any term that
+  -- indexes a row (`cons v r 0`) then fails to typecheck once `cons` itself is left folded — which is
+  -- exactly what the membership route needs (`LeanDatabase/Membership.lean`).
+  | t :: _, ⟨0, _⟩ => t.type
+  | _ :: rest, ⟨i + 1, h⟩ => colTypeOfList rest ⟨i, by simp only [List.length_cons] at h; omega⟩
+
+/-- The recursive definition agrees with the `List.get` one, which is how the generic per-column
+instances below are still built. -/
+theorem colTypeOfList_eq : ∀ (l : List SQLTypeProxy) (i : Fin l.length),
+    colTypeOfList l i = (l.get i).type
+  | _ :: _, ⟨0, _⟩ => rfl
+  | _ :: rest, ⟨i + 1, h⟩ => colTypeOfList_eq rest ⟨i, by simp only [List.length_cons] at h; omega⟩
 
 /-- Every column type is `Inhabited` — needed by the outer-join operators (`leftOuterJoin` uses a
 default to build the `NULL`-padded rows). `Option _` is inhabited by `none`. -/
@@ -154,7 +166,7 @@ instance instInhabitedProxyType : (t : SQLTypeProxy) → Inhabited t.type
   | .nullable _ => inferInstance
 
 instance sqlTypeInhabited (l : List SQLTypeProxy) : (i : Fin l.length) → Inhabited (colTypeOfList l i) :=
-  fun i => instInhabitedProxyType (l.get i)
+  fun i => (colTypeOfList_eq l i) ▸ instInhabitedProxyType (l.get i)
 
 /-- Every column type is a `LinearOrder` (needed by the per-column order the `CREATE TABLE` macro
 otherwise emitted by hand). Provided generically here so many-column tables need no per-column
@@ -168,7 +180,7 @@ instance instLinearOrderProxyType : (t : SQLTypeProxy) → LinearOrder t.type
   | .nullable t => @instLinearOrderOption _ (instLinearOrderProxyType t)
 
 instance sqlTypeLinearOrder (l : List SQLTypeProxy) : (i : Fin l.length) → LinearOrder (colTypeOfList l i) :=
-  fun i => instLinearOrderProxyType (l.get i)
+  fun i => (colTypeOfList_eq l i) ▸ instLinearOrderProxyType (l.get i)
 
 instance sqlTypeDecEq (l: List SQLTypeProxy) : (i : Fin l.length) → DecidableEq (colTypeOfList l i) := by
   match l with
@@ -197,7 +209,10 @@ def TypedRelationOfList (l: List SQLTypeProxy) : Type :=
 @[reducible]
 def TypedTupleOfList.nil : TypedTupleOfList [] := fun ⟨i, hi⟩ => by simp at hi
 
-@[reducible]
+-- NOT `@[reducible]`: a reducible `cons` is unfolded by `simp`/`grind` into `fun i => match i …`,
+-- and congruence closure cannot then relate two rows built from equal components (that would need
+-- rewriting under a binder). Keeping it folded is what lets the membership route reason about rows
+-- as records — `cons_zero`/`cons_succ_apply` (Membership.lean) keep indexing computable.
 def TypedTupleOfList.cons (t : SQLTypeProxy) (x: t.type) (ts : TypedTupleOfList rest) :
   TypedTupleOfList (t :: rest) := fun ⟨i, hi⟩ =>
   match i with
@@ -233,8 +248,11 @@ theorem TypedTupleOfList.cons_inj {t : SQLTypeProxy} {rest : List SQLTypeProxy}
   constructor
   · intro h
     refine ⟨?_, ?_⟩
-    · have := congrFun h (0 : Fin (rest.length + 1))
-      simpa [TypedTupleOfList.cons, colTypeOfList] using this
+    · have e0 : TypedTupleOfList.cons t x xs ⟨0, Nat.succ_pos _⟩ = x := rfl
+      have e1 : TypedTupleOfList.cons t y ys ⟨0, Nat.succ_pos _⟩ = y := rfl
+      have := congrFun h (⟨0, Nat.succ_pos _⟩ : Fin (rest.length + 1))
+      rw [e0, e1] at this
+      exact this
     · funext i
       have := congrFun h i.succ
       rwa [TypedTupleOfList.cons_succ, TypedTupleOfList.cons_succ] at this

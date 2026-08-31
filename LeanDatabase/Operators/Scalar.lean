@@ -67,6 +67,9 @@ opaque toNumber {α : Type} (x : α) : Rat := 0
 -- Tags a `PERCENTILE_CONT/DISC` order value with its percentile + a CONT/DISC marker, so the opaque
 -- ordered-set aggregate stays distinct across different percentiles and the two kinds.
 opaque pctTag (marker : String) (p v : Rat) : Rat := v
+-- `GROUPING(a, …)` — the grouping-set bitmask flag; opaque over its (folded) arguments so identical
+-- calls agree and different ones stay distinct.
+opaque groupingOf {α : Type} (x : α) : Int := 0
 opaque dateTrunc (unit : String) (x : String) : String := x
 
 /-- String functions. -/

@@ -380,6 +380,13 @@ differing in any of these keep distinct summands. -/
 opaque groupPercentile (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
     (f : TypedTuple colType → Rat) : Rat := 0
 
+/-- `GROUP BY ROLLUP/CUBE/GROUPING SETS(…)` — an opaque marker over the base grouped relation, tagged
+by a `spec` string capturing the exact construct + columns. Two identical grouping-set queries share
+the same `spec` and base relation, so they prove equal; different constructs/columns (or a plain
+`GROUP BY`) get a different `spec`/base and stay distinct — never wrongly equated. Sound: the true
+NULL-padded multi-level semantics is not modelled, only kept opaque. -/
+opaque groupSetMark (spec : String) (rel : TypedRelation colType) : TypedRelation colType := rel
+
 /-- `EVERY` / `BOOL_AND(p)` — true iff every row in the group satisfies `p`. -/
 def groupBoolAnd (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
     (p : TypedTuple colType → Bool) : Bool :=
@@ -528,6 +535,6 @@ end LeanDatabase.TypedAgg
 /- Re-export the aggregate operators into the top-level `LeanDatabase` namespace-/
 namespace LeanDatabase
 export LeanDatabase.TypedAgg
-  (group groupCount groupSum groupKeys groupMax groupMaxInt groupMinInt groupAvg groupSumDistinct groupCountDistinct groupAvgDistinct groupBoolAnd groupBoolOr groupStddev groupVariance groupStringAgg groupPercentile relCount relSum relMax relMin relCountDistinct relAvg groupBy
+  (group groupCount groupSum groupKeys groupMax groupMaxInt groupMinInt groupAvg groupSumDistinct groupCountDistinct groupAvgDistinct groupBoolAnd groupBoolOr groupStddev groupVariance groupStringAgg groupPercentile groupSetMark relCount relSum relMax relMin relCountDistinct relAvg groupBy
    groupSumRat groupMaxRat groupMinRat groupAvgRat groupSumDistinctRat groupAvgDistinctRat groupStddevRat groupVarianceRat)
 end LeanDatabase

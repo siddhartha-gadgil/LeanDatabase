@@ -6,6 +6,7 @@ import LeanDatabase.Operators
 import LeanDatabase.Constraints
 import LeanDatabase.Parser.Context
 import LeanDatabase.DataEquiv
+import LeanDatabase.Membership
 
 open LeanDatabase LeanDatabase.TypedAgg
 
@@ -100,6 +101,32 @@ macro "sql_bijection" : tactic => `(tactic|
      | exact (‹SamePartition _ _ _› : SamePartition _ _ _) a ha b hb
    done))
 
+/-- **The membership route** — the informed reduction, and the analogue of what VeriEQL hands to Z3.
+
+`A ~= B` is `A.rows = B.rows`, which `Finset.ext` turns into `∀ x, x ∈ A.rows ↔ x ∈ B.rows`; the
+`sql_mem` laws (`LeanDatabase/Membership.lean`) then push `∈` through the algebra — `σ` to `∧`, `π`
+and `×` to `∃`, `∪` to `∨` — and decompose the row equalities that fall out into per-column ones,
+until only memberships in *base* tables remain. What is left is a first-order formula over rows, which
+`grind` closes; unlike their bounded encoding, the result holds for every database.
+
+`List.cons_append`/`List.nil_append` are essential rather than cosmetic: a join's column list reaches
+the goal as `l₁ ++ l₂` inside the `DecidableEq` instance while the ambient type is already the literal
+list, and until those agree *no* membership lemma unifies — not even `Finset.mem_image`. -/
+macro "sql_membership" : tactic => `(tactic|
+  (try simp only [LeanDatabase.dataEq]
+   first
+     | apply Finset.ext
+     | (apply TypedRelation.ext (by rfl); apply Finset.ext)
+     | skip
+   try intro _
+   -- Two passes: the first makes the appended column lists literal (so the membership lemmas can
+   -- unify at all), the second pushes `∈` through the algebra and splits the row equalities.
+   try simp only [List.cons_append, List.nil_append]
+   try simp only [sql_mem, Finset.mem_image, Finset.mem_filter, Finset.mem_product,
+     Finset.mem_union, Finset.mem_inter, Finset.mem_sdiff, Prod.exists,
+     decide_eq_true_eq, Bool.and_eq_true, Bool.or_eq_true, Bool.not_eq_true]
+   first | grind +locals | tauto))
+
 macro "sql_equiv" : tactic => `(tactic|
   (
    -- data-equivalence goal (`A ~= B`): unfold to `A.rows = B.rows` (labels/aliases erased), then reduce.
@@ -136,6 +163,10 @@ macro "sql_equiv" : tactic => `(tactic|
           Finset.mem_sdiff]
         (try sql_simp); first | grind +locals | tauto)
      | (sql_simp; first | grind +locals | tauto | omega)
-     | (funext _; apply Finset.ext; intro _; (try sql_simp); first | grind +locals | tauto))))
+     | (funext _; apply Finset.ext; intro _; (try sql_simp); first | grind +locals | tauto)
+     -- Last: the structural membership route. Tried after the cheap closers because it rewrites the
+     -- goal wholesale; when they fail on a join/projection equality, this is what has a shape `grind`
+     -- can actually reason about.
+     | sql_membership)))
 
 end LeanDatabase.SQLEquiv

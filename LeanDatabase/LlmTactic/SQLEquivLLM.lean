@@ -29,6 +29,19 @@ register_option sqlEquivLlm.model : String := {
   descr := "Model name for sql_equiv_llm (empty = the provider's default)"
 }
 
+/-- Price of INPUT (prompt) tokens, in **cents per 1,000,000 tokens** (options can't be `Float`).
+E.g. $0.25 / 1M input tokens ⇒ 25. Set to your model's real rate; default ≈ a cheap gpt-5.x tier. -/
+register_option sqlEquivLlm.inputCentsPerMTok : Nat := {
+  defValue := 25
+  descr := "Input/prompt token price in cents per 1M tokens (for the cost estimate)"
+}
+
+/-- Price of OUTPUT (completion) tokens, in **cents per 1,000,000 tokens**. E.g. $2.00 / 1M ⇒ 200. -/
+register_option sqlEquivLlm.outputCentsPerMTok : Nat := {
+  defValue := 200
+  descr := "Output/completion token price in cents per 1M tokens (for the cost estimate)"
+}
+
 namespace LeanDatabase.SQLEquivLLM
 
 /-! ## Providers -/
@@ -94,7 +107,18 @@ def curlPostJson (url : String) (headers : Array String) (body : Json) : IO Json
     | .ok j => pure j
     | .error _ => throw (IO.userError s!"non-JSON response (curl exit {out.exitCode}): {out.stdout}")
 
-def callOpenAI (key prompt model : String) (maxTokens : Nat) : IO String := do
+/-- Token counts `(promptTokens, completionTokens)` from a response's `usage` object, under the given
+key names (OpenAI/Gemini: `prompt_tokens`/`completion_tokens`; Anthropic: `input_tokens`/`output_tokens`).
+Missing ⇒ `(0, 0)`. -/
+def getUsage (json : Json) (pk ck : String) : Nat × Nat :=
+  match json.getObjVal? "usage" with
+  | .ok u => ((u.getObjValAs? Nat pk).toOption.getD 0, (u.getObjValAs? Nat ck).toOption.getD 0)
+  | .error _ => (0, 0)
+
+/-- A completion plus its `(promptTokens, completionTokens)` usage. -/
+abbrev LLMResult := String × Nat × Nat
+
+def callOpenAI (key prompt model : String) (maxTokens : Nat) : IO LLMResult := do
   -- Newer OpenAI models (gpt-5.x) reject `max_tokens` and require `max_completion_tokens`.
   let body := Json.mkObj [("model", model),
     ("messages", Json.arr #[Json.mkObj [("role", "user"), ("content", prompt)]]),
@@ -102,41 +126,44 @@ def callOpenAI (key prompt model : String) (maxTokens : Nat) : IO String := do
   let json ← curlPostJson "https://api.openai.com/v1/chat/completions"
     #[s!"Authorization: Bearer {key}", "Content-Type: application/json"] body
   if let .ok err := json.getObjVal? "error" then throw (IO.userError s!"OpenAI error: {err}")
+  let (pt, ct) := getUsage json "prompt_tokens" "completion_tokens"
   match json.getObjValAs? (Array Json) "choices" with
   | .error e => throw (IO.userError s!"OpenAI: no choices ({e})")
   | .ok cs => match cs[0]? >>= (·.getObjVal? "message" |>.toOption) >>=
       (·.getObjValAs? String "content" |>.toOption) with
-    | some t => pure t | none => throw (IO.userError "OpenAI: no message.content")
+    | some t => pure (t, pt, ct) | none => throw (IO.userError "OpenAI: no message.content")
 
-def callAnthropic (key prompt model : String) (maxTokens : Nat) : IO String := do
+def callAnthropic (key prompt model : String) (maxTokens : Nat) : IO LLMResult := do
   let body := Json.mkObj [("model", model), ("max_tokens", maxTokens),
     ("messages", Json.arr #[Json.mkObj [("role", "user"), ("content", prompt)]])]
   let json ← curlPostJson "https://api.anthropic.com/v1/messages"
     #[s!"x-api-key: {key}", "anthropic-version: 2023-06-01", "Content-Type: application/json"] body
   if let .ok err := json.getObjVal? "error" then throw (IO.userError s!"Anthropic error: {err}")
+  let (pt, ct) := getUsage json "input_tokens" "output_tokens"
   match json.getObjValAs? (Array Json) "content" with
   | .error e => throw (IO.userError s!"Anthropic: no content ({e})")
   | .ok bs => match bs[0]? >>= (·.getObjValAs? String "text" |>.toOption) with
-    | some t => pure t | none => throw (IO.userError "Anthropic: no text block")
+    | some t => pure (t, pt, ct) | none => throw (IO.userError "Anthropic: no text block")
 
 -- Gemini via Google's OpenAI-compatible endpoint (Bearer auth + chat/completions) — the native
 -- `generateContent?key=` route rejects OpenAI-style keys with "API key not valid". Matches the
 -- proven-working `PyAstLean/src/transpile/llm.py` client.
-def callGemini (key prompt model : String) (maxTokens : Nat) : IO String := do
+def callGemini (key prompt model : String) (maxTokens : Nat) : IO LLMResult := do
   let body := Json.mkObj [("model", model),
     ("messages", Json.arr #[Json.mkObj [("role", "user"), ("content", prompt)]]),
     ("max_tokens", maxTokens)]
   let json ← curlPostJson "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
     #[s!"Authorization: Bearer {key}", "Content-Type: application/json"] body
   if let .ok err := json.getObjVal? "error" then throw (IO.userError s!"Gemini error: {err}")
+  let (pt, ct) := getUsage json "prompt_tokens" "completion_tokens"
   match json.getObjValAs? (Array Json) "choices" with
   | .error e => throw (IO.userError s!"Gemini: no choices ({e})")
   | .ok cs => match cs[0]? >>= (·.getObjVal? "message" |>.toOption) >>=
       (·.getObjValAs? String "content" |>.toOption) with
-    | some t => pure t | none => throw (IO.userError "Gemini: no message.content")
+    | some t => pure (t, pt, ct) | none => throw (IO.userError "Gemini: no message.content")
 
-/-- One completion from `p`. -/
-def callLLM (p : Provider) (prompt model : String) (maxTokens : Nat := 8192) : IO String := do
+/-- One completion from `p`, with its token usage. -/
+def callLLM (p : Provider) (prompt model : String) (maxTokens : Nat := 8192) : IO LLMResult := do
   let key ← getKey p
   match p with
   | .openai => callOpenAI key prompt model maxTokens
@@ -152,6 +179,15 @@ def stripFence (s : String) : String := Id.run do
     let s := (s.dropWhile (· != '\n')).trimAscii.toString
     return if s.endsWith "```" then (s.dropEnd 3).trimAscii.toString else s
   return s
+
+/-- Estimated cost **in cents** for a problem from its accumulated token usage and the per-1M-token
+cent prices: `(promptTok × inputCents + completionTok × outputCents) / 1e6`. -/
+def estCostCents (promptTok completionTok inputCents outputCents : Nat) : Float :=
+  (promptTok.toFloat * inputCents.toFloat + completionTok.toFloat * outputCents.toFloat) / 1000000.0
+
+/-- Round a cent amount to 4 decimal places for display. -/
+def fmtCents (cents : Float) : String :=
+  s!"{(cents * 10000.0).round / 10000.0}¢"
 
 /-- One-line, length-capped summary of an error, for the concise status line. -/
 def shortErr (s : String) (length : Nat := 100) : String :=
@@ -223,7 +259,7 @@ def suggestProof (code : String) : TacticM Unit := do
 /-! ## The tactic -/
 
 def maxRounds : Nat := 5
-def defaultProvider : Provider := .gemini
+def defaultProvider : Provider := .openai
 
 /-- LLM-assisted fallback. Order: (0) try the deterministic `sql_equiv`; (1) if that fails, run the
 LLM refinement loop (up to `maxRounds`, stopping after the first call on an auth/key error); (2) if no
@@ -251,16 +287,20 @@ elab "sql_equiv_llm" : tactic => do
   let mut status : Array String := #["sql_equiv: failed"]
   let mut winner : Option Syntax := none
   let mut stop := false
+  -- Accumulated across ALL rounds for this problem, so the cost is per-problem (not per-send).
+  let mut totPrompt : Nat := 0
+  let mut totCompletion : Nat := 0
   for round in [1:maxRounds+1] do
     if stop then break
     let resp ← (do try pure (.ok (← callLLM p (buildPrompt goalText context feedback) model))
                    catch e => pure (.error (← e.toMessageData.toString)) :
-                   TacticM (Except String String))
+                   TacticM (Except String LLMResult))
     match resp with
     | .error e =>
       status := status.push s!"call{round}: NET-ERR ({shortErr e})"; feedback := ""
       if isAuthError e then status := status.push "auth error → stopping"; stop := true
-    | .ok raw =>
+    | .ok (raw, pt, ct) =>
+      totPrompt := totPrompt + pt; totCompletion := totCompletion + ct
       lastCode := stripFence raw
       match ← parseCandidate raw with
       | none => status := status.push s!"call{round}: 200 OK, parse-fail"
@@ -271,7 +311,13 @@ elab "sql_equiv_llm" : tactic => do
         | .error e =>
           status := status.push s!"call{round}: 200 OK, failed"
           feedback := s!"Tactic:\n{lastCode}\nfailed with:\n{e.take 1500}"
-  let hdr := s!"LlmTactic: {p.name} ({model})\n" ++ String.intercalate "\n" status.toList
+  -- Per-problem token/cost summary (net over all rounds).
+  let inC := sqlEquivLlm.inputCentsPerMTok.get opts
+  let outC := sqlEquivLlm.outputCentsPerMTok.get opts
+  let costLine := s!"tokens: {totPrompt} in + {totCompletion} out | " ++
+    s!"cost: {fmtCents (estCostCents totPrompt totCompletion inC outC)}"
+  let hdr := s!"LlmTactic: {p.name} ({model})\n" ++
+    String.intercalate "\n" status.toList ++ "\n" ++ costLine
   -- Apply the winner if one closed the goal on trial (reapplied safely).
   if let some stx := winner then
     if ← tryClose goal stx then

@@ -267,6 +267,29 @@ def buildValues (rows : List (List Syntax.Term)) (cols : List Name) (alias_ : Na
   let rel ← mkAppM ``valuesRel #[lE, ← mkListLit (mkConst ``String) (labels.map (mkStrLit ·)), rowsE]
   return (rel, (cols.map (alias_ ++ ·)).zip tys)
 
+/-- If the `GROUP BY` items are a grouping-set construct (`ROLLUP`/`CUBE`/`GROUPING SETS`), return its
+`spec` string (the reprinted construct — distinguishes ROLLUP vs CUBE vs different columns) and the flat
+list of grouping columns (their union). The SELECT arm then groups over those columns and wraps the
+result in the opaque `groupSetMark spec`. -/
+def detectGroupingSet (items : Array Syntax.Term) : Option (String × Array Syntax.Term) := Id.run do
+  unless items.size == 1 do return none
+  let it := items[0]!
+  let spec := (it.raw.reprint.getD "gs").trim
+  match it with
+  | `(ROLLUP($cols,*)) => return some (spec, cols.getElems)
+  | `(CUBE($cols,*))   => return some (spec, cols.getElems)
+  | `(GROUPING SETS($sets,*)) => do
+      let mut cols : Array Syntax.Term := #[]
+      for s in sets.getElems do
+        match s with
+        | `(grouping_set| ( $cs,* )) => for c in cs.getElems do
+            unless cols.any (fun d => d.raw.reprint == c.raw.reprint) do cols := cols.push c
+        | `(grouping_set| $t:term) =>
+            unless cols.any (fun d => d.raw.reprint == t.raw.reprint) do cols := cols.push t
+        | _ => pure ()
+      return some (spec, cols)
+  | _ => return none
+
 /--
 This is the main entry point for parsing a full SQL query (`SELECT` / `FROM` / `WHERE` / `GROUP BY`),
 plus the binary set operators `UNION` / `UNION ALL` / `INTERSECT` / `EXCEPT` and parenthesised
@@ -393,8 +416,17 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
     -- Subquery aliases map to *nothing*: `itpv.pur.vendn` labels as `pur.vendn`, so a derived-table
     -- query and its flattened twin agree on output labels.
     let aliasMap := collectAliases dbs ++ (collectSubqueryAliases dbs).map (fun a => (a, .anonymous))
+    -- `GROUP BY ROLLUP/CUBE/GROUPING SETS(…)`: group over the union of the construct's columns, then
+    -- wrap the result in the opaque `groupSetMark spec` so identical grouping-set queries prove equal
+    -- while distinct constructs never do. See `detectGroupingSet` / `groupSetMark`.
+    let (groupItems, gsSpec?) := match detectGroupingSet groupItems with
+      | some (spec, cols) => (cols, some spec)
+      | none => (groupItems, none)
     let (rel, outSchema) ← elabSelect sel combinedSchema filteredExpr groupItems groups.isSome
       havingT? aliasMap
+    let rel ← match gsSpec? with
+      | some spec => mkAppM ``groupSetMark #[toExpr spec, rel]
+      | none => pure rel
     let rel ← if distinct?.isSome then mkAppM ``distinct #[rel] else pure rel
     -- ORDER BY resolves against the (base-qualified) output labels, so baseify its column refs too.
     let ordCols? := ord.map (fun ords => ords.getElems.toList.map

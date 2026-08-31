@@ -53,3 +53,8 @@ supportInterpreter = true
 name = "runall"
 root = "Bench.RunAll"
 supportInterpreter = true
+
+[[lean_exe]]
+name = "refute"
+root = "Bench.Refute"
+supportInterpreter = true

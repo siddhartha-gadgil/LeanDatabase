@@ -22,26 +22,73 @@ PATTERNS = [
 ]
 
 
+# `a.b = c.d` — a comparison between two column refs propagates the type from one side to the other.
+COL_CMP = re.compile(r"([A-Za-z_][\w.]*)\s*(?:=|<>|!=)\s*([A-Za-z_][\w.]*)")
+
+
+def bare(name: str) -> str:
+    return name.split(".")[-1].upper()
+
+
 def string_columns(sql: str) -> set[str]:
     """Bare column names (last component, upper-cased) compared against a string literal."""
     out = set()
     for pat in PATTERNS:
         for m in pat.finditer(sql):
-            out.add(m.group(1).split(".")[-1].upper())
+            out.add(bare(m.group(1)))
+    return out
+
+
+def propagate(sqls: list[str], seeds: set[str]) -> set[str]:
+    """Close `seeds` under column-to-column comparisons: `DNAME = PDEPT` makes PDEPT a string too.
+
+    The datasets type every column INT, so a column is only known to be a string through *use*; a
+    comparison is exactly such a use, and SQL has no cross-type `=`, so the two sides share a type.
+    """
+    edges: set[tuple[str, str]] = set()
+    for sql in sqls:
+        for m in COL_CMP.finditer(sql):
+            a, b = bare(m.group(1)), bare(m.group(2))
+            if a != b and not b.isdigit():
+                edges.add((a, b))
+    out = set(seeds)
+    changed = True
+    while changed:
+        changed = False
+        for a, b in edges:
+            for x, y in ((a, b), (b, a)):
+                if x in out and y not in out:
+                    out.add(y); changed = True
     return out
 
 
 def retype(dataset: str):
-    changed = 0
-    for name, keys in [("corpus_pg.json", ["query"]), ("pairs.json", ["first", "second"])]:
+    """Infer the string columns of each *problem* (pooling both its queries, in both files) and apply."""
+    files = [("corpus_pg.json", ["query"]), ("pairs.json", ["first", "second"])]
+    loaded = []
+    sqls_by_problem: dict[str, list[str]] = {}
+    for name, keys in files:
         path = ROOT / dataset / name
         if not path.exists():
             continue
         recs = json.loads(path.read_text())
+        loaded.append((path, keys, recs))
         for rec in recs:
-            cols = set()
-            for k in keys:
-                cols |= string_columns(rec.get(k, ""))
+            pid = rec.get("id", "").split(":")[0]
+            sqls_by_problem.setdefault(pid, []).extend(rec.get(k, "") for k in keys)
+
+    # One query of a problem may carry the literal that types a column its sibling only compares.
+    strings_by_problem = {}
+    for pid, sqls in sqls_by_problem.items():
+        seeds = set()
+        for sql in sqls:
+            seeds |= string_columns(sql)
+        strings_by_problem[pid] = propagate(sqls, seeds) if seeds else seeds
+
+    changed = 0
+    for path, _keys, recs in loaded:
+        for rec in recs:
+            cols = strings_by_problem.get(rec.get("id", "").split(":")[0], set())
             for schema in rec.get("schemas", []):
                 for col in schema.get("columns", []):
                     if col["name"].upper() in cols and col["type"].upper() != "STRING":

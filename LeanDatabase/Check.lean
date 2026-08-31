@@ -26,7 +26,7 @@ open Lean Meta Elab Term
 namespace LeanDatabase
 
 /-- Parse one `schemas` entry into the `(name, columns)` shape the parser expects. -/
-private def parseSchema (schema : Json) : TermElabM (Name × List (Name × SQLTypeProxy)) := do
+def parseSchema (schema : Json) : TermElabM (Name × List (Name × SQLTypeProxy)) := do
   let .ok name := schema.getObjValAs? Name "name" | throwError "Missing schema name"
   let .ok cols := schema.getObjValAs? (List Json) "columns" | throwError "Missing schema columns"
   let colStrs : List (Name × SQLTypeProxy) ← cols.mapM fun colJson => do
@@ -43,7 +43,9 @@ private def hypothesisProp
   let .ok tblRaw := h.getObjValAs? Name "table" | throwError "HYPOTHESIS: missing `table`"
   let tbl := lowerName tblRaw
   let some tvar := tvarOf tbl | throwError "HYPOTHESIS: unknown table {tblRaw}"
-  let some (_, cols) := schemasStr.find? (·.1 == tbl)
+  -- The schema names come straight from the JSON (`ITM`), the hypothesis' table is lowered, so the
+  -- lookup has to compare case-insensitively — as `parseSqlQuery` does for the query's own idents.
+  let some (_, cols) := schemasStr.find? (fun (n, _) => lowerName n == tbl)
     | throwError "HYPOTHESIS: unknown table {tblRaw}"
   let (tupleType, _, schemaExprs) ← columnProjectionsE (cols.map (fun (c, ty) => (lowerName c, ty)))
   let proj (c : Name) : TermElabM Expr := do
@@ -67,6 +69,21 @@ private def hypothesisProp
     -- `k` determines the whole row: `det` is the identity `fun r => r` (matching the file `UNIQUE` sugar).
     let idTuple ← withLocalDeclD `r tupleType fun r => mkLambdaFVars #[r] r
     mkAppM ``LeanDatabase.FuncDepEq #[← proj k, idTuple, tvar]
+  else if let .ok fk := h.getObjValAs? (List Name) "foreign" then
+    -- `"foreign": [childCol, parentTable, parentCol]` — referential integrity across two tables, so
+    -- unlike the other kinds this one needs the *parent's* table variable and column projections too.
+    match fk with
+    | [c, ptbl, pcol] =>
+      let pt := lowerName ptbl
+      let some ptvar := tvarOf pt | throwError "HYPOTHESIS: unknown table {ptbl}"
+      let some (_, pcols) := schemasStr.find? (fun (n, _) => lowerName n == pt)
+        | throwError "HYPOTHESIS: unknown table {ptbl}"
+      let (_, _, pSchemaExprs) ← columnProjectionsE (pcols.map (fun (c, ty) => (lowerName c, ty)))
+      let pcl := lowerName pcol
+      let some (_, pproj) := pSchemaExprs.find? (fun ((n, _), _) => n == pcl)
+        | throwError "HYPOTHESIS: unknown column {pcol} in table {ptbl}"
+      mkAppM ``LeanDatabase.ForeignKey #[← proj c, pproj, tvar, ptvar]
+    | _ => throwError "HYPOTHESIS: `foreign` expects [childCol, parentTable, parentCol]"
   else if let .ok bj := h.getObjValAs? (List Name) "bijection" then
     match bj with
     | [a, b] => mkAppM ``LeanDatabase.SamePartition #[← proj a, ← proj b, tvar]

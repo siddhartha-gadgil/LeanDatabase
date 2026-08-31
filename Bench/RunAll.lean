@@ -19,6 +19,22 @@ For each dataset under `Bench/` (default: CrossSkill, Calcite, Literature) this:
 the set that proves right now, so a regression just moves a file back to `Problems/` and is recorded.
 -/
 
+/-- First line of a (possibly multi-line) error, truncated — the per-record progress lines stay one
+line each. -/
+def firstLine (s : String) : String :=
+  let l := (s.splitOn "\n").headD s
+  if l.length ≤ 120 then l else (l.take 120).toString ++ "…"
+
+/-- Resolve a dataset name against the directories under `Bench/`, ignoring case, so `literature`
+finds `Bench/Literature`. -/
+def resolveDataset (ds : String) : IO (Option String) := do
+  let root : System.FilePath := "Bench"
+  unless ← root.pathExists do return none
+  for e in (← root.readDir) do
+    let name := e.fileName
+    if name.toLower == ds.toLower && (← (root / name).isDir) then return some name
+  return none
+
 /-- Map a JSON column type to the DDL keyword our `CREATE TABLE` macro accepts. -/
 def ddlType (t : String) : String :=
   match t.toUpper with
@@ -28,6 +44,18 @@ def ddlType (t : String) : String :=
   | "TIMESTAMP" | "DATE" | "DATETIME" => "TIMESTAMP"
   | _ => "STRING"
 
+/-- The `SQLTypeProxy` constructor for a DDL keyword — the theorem binds each table at its **literal**
+`TypedRelationOfList [...]` type rather than `TableRel T_schema`: the abbrev hides the column list
+behind a projection, and the membership route (`sql_membership`) then cannot normalise a join's
+`l₁ ++ l₂` type index, so nothing fires. -/
+def proxyOf (ddl : String) : String :=
+  match ddl with
+  | "INT" => "SQLTypeProxy.int"
+  | "FLOAT" => "SQLTypeProxy.float"
+  | "BOOL" => "SQLTypeProxy.bool"
+  | "TIMESTAMP" => "SQLTypeProxy.timestamp"
+  | _ => "SQLTypeProxy.string"
+
 /-- Sanitise an id into a valid identifier component (for the namespace). -/
 def sanitizeIdent (s : String) : String :=
   let cs := s.toList.map fun c => if c.isAlphanum then c else '_'
@@ -35,7 +63,7 @@ def sanitizeIdent (s : String) : String :=
 
 /-- Filename base for a pair id (`1:eq` → `1`; `sf035:eq_0_1` → `sf035_eq_0_1`). -/
 def fileBase (s : String) : String :=
-  let s := if s.endsWith ":eq" then s.dropRight 3 else s
+  let s := if s.endsWith ":eq" then (s.dropEnd 3).toString else s
   String.ofList (s.toList.map fun c => if c.isAlphanum then c else '_')
 
 def escapeSql (s : String) : String := (s.replace "\\" "\\\\").replace "\"" "\\\""
@@ -48,6 +76,7 @@ def genTheorem (rec : Json) (tactic : String) : String := Id.run do
   let schemas := (rec.getObjValAs? (List Json) "schemas").toOption.getD []
   let mut creates := ""
   let mut refs : List String := []
+  let mut types : List String := []
   for s in schemas do
     let name := (s.getObjValAs? String "name").toOption.getD "T"
     let cols := (s.getObjValAs? (List Json) "columns").toOption.getD []
@@ -57,19 +86,23 @@ def genTheorem (rec : Json) (tactic : String) : String := Id.run do
       s!"«{cn}» {ct}")
     creates := creates ++ s!"CREATE TABLE {name} ({colDdl})\n"
     refs := refs ++ [s!"{name}_schema"]
+    types := types ++ [", ".intercalate (cols.map fun c =>
+      proxyOf (ddlType ((c.getObjValAs? String "type").toOption.getD "STRING")))]
   let ns := sanitizeIdent id
   let reflist := ", ".intercalate refs
+  -- The theorem is stated **applied to table binders** (`(t0 : TableRel A_schema) … : q₁ t0 ~= q₂ t0`),
+  -- the same goal the census proves: `~=` compares rows only, and it is not defined on the *function*
+  -- `sql%` returns, so a bare `q₁ ~= q₂` would not even typecheck. A non-`dataEq` pair keeps `=`.
+  let binders := String.join ((types.zipIdx).map fun (ty, i) =>
+    s!" (t{i} : TypedRelationOfList [{ty}])")
+  let args := String.join ((refs.zipIdx).map fun (_, i) => s!" t{i}")
+  let op := if (rec.getObjValAs? Bool "dataEq").toOption.getD true then "~=" else "="
   "import LeanDatabase.Parser\nimport LeanDatabase.SQLSyntax\nopen LeanDatabase Lean\n" ++
   "set_option maxHeartbeats 1000000\nset_option maxRecDepth 1000000\n\n" ++
   s!"namespace {ns}\n\n{creates}\n" ++
-  s!"theorem eq :\n    sql%([{reflist}]) \"{escapeSql first}\"\n" ++
-  s!"  = sql%([{reflist}]) \"{escapeSql second}\"\n  := by {tactic}\n\n" ++
+  s!"theorem eq{binders} :\n    (sql%([{reflist}]) \"{escapeSql first}\"){args}\n" ++
+  s!"  {op} (sql%([{reflist}]) \"{escapeSql second}\"){args}\n  := by {tactic}\n\n" ++
   s!"end {ns}\n"
-
-/-- Remove a pair's file from a directory if present. -/
-def rmIfExists (dir base : String) : IO Unit := do
-  let p : System.FilePath := s!"{dir}/{base}.lean"
-  if ← p.pathExists then IO.FS.removeFile p
 
 unsafe def runElabCensus (env : Environment) (ctx : Core.Context) (ds : String) : IO Unit := do
   let path : System.FilePath := s!"Bench/{ds}/corpus_pg.json"
@@ -77,15 +110,20 @@ unsafe def runElabCensus (env : Environment) (ctx : Core.Context) (ds : String) 
   let .ok (.arr recs) := Json.parse (← IO.FS.readFile path) | return
   let mut ok : Nat := 0
   let mut results : Array Json := #[]
-  for rec in recs do
-    let id := (rec.getObjValAs? String "id").toOption.getD "?"
+  for h : i in [0 : recs.size] do
+    let r := recs[i]
+    let id := (r.getObjValAs? String "id").toOption.getD "?"
     let ctx := { ctx with initHeartbeats := (← IO.getNumHeartbeats) }
-    let v ← ((elabCheckCore rec).run' ctx { env := env }).toIO'
+    let v ← ((elabCheckCore r).run' ctx { env := env }).toIO'
     let status := match v with
       | .ok j => (j.getObjValAs? String "status").toOption.getD "fail"
       | .error _ => "fail"
     let err := match v with | .ok j => (j.getObjValAs? String "error").toOption.getD "?" | .error _ => "exn"
     if status == "ok" then ok := ok + 1
+    -- One line per query, flushed, so a long census shows progress instead of going silent.
+    IO.println (if status == "ok" then s!"[{ds}] elab {i + 1}/{recs.size} ok    {id}"
+                else s!"[{ds}] elab {i + 1}/{recs.size} FAIL  {id}: {firstLine err}")
+    (← IO.getStdout).flush
     results := results.push (Json.mkObj [("id", Json.str id), ("status", Json.str status),
       ("error", if status == "ok" then Json.null else Json.str err)])
   IO.FS.writeFile s!"Bench/{ds}/elab_results.json"
@@ -93,53 +131,89 @@ unsafe def runElabCensus (env : Environment) (ctx : Core.Context) (ds : String) 
                  ("results", Json.arr results)]).pretty
   IO.println s!"[{ds}] ELABORATES: {ok}/{recs.size}"
 
-unsafe def runProveSync (env : Environment) (ctx : Core.Context) (ds : String) : IO Unit := do
+/-- Fast pass: clear both dirs and write EVERY pair to `Problems/` (the complete set). `Proven/` (a
+subset) is filled later by proving. Runs for all datasets before any slow census so files appear at once. -/
+def populateProblems (ds : String) : IO Unit := do
   let path : System.FilePath := s!"Bench/{ds}/pairs.json"
-  unless ← path.pathExists do IO.println s!"[{ds}] no pairs.json, skipping prove"; return
+  unless ← path.pathExists do IO.println s!"[{ds}] no pairs.json"; return
   let .ok (.arr recs) := Json.parse (← IO.FS.readFile path) | return
-  -- Authoritative: clear both dirs, then regenerate every pair into exactly one of them.
   for dir in [s!"Bench/{ds}/Proven", s!"Bench/{ds}/Problems"] do
     let d : System.FilePath := dir
     if ← d.pathExists then
       for e in (← d.readDir) do
         if e.path.extension == some "lean" then IO.FS.removeFile e.path
     IO.FS.createDirAll dir
-  let mut proved : Nat := 0
-  let mut results : Array Json := #[]
   for rec in recs do
-    let id := (rec.getObjValAs? String "id").toOption.getD "?"
+    let base := fileBase ((rec.getObjValAs? String "id").toOption.getD "?")
+    IO.FS.writeFile s!"Bench/{ds}/Problems/{base}.lean" (genTheorem rec "first | sql_equiv | sorry")
+  IO.println s!"[{ds}] Problems: {recs.size} (all pairs)"
+
+unsafe def runProveSync (env : Environment) (ctx : Core.Context) (ds : String) : IO Unit := do
+  let path : System.FilePath := s!"Bench/{ds}/pairs.json"
+  unless ← path.pathExists do return
+  let .ok (.arr recs) := Json.parse (← IO.FS.readFile path) | return
+  let mut proved : Nat := 0
+  let mut elaborated : Nat := 0
+  let mut results : Array Json := #[]
+  -- One pass per pair (file-wise): `provePair` parses + elaborates both queries, THEN runs `sql_equiv`
+  -- — so a single call gives us both statuses. An exception (`err`) means it never elaborated; no error
+  -- + `proved` false means it elaborated but the tactic couldn't close it.
+  for h : i in [0 : recs.size] do
+    let r := recs[i]
+    let id := (r.getObjValAs? String "id").toOption.getD "?"
     let base := fileBase id
     let ctx := { ctx with initHeartbeats := (← IO.getNumHeartbeats) }
-    let v ← ((provePairCore rec).run' ctx { env := env }).toIO'
+    let v ← ((provePairCore r).run' ctx { env := env }).toIO'
     let (ok, err) ← match v with
       | .ok j => pure ((j.getObjValAs? Bool "proved").toOption.getD false,
                        (j.getObjValAs? String "error").toOption)
       | .error e => do pure (false, some s!"exception: {← e.toMessageData.toString}")
-    -- Sync: proving → Proven/, else → Problems/. Remove the stale counterpart.
+    let didElab := err.isNone
+    if didElab then elaborated := elaborated + 1
     if ok then
       proved := proved + 1
-      rmIfExists s!"Bench/{ds}/Problems" base
-      IO.FS.writeFile s!"Bench/{ds}/Proven/{base}.lean" (genTheorem rec "sql_equiv")
-    else
-      rmIfExists s!"Bench/{ds}/Proven" base
-      IO.FS.writeFile s!"Bench/{ds}/Problems/{base}.lean" (genTheorem rec "first | sql_equiv | sorry")
+      IO.FS.writeFile s!"Bench/{ds}/Proven/{base}.lean" (genTheorem r "sql_equiv")
+    -- One line per pair, flushed. Status: PROVED | UNPROVED (elaborated, tactic failed) | ELAB-FAIL.
+    let tag := if ok then "PROVED  " else if didElab then "UNPROVED" else "ELAB-FAIL"
+    IO.println (s!"[{ds}] {i + 1}/{recs.size} {tag} {id}"
+                ++ (match err with | some e => s!": {firstLine e}" | none => ""))
+    (← IO.getStdout).flush
     results := results.push (Json.mkObj [("id", Json.str id), ("proved", Json.bool ok),
-      ("error", match err with | some e => Json.str e | none => Json.null)])
+      ("elaborated", Json.bool didElab), ("error", match err with | some e => Json.str e | none => Json.null)])
   IO.FS.writeFile s!"Bench/{ds}/prove_results.json"
-    (Json.mkObj [("proved", Json.num proved), ("total", Json.num recs.size),
-                 ("results", Json.arr results)]).pretty
-  IO.println s!"[{ds}] PROVED: {proved}/{recs.size}"
+    (Json.mkObj [("proved", Json.num proved), ("elaborated", Json.num elaborated),
+                 ("total", Json.num recs.size), ("results", Json.arr results)]).pretty
+  IO.println s!"[{ds}] elaborated {elaborated}/{recs.size}, PROVED {proved}/{recs.size} (Proven ⊆ Problems)"
 
 unsafe def main (args : List String) : IO UInt32 := do
   enableInitializersExecution
   initSearchPath (← findSysroot)
+  IO.println "runall: loading Mathlib + LeanDatabase environment (~1 min)…"
+  (← IO.getStdout).flush
   let env ← importModules (loadExts := true) #[{module := `Mathlib}, {module := `LeanDatabase}] {}
+  IO.println "runall: environment loaded."; (← IO.getStdout).flush
+  -- Heartbeats: the `Core.Context.maxHeartbeats` FIELD is in raw units = 1000× the `maxHeartbeats`
+  -- *option*, whose default is 200000 (field 200_000_000). We use 4× the default (~30 s of work) so
+  -- proofs that need a bit longer succeed while failures still trip in bounded time.
+  -- `maxRecDepth` is kept MODERATE (not ~1M): a runaway recursion (e.g. a malformed query) must hit the
+  -- Lean recursion-depth *error* — which `provePairCore` catches — before it overflows the OS stack.
+  let opts := Lean.maxRecDepth.set (Lean.maxHeartbeats.set {} 800000) 8000
   let ctx : Core.Context :=
     { fileName := "", fileMap := { source := "", positions := #[] },
-      options := Lean.maxRecDepth.set {} 1000000, maxHeartbeats := 100000000, maxRecDepth := 1000000 }
-  let datasets := if args.isEmpty then ["CrossSkill", "Calcite", "Literature"] else args
+      options := opts, maxHeartbeats := 800000000, maxRecDepth := 8000 }
+  let requested := if args.isEmpty then ["CrossSkill", "Calcite", "Literature"] else args
+  let mut datasets := []
+  for ds in requested do
+    match ← resolveDataset ds with
+    | some real => datasets := datasets ++ [real]
+    | none => IO.eprintln s!"unknown dataset `{ds}` — no directory Bench/{ds}"
+  if datasets.isEmpty then return 1
+  -- First, populate every dataset's Problems/ (fast) so all appear immediately.
+  for ds in datasets do populateProblems ds
+  -- Then the slow work: one file-wise pass per dataset that elaborates + proves each pair (proving
+  -- subsumes elaboration, so there is no separate elab census here — use `elabcheck` for the
+  -- per-query corpus_pg.json coverage metric, which is a different granularity).
   for ds in datasets do
     IO.println s!"=== {ds} ==="
-    runElabCensus env ctx ds
     runProveSync env ctx ds
   return 0
