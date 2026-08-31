@@ -4,7 +4,7 @@ open LeanDatabase Lean
 set_option maxHeartbeats 1000000
 set_option maxRecDepth 1000000
 
-namespace Literature_51
+namespace N_51_eq
 
 CREATE TABLE COURSE («COURSE_ID» INT, «TITLE» INT, «DEPT_NAME» INT, «CREDITS» INT)
 CREATE TABLE DEPARTMENT («DEPT_NAME» INT, «BUILDING» INT, «BUDGET» INT)
@@ -19,4 +19,4 @@ theorem eq :
   = sql%([COURSE_schema, DEPARTMENT_schema, INSTRUCTOR_schema, TEACHES_schema, SECTION_schema, TAKES_schema, STUDENT_schema]) "SELECT C.DEPT_NAME, SUM(I.SALARY) FROM COURSE AS C INNER JOIN DEPARTMENT AS D ON (C.DEPT_NAME = D.DEPT_NAME) INNER JOIN INSTRUCTOR AS I ON (D.DEPT_NAME = I.DEPT_NAME) GROUP BY C.DEPT_NAME HAVING SUM(I.SALARY) >= 100 AND MAX(I.SALARY) < 75"
   := by first | sql_equiv | sorry
 
-end Literature_51
+end N_51_eq

@@ -47,7 +47,10 @@ elab_rules : term
     let xe ← elabTerm x none
     Term.synthesizeSyntheticMVarsNoPostponing
     let xt ← whnf (← instantiateMVars (← inferType xe))
-    let isInt := xt.isConstOf ``Int
+    -- A bare numeric literal defaults to `ℕ`; coerce to `Int` so `CAST(10 AS …)` is handled.
+    let isNat := xt.isConstOf ``Nat
+    let xe ← if isNat then mkAppM ``Int.ofNat #[xe] else pure xe
+    let isInt := xt.isConstOf ``Int || isNat
     let isRat := xt.isConstOf ``Rat
     let isStr := xt.isConstOf ``String
     let toFloat : TermElabM Expr := do
@@ -83,6 +86,28 @@ elab_rules : term
     | `(sql_cast_type| ARRAY) => toStr
     | `(sql_cast_type| BOOLEAN) => toBool
     | _ => throwUnsupportedSyntax
+
+/-- `B1(X)` / `B(X, Y)` — an uninterpreted predicate over the named rows. Each argument expands to the
+in-scope columns it owns (a FROM item) or to itself (a column); the values are folded, through the
+opaque `toChar`, into one string keyed by the predicate's name and handed to the opaque `toBoolOpaque`.
+Sound by construction: the result is a *function of those values only*, so `σ_B1(σ_B2 R) = σ_B2(σ_B1 R)`
+goes through while nothing about `B1` itself is assumed. -/
+elab_rules : term
+  | `($f:ident($args:ident,*)) => do
+    let lctx ← getLCtx
+    let mut acc : Syntax.Term := ⟨Syntax.mkStrLit s!"{f.getId}|"⟩
+    for a in args.getElems do
+      let owner := a.getId
+      -- Columns owned by this argument, in schema order; `…proj` decls are the projection functions.
+      let owned := lctx.decls.toList.filterMap fun d? => do
+        let d ← d?
+        guard (d.isLet && owner.isPrefixOf d.userName && d.userName != owner)
+        guard ((d.userName.components.getLast?).getD .anonymous != `proj)
+        some d.userName
+      let vals := if owned.isEmpty then [owner] else owned
+      for v in vals do
+        acc ← `($acc ++ $(mkIdent ``LeanDatabase.Scalar.toChar) $(mkIdent v))
+    elabTerm (← `($(mkIdent ``LeanDatabase.Scalar.toBoolOpaque) $acc)) (mkConst ``Bool)
 
 /-! ## Column-binding context -/
 
@@ -192,9 +217,14 @@ def expandNames (labels : List Name) (stx: Syntax) (aliases : List (Name × Name
     -- prefixes so base/alias/lateral qualified refs (`t.col`, `e.col`, `h.value`) are untouched.
     if subqAliases.any (fun a => a != idName && a.isPrefixOf idName) then
       return some (mkIdent ((idName.components.getLast?).getD idName))
-    -- Alias-as-owner: an alias-qualified `x.col` is kept as-is — `productPair` binds an aliased table's
-    -- columns under `x.col`, so the reference matches the binding directly (and self-joins stay distinct).
-    match aliases.find? (fun (a, _) => a != idName && a.isPrefixOf idName) with
+    -- Already a declared column (`instructor.id`) → final. Without this, a *column* whose name
+    -- matches a table (`teaches.instructor`) would re-qualify the ref to `teaches.instructor.id`.
+    if labels.contains idName then return none
+    -- Alias-as-owner: an alias-qualified `x.col` — and the alias binder `x` itself — is kept as-is.
+    -- `productPair` binds an aliased table's columns under `x.col`, so the reference matches the binding
+    -- directly (self-joins stay distinct), and an alias that shares a column's name (`R1 AS X` over
+    -- `R1(X, Y)`) is not re-qualified into `r1.x`.
+    match aliases.find? (fun (a, _) => a.isPrefixOf idName) with
     | some _ => return none
     | none =>
       match pairs.find? (fun (shorter, _) => shorter.isPrefixOf idName) with
@@ -509,8 +539,21 @@ what lets `sql_equiv` see through a projecting CTE (ROADMAP 3.3). -/
 /-! ## Per-operator elaborators -/
 
 -- This is the "WHERE" part of a SQL query, which is a function from a TypedRelation to a TypedRelation. This is to be applied to the database, which may be a single schema or built from multiple schemas.
-def elabTypedTupleFilter (schemas : List (Name × List (Name × SQLTypeProxy))) (stx: Syntax) : TermElabM Expr := do
-  withSchemasTupleVars schemas (stx.hasIdent) (fun vars =>
+/-- A column is "used" by `stx` if it is named outright **or** its owner is (`B1(X)` references every
+column of `X`), so the row-predicate arguments stay bound. -/
+def usedByOrOwned (stx : Syntax) (n : Name) : Bool := Id.run do
+  if stx.hasIdent n then return true
+  let mut p := Name.anonymous
+  for c in n.components do
+    p := p ++ c
+    if p != n && stx.hasIdent p then return true
+  return false
+
+/-- `usedStx` decides which columns get bound; it defaults to `stx` but a caller that rewrote the
+syntax (stashing a scalar subquery hides the outer columns its correlation names) passes the original. -/
+def elabTypedTupleFilter (schemas : List (Name × List (Name × SQLTypeProxy))) (stx: Syntax)
+    (usedStx : Syntax := stx) : TermElabM Expr := do
+  withSchemasTupleVars schemas (usedByOrOwned usedStx) (fun vars =>
     mkLambdaLetsFVars vars (elabTermEnsuringType stx (mkConst ``Bool)))
 
 def elabTypedTupleGroupFilter (schemas : List (Name × List (Name × SQLTypeProxy))) (stx: Syntax) (groupTerms : List Syntax.Term) (relE: Expr) (aggs : List (Name × AggKind × Syntax.Term)) : TermElabM Expr := do

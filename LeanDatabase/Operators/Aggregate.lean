@@ -411,6 +411,11 @@ For `GROUP BY` apply these to `group key k rel`. `MAX`/`MIN` are NULL-aware (`Wi
 /-- `COUNT(*)`. -/
 @[simp, grind] def relCount (rel : TypedRelation colType) : Nat := rel.rows.card
 
+/-- The value of a scalar subquery whose shape isn't one of the real aggregates below (grouped,
+set-operated, …). Uninterpreted, and a function of the **relation** alone: two provably equal inner
+relations give the same value, and nothing else about it is ever assumed. -/
+opaque relScalarOpaque (rel : TypedRelation colType) : Int := 0
+
 /-- `SUM(f)`. -/
 @[simp, grind] def relSum (f : TypedTuple colType → Int) (rel : TypedRelation colType) : Int :=
   ∑ t ∈ rel.rows, f t

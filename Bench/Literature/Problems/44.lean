@@ -4,7 +4,7 @@ open LeanDatabase Lean
 set_option maxHeartbeats 1000000
 set_option maxRecDepth 1000000
 
-namespace Literature_44
+namespace N_44_eq
 
 CREATE TABLE COURSE («COURSE_ID» INT, «TITLE» INT, «DEPT_NAME» INT, «CREDITS» INT)
 CREATE TABLE DEPARTMENT («DEPT_NAME» INT, «BUILDING» INT, «BUDGET» INT)
@@ -19,4 +19,4 @@ theorem eq :
   = sql%([COURSE_schema, DEPARTMENT_schema, INSTRUCTOR_schema, TEACHES_schema, SECTION_schema, TAKES_schema, STUDENT_schema]) "WITH S AS (SELECT ID, TIME_SLOT_ID, YEAR FROM TAKES NATURAL JOIN SECTION GROUP BY ID, TIME_SLOT_ID, YEAR HAVING COUNT(TIME_SLOT_ID) > 5) SELECT DISTINCT ID, NAME FROM S NATURAL JOIN STUDENT"
   := by first | sql_equiv | sorry
 
-end Literature_44
+end N_44_eq

@@ -122,9 +122,20 @@ macro "sql_equiv" : tactic => `(tactic|
      | refine Finset.image_congr (fun _ _ => ?_)
      | sql_simp
      | (apply funext; intro _))
+   -- Closing fallbacks — tried in order, each fully closes the goal or backtracks (so appending more
+   -- only ever proves *more*, never breaks an existing proof). Covers: relation/function/Finset
+   -- equalities, the membership route (`x ∈ σ/π/∪` unfolds to `∧`/`∨`), and arithmetic residues.
    all_goals (first
      | grind +locals
      | (apply Finset.ext; (try sql_simp); grind +locals)
-     | (apply Finset.ext; intro _; sql_simp; grind +locals))))
+     | (apply Finset.ext; intro _; (try sql_simp); grind +locals)
+     | (apply TypedRelation.ext (by rfl); (try sql_simp); grind +locals)
+     | (funext _; (try sql_simp); grind +locals)
+     | (apply Finset.ext; intro _
+        simp only [Finset.mem_filter, Finset.mem_image, Finset.mem_union, Finset.mem_inter,
+          Finset.mem_sdiff]
+        (try sql_simp); first | grind +locals | tauto)
+     | (sql_simp; first | grind +locals | tauto | omega)
+     | (funext _; apply Finset.ext; intro _; (try sql_simp); first | grind +locals | tauto))))
 
 end LeanDatabase.SQLEquiv

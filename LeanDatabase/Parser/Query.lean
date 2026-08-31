@@ -1,4 +1,5 @@
 import LeanDatabase.Parser.Context
+import LeanDatabase.Operators.Values
 import LeanDatabase.Parser.Alias
 import LeanDatabase.Parser.GroupBy
 import LeanDatabase.Parser.Handlers.Normalize
@@ -58,7 +59,14 @@ elab_rules : term
     | .count => mkAppM ``Int.ofNat #[← mkAppM ``relCount #[rel]]
     | .sum => mkAppM ``relSum #[d.summand.get!, rel]
     | .countDistinct => mkAppM ``Int.ofNat #[← mkAppM ``relCountDistinct #[d.summand.get!, rel]]
-    | _ => throwError "scalar subquery: only SUM / COUNT / COUNT(DISTINCT) are supported"
+    -- MAX / MIN reuse the grouped operators under a constant key (that group *is* the whole relation),
+    -- so their existing `grind` lemmas apply unchanged.
+    | .max | .min => do
+      let (tupleType, _, _) ← columnProjectionsE d.innerSchema
+      let key ← withLocalDeclD `t tupleType fun t => mkLambdaFVars #[t] (mkConst ``Unit.unit)
+      mkAppM (if d.kind == .max then ``groupMaxInt else ``groupMinInt)
+        #[key, mkConst ``Unit.unit, rel, d.summand.get!]
+    | _ => throwError "scalar subquery: only SUM / COUNT / COUNT(DISTINCT) / MAX / MIN are supported"
 
 def ofOption : {l : List SQLTypeProxy} →
     ((i : Fin l.length) → Option (colTypeOfList l i)) → TypedTupleOfList (l.map .nullable)
@@ -203,11 +211,54 @@ partial def resolveInScope (scopeLabels : List Name) (stx : Syntax) : Syntax := 
       match s with
       | .ident info raw val _ =>
         if val.components.length ≥ 2 && !(scopeLabels.contains val) then
-          match scopeLabels.filter (fun l => lastOf l == lastOf val) with
+          -- `x.c` under a derived-table alias resolves against *that* alias's columns first
+          -- (`itpv.itemn` → `itpv.itp.itemn`), so a same-named column elsewhere in scope can't clash.
+          let sameLast := scopeLabels.filter (fun l => lastOf l == lastOf val)
+          let pfx := val.getPrefix
+          match sameLast.filter (fun l => pfx.isPrefixOf l) with
           | [uniq] => return some (.ident info raw uniq [])
-          | _ => return none
+          | _ => match sameLast with
+            | [uniq] => return some (.ident info raw uniq [])
+            | _ => return none
         else return none
       | _ => return none
+
+/-- Map a Lean value type to its `SQLTypeProxy` (a bare `Nat` literal counts as `int`). -/
+def proxyOfType (e : Expr) : MetaM (Option SQLTypeProxy) := do
+  let e ← whnf e
+  if e.isConstOf ``Int || e.isConstOf ``Nat then pure (some .int)
+  else if e.isConstOf ``Rat then pure (some .float)
+  else if e.isConstOf ``String then pure (some .string)
+  else if e.isConstOf ``Bool then pure (some .bool)
+  else pure none
+
+/-- Build an inline `VALUES` relation: infer each column's type from the first row, elaborate every
+cell to that type, assemble the tuples, and hand them to `valuesRel`. Columns are labelled `alias.col`. -/
+def buildValues (rows : List (List Syntax.Term)) (cols : List Name) (alias_ : Name) :
+    TermElabM (Expr × List (Name × SQLTypeProxy)) := do
+  let some row0 := rows.head? | throwError "VALUES: no rows"
+  unless row0.length == cols.length do throwError "VALUES: row width ≠ column count"
+  -- Column types from the first row.
+  let tys ← row0.mapM fun cell => do
+    let e ← elabTerm cell none
+    Term.synthesizeSyntheticMVarsNoPostponing
+    let some p ← proxyOfType (← instantiateMVars (← inferType e))
+      | throwError "VALUES: unsupported cell type in {cell}"
+    pure p
+  let lE ← sqlTypeListExpr tys
+  -- Each row → a `TypedTupleOfList tys` (built right-to-left with `cons`), each cell at its column type.
+  let tuples ← rows.mapM fun row => do
+    unless row.length == tys.length do throwError "VALUES: ragged rows"
+    let mut tup ← mkAppOptM ``TypedTupleOfList.nil #[]
+    for (cell, ty) in (row.zip tys).reverse do
+      let v ← elabTermEnsuringType cell (typeExpr ty)
+      tup ← mkAppM ``TypedTupleOfList.cons #[toExpr ty, v, tup]
+    pure tup
+  let tupleTy ← mkAppM ``TypedTupleOfList #[lE]
+  let rowsE ← mkListLit tupleTy tuples
+  let labels := cols.map (fun c => toString (alias_ ++ c))
+  let rel ← mkAppM ``valuesRel #[lE, ← mkListLit (mkConst ``String) (labels.map (mkStrLit ·)), rowsE]
+  return (rel, (cols.map (alias_ ++ ·)).zip tys)
 
 /--
 This is the main entry point for parsing a full SQL query (`SELECT` / `FROM` / `WHERE` / `GROUP BY`),
@@ -224,6 +275,16 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
   let vars := tableVars.map (fun (relVar, _, _) => relVar)
   match stx with
   | `(sql_query| ( $q:sql_query )) => elabSqlQueryCore tableVars ctes q
+  | `(sql_query| VALUES $rows,*) => do
+    -- Inline literal relation: constant in the table vars. Placeholder column names `c0…`; the outer
+    -- `(…) AS t(cols)` from-source relabels them.
+    let rowLists ← rows.getElems.toList.mapM fun r => match r with
+      | `(sql_values_row| ( $es,* )) => pure es.getElems.toList
+      | _ => throwError "malformed VALUES row"
+    let ncols := (rowLists.head?.map (·.length)).getD 0
+    let names := (List.range ncols).map (fun i => Name.mkSimple s!"c{i}")
+    let (rel, schema) ← buildValues rowLists names .anonymous
+    return (← mkLambdaFVars vars.toArray rel, schema)
   | `(sql_query| WITH $cs:sql_cte,* $body:sql_query) => do
     -- Non-recursive CTEs: elaborate each body to a relation over the current base vars, re-qualify
     -- its columns under the CTE name, and make it available for lookup (inlined at each reference).
@@ -312,12 +373,19 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
     let sel : TSyntax `sql_cols := ⟨resolveInScope scopeLabels sel⟩
     let filter? := filter?.map (fun f => (⟨resolveInScope scopeLabels f⟩ : Syntax.Term))
     let havingT? := having?.join.map (fun h => (⟨resolveInScope scopeLabels h⟩ : Syntax.Term))
-    let filteredExpr ← match filter? with
-      | some filter => elabWhere productExpr combinedSchema filter
-      | none => pure productExpr
+    -- A scalar subquery used as a *value* inside `WHERE`/`HAVING` becomes a stashed placeholder, like
+    -- one in the SELECT list, so its (possibly correlated) inner `WHERE` elaborates with this row bound.
+    let filterOrig? := filter?
+    let filter? ← filter?.mapM stashTermSubqueries
+    let havingT? ← havingT?.mapM stashTermSubqueries
+    let filteredExpr ← match filter?, filterOrig? with
+      | some filter, some orig => elabWhere productExpr combinedSchema filter orig
+      | _, _ => pure productExpr
     let groupItems := ((groups.map (·.getElems)).getD #[]).map
       (fun g => (⟨resolveInScope scopeLabels g⟩ : Syntax.Term))
-    let aliasMap := collectAliases dbs
+    -- Subquery aliases map to *nothing*: `itpv.pur.vendn` labels as `pur.vendn`, so a derived-table
+    -- query and its flattened twin agree on output labels.
+    let aliasMap := collectAliases dbs ++ (collectSubqueryAliases dbs).map (fun a => (a, .anonymous))
     let (rel, outSchema) ← elabSelect sel combinedSchema filteredExpr groupItems groups.isSome
       havingT? aliasMap
     let rel ← if distinct?.isSome then mkAppM ``distinct #[rel] else pure rel
@@ -417,14 +485,20 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       -- `base.col`) AND for CTE columns (bare `col`, which `replacePrefix` could not touch).
       let (e, cols) ← productPair (← `(sql_from| $t:ident))
       return (e, cols.map (fun (n, ty) => (x.getId ++ (n.components.getLast?).getD n, ty)))
-    | `(sql_from| ( $sub:sql_query ) AS $_alias:ident)
-    | `(sql_from| ( $sub:sql_query ) $_alias:ident) => do
+    | `(sql_from| ( $sub:sql_query ) AS $al:ident $[( $cols,* )]?)
+    | `(sql_from| ( $sub:sql_query ) $al:ident $[( $cols,* )]?) => do
       let (lamSub, subSchema) ← elabSqlQueryCore tableVars ctes sub
       let vars := tableVars.map (fun (relVar, _, _) => relVar)
-      -- Keep the subquery's own output column names (do NOT re-prefix under the alias): `expandNames`
-      -- qualifies a bare outer ref to the base table those columns came from, and the per-scope bare
-      -- binding (`withLetColumnVars`) resolves bare refs — re-prefixing would break both.
-      return (lamSub.beta vars.toArray, subSchema)
+      match cols with
+      | some cs =>
+        -- Explicit column-alias list: relabel the subquery's output columns to `alias.col`.
+        let names := cs.getElems.toList.map (fun c => al.getId ++ c.getId)
+        return (lamSub.beta vars.toArray, names.zip (subSchema.map (·.2)))
+      | none =>
+        -- Qualify under the alias but **keep** the subquery's own name (`itpv.itp.itemn`): the prefix
+        -- makes `itpv.itemn` resolve here (`resolveInScope`) instead of being ambiguously bare, and the
+        -- retained inner name is what the output label reverts to (`aliasMap` maps the alias away).
+        return (lamSub.beta vars.toArray, subSchema.map (fun (n, ty) => (al.getId ++ n, ty)))
     -- `LATERAL FLATTEN` — correlated unnest appended to the left FROM (see `flattenArm`). Matched
     -- before the plain comma so `f1 , LATERALFLATTEN(e) …` doesn't fall through to a cross product.
     | `(sql_from| $f1:sql_from , LATERALFLATTEN( $e:term ) AS $h:ident ( $cols:ident,* ))
@@ -452,6 +526,11 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
     | `(sql_from| $f1:sql_from FULL JOIN $t:ident ON $cond:term)
     | `(sql_from| $f1:sql_from FULL OUTER JOIN $t:ident ON $cond:term) =>
       outerJoin f1 t none cond ``fullOuterJoin ``ofOuterFull true true
+    | `(sql_from| $f1:sql_from NATURAL JOIN $t:ident) =>
+      naturalJoin f1 (← `(sql_from| $t:ident))
+    | `(sql_from| $f1:sql_from NATURAL JOIN $t:ident AS $x:ident)
+    | `(sql_from| $f1:sql_from NATURAL JOIN $t:ident $x:ident) =>
+      naturalJoin f1 (← `(sql_from| $t:ident AS $x:ident))
     -- Aliased-RHS joins: build with the alias-renamed right table (so self-joins get distinct cols).
     | `(sql_from| $f1:sql_from JOIN $t:ident AS $x:ident ON $cond:term)
     | `(sql_from| $f1:sql_from JOIN $t:ident $x:ident ON $cond:term) =>
@@ -480,6 +559,14 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       innerJoin f1 (← `(sql_from| $t:ident)) (some cond)
     | `(sql_from| $f1:sql_from CROSS JOIN $t:ident) =>
       innerJoin f1 (← `(sql_from| $t:ident)) none
+    -- Subquery-RHS INNER / CROSS joins: elaborate the subquery, prefix its columns under the alias
+    -- (`x.col`) so an `ON`/`WHERE` ref `x.col` resolves and can't clash with a same-named left column.
+    | `(sql_from| $f1:sql_from JOIN ( $sub:sql_query ) AS $x:ident ON $cond:term)
+    | `(sql_from| $f1:sql_from JOIN ( $sub:sql_query ) $x:ident ON $cond:term) =>
+      subqueryJoin f1 sub x.getId (some cond)
+    | `(sql_from| $f1:sql_from CROSS JOIN ( $sub:sql_query ) AS $x:ident)
+    | `(sql_from| $f1:sql_from CROSS JOIN ( $sub:sql_query ) $x:ident) =>
+      subqueryJoin f1 sub x.getId none
     -- `JOIN u USING (a, b)` — inner join equating each shared column (`f.a = u.a AND …`).
     | `(sql_from| $f1:sql_from JOIN $t:ident USING ( $cols:ident,* )) => do
       let (e1, s1) ← productPair f1
@@ -519,6 +606,48 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
     let appended ← mkAppM ``TypedRelationOfList.append #[e1, e2]
     match cond? with
     | some cond => do
+      -- `ON` sits inside the FROM, so the SELECT arm's `resolveInScope` never saw it: re-qualify here
+      -- (`x.origin_city` → the derived table's `x.flights.origin_city`).
+      let cond : Term := ⟨resolveInScope (combined.map (·.1)) cond⟩
+      let condExpr ← elabTypedTupleFilter [(.anonymous, combined)] cond
+      return (← mkAppM ``restriction #[condExpr, appended], combined)
+    | none => return (appended, combined)
+  -- `A NATURAL JOIN B` — equi-join on every column name shared by the two sides (matched on the bare
+  -- last component), then project the right side's duplicates away, so a bare reference to a shared
+  -- column stays unambiguous and `SELECT *` doesn't repeat it.
+  naturalJoin (f1 rhs : TSyntax `sql_from) : TermElabM (Expr × List (Name × SQLTypeProxy)) := do
+    let (e1, s1) ← productPair f1
+    let (e2, s2) ← productPair rhs
+    let lastOf : Name → Name := fun n => (n.components.getLast?).getD n
+    let combined := s1 ++ s2
+    let appended ← mkAppM ``TypedRelationOfList.append #[e1, e2]
+    -- Each right-hand column that also occurs on the left, paired with its left counterpart.
+    let shared := s2.filterMap fun (n, _) =>
+      (s1.find? (fun (m, _) => lastOf m == lastOf n)).map (fun (m, _) => (m, n))
+    if shared.isEmpty then return (appended, combined)
+    let mut cond : Term ← `(true)
+    for (m, n) in shared do
+      cond ← `($cond && $(mkIdent m) = $(mkIdent n))
+    let condExpr ← elabTypedTupleFilter [(.anonymous, combined)] cond
+    let joined ← mkAppM ``restriction #[condExpr, appended]
+    let keep := s1 ++ s2.filter (fun (n, _) => !shared.any (fun (_, d) => d == n))
+    let (proj, types) ← elabTypedTupleProjection [(.anonymous, combined)]
+      (keep.map (fun (n, _) => mkIdent n))
+    let names := keep.map (·.1)
+    return (← mkAppM ``TypedRelation.mapByList #[joined, toExpr (names.map (·.toString)), proj],
+            names.zip types)
+  -- Inner/cross join with a subquery RHS: elaborate the subquery, re-label its columns under the alias
+  -- (`x.<last component>`) so `x.col` in the `ON`/`WHERE` resolves and stays distinct from a left column.
+  subqueryJoin (f1 : TSyntax `sql_from) (sub : TSyntax `sql_query) (x : Name) (cond? : Option Term) :
+      TermElabM (Expr × List (Name × SQLTypeProxy)) := do
+    let (e1, s1) ← productPair f1
+    let (lamSub, subSchema) ← elabSqlQueryCore tableVars ctes sub
+    let e2 := lamSub.beta (tableVars.map (·.1)).toArray
+    let s2 := subSchema.map (fun (n, ty) => (x ++ (n.components.getLast?).getD n, ty))
+    let combined := s1 ++ s2
+    let appended ← mkAppM ``TypedRelationOfList.append #[e1, e2]
+    match cond? with
+    | some cond => do
       let condExpr ← elabTypedTupleFilter [(.anonymous, combined)] cond
       return (← mkAppM ``restriction #[condExpr, appended], combined)
     | none => return (appended, combined)
@@ -547,14 +676,15 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
     return (reindexed, (if nullLeft then nul s1 else s1) ++ (if nullRight then nul s2 else s2))
   -- Apply a `WHERE` clause to `rel`. `[NOT] EXISTS (subquery)` and `x [NOT] IN (subquery)` become a
   -- `semijoin`/`antijoin`; anything else is an ordinary `restriction` by a tuple predicate.
-  elabWhere (rel : Expr) (schema : List (Name × SQLTypeProxy)) (filter : Term) : TermElabM Expr := do
+  elabWhere (rel : Expr) (schema : List (Name × SQLTypeProxy)) (filter : Term)
+      (usedStx : Syntax) : TermElabM Expr := do
     match filter with
     | `(EXISTS ( $inner:sql_query ))     => elabExists rel schema inner none false
     | `(NOT EXISTS ( $inner:sql_query )) => elabExists rel schema inner none true
     | `($oc:term IN ( $inner:sql_query ))     => elabExists rel schema inner (some oc) false
     | `($oc:term NOT IN ( $inner:sql_query )) => elabExists rel schema inner (some oc) true
     | _ => do
-      let f ← elabTypedTupleFilter [(.anonymous, schema)] filter
+      let f ← elabTypedTupleFilter [(.anonymous, schema)] filter usedStx
       mkAppM ``restriction #[f, rel]
 
   elabExists (rel : Expr) (outerSchema : List (Name × SQLTypeProxy)) (inner : TSyntax `sql_query)
@@ -562,7 +692,7 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
     match inner with
     | `(sql_query| SELECT $[DISTINCT%$_d]? $sel:sql_cols FROM $sdb:sql_from $[WHERE $corr?]? $[;]?) => do
       -- `DISTINCT` in an IN/EXISTS subquery is irrelevant (set membership), so it is accepted and ignored.
-      let some innerName := (getIdents sdb).head? | throwError "subquery expects a single inner table"
+      let some _ := (getIdents sdb).head? | throwError "subquery expects a single inner table"
       let (sExpr, sSchema) ← productPair sdb
       let corr ← match inCol?, corr? with
         | some oc, _ => do                                  -- `oc IN (SELECT c FROM …)`  ⇒  `oc = c`
@@ -573,7 +703,9 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
           | _ => throwError "IN subquery must SELECT exactly one column"
         | none, some corr => pure corr                      -- `EXISTS (… WHERE corr)`
         | none, none => throwError "EXISTS subquery needs a correlating WHERE condition"
-      let cond ← elabTypedTupleFilter [(.anonymous, outerSchema), (innerName, sSchema)] corr
+      -- `.anonymous` for both: `productPair` already qualified the inner columns (`y.loc` under
+      -- `DEPT AS Y`), so re-prefixing them by the base table would hide them from the correlation.
+      let cond ← elabTypedTupleFilter [(.anonymous, outerSchema), (.anonymous, sSchema)] corr
       mkAppM (if isNeg then ``antijoin else ``semijoin) #[rel, sExpr, cond]
     | _ => throwError "subquery expects `SELECT … FROM table …`"
 
@@ -582,6 +714,11 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
   -- the inner `WHERE` — which may be **correlated** (reference outer columns) — is stored and
   -- elaborated later, inside the projection context, where the outer row's let-vars are in scope.
   stashSubq (q : TSyntax `sql_query) (name : TSyntax `ident) : TermElabM (TSyntax `sql_col) := do
+    `(sql_col| $(← stashSubqTerm q):term AS $name:ident)
+
+  -- The term half of `stashSubq`: stash the subquery and yield its placeholder, for a scalar subquery
+  -- used as a *value* (`WHERE x = (SELECT MAX(y) FROM t)`) as well as in the SELECT list.
+  stashSubqTerm (q : TSyntax `sql_query) : TermElabM Syntax.Term := do
     match q with
     | `(sql_query| SELECT $sel:sql_cols FROM $sdb:sql_from $[WHERE $p?]? $[;]?) => do
       let (rel, schema) ← productPair sdb
@@ -598,12 +735,26 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
         | .count => pure none
         | .sum => some <$> mkSummand true
         | .countDistinct => some <$> mkSummand false
-        | _ => throwError "scalar subquery: only SUM / COUNT / COUNT(DISTINCT) are supported"
+        | .max | .min => some <$> mkSummand true
+        | _ => throwError "scalar subquery: only SUM / COUNT / COUNT(DISTINCT) / MAX / MIN are supported"
       let idx := (← scalarSubqStash.get).size
       scalarSubqStash.modify (·.push
         { innerRel := rel, innerSchema := schema, kind, summand := summand?, cond := p?.map (·.raw) })
-      `(sql_col| (sqlDeferredSubq% $(quote idx)) AS $name:ident)
-    | _ => throwError "unsupported scalar subquery shape"
+      `((sqlDeferredSubq% $(quote idx)))
+    | _ => do
+      -- Any other shape (grouped, set-op, …): elaborate the inner query and take the opaque
+      -- `relScalarOpaque` of it — sound, and enough for two equal inner relations to agree.
+      let (lam, _) ← elabSqlQueryCore tableVars ctes q
+      let rel := lam.beta (tableVars.map (fun (relVar, _, _) => relVar)).toArray
+      Term.exprToSyntax (← mkAppM ``LeanDatabase.TypedAgg.relScalarOpaque #[rel])
+
+  -- Replace every parenthesised scalar subquery inside a term by its stashed placeholder.
+  stashTermSubqueries (t : Syntax.Term) : TermElabM Syntax.Term := do
+    let out ← t.raw.replaceM fun s =>
+      match s with
+      | `(term| ( $q:sql_query )) => do pure (some (← stashSubqTerm q).raw)
+      | _ => pure none
+    pure ⟨out⟩
 
   preprocessScalarSubqueries (cols : Array (TSyntax `sql_col)) :
       TermElabM (Array (TSyntax `sql_col)) := do
@@ -701,8 +852,50 @@ def lowerIdents (stx : Syntax) : Syntax :=
     | .ident info raw val pre => some (.ident info raw (lowerName val) pre)
     | _ => none
 
+/-- A column named like one of our function keywords (`YEAR`, `DATE`, `MAX`, `RANK`, …) is a reserved
+token, so the tokenizer never offers it as an identifier and `SELECT YEAR FROM …` fails to parse.
+Wrap such a *name use* (not a call) in `«…»`, which the tokenizer always reads as an identifier.
+Only names this query's schema actually declares are touched, and `CAST(x AS DATE)` / `EXTRACT(YEAR
+FROM x)` — where the keyword is the operator's own argument — are left alone. -/
+def escapeReservedNames (env : Environment) (names : List String) (s : String) : String := Id.run do
+  let tokens := Lean.Parser.getTokenTable env
+  let isWordChar := fun (c : Char) => c.isAlphanum || c == '_'
+  let cs := s.toList
+  let mut out := ""
+  let mut i := 0
+  let mut inStr := false
+  while h : i < cs.length do
+    let c := cs[i]
+    if c == '\'' then
+      inStr := !inStr; out := out.push c; i := i + 1
+    else if inStr || !(c.isAlpha || c == '_') then
+      out := out.push c; i := i + 1
+    else
+      -- One word, plus the characters around it that decide whether it is a name use.
+      let mut j := i
+      let mut word := ""
+      while h : j < cs.length do
+        if isWordChar cs[j] then word := word.push cs[j]; j := j + 1 else break
+      let prev := (cs.take i).reverse.dropWhile (· == ' ')
+      let afterCall := (cs.drop j).dropWhile (· == ' ')
+      let nextWord := String.ofList (afterCall.takeWhile isWordChar)
+      let isCall := afterCall.head? == some '('
+      let isCastTarget := (prev.take 2).reverse == ['A', 'S'] && (prev[2]? == some ' ')
+      let isExtractPart := prev.head? == some '(' && nextWord.toUpper == "FROM"
+      let dotted := prev.head? == some '.' || prev.head? == some '«'
+      let declared := names.contains word.toLower
+      let reserved := (tokens.find? word).isSome || (tokens.find? word.toUpper).isSome
+      if declared && reserved && !isCall && !isCastTarget && !isExtractPart && !dotted then
+        out := out ++ "«" ++ word ++ "»"
+      else
+        out := out ++ word
+      i := j
+  return out
+
 def parseSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (str : String) : TermElabM (Expr × List (Name × SQLTypeProxy)) := do
   let str := normalizeSqlLiterals str
+  let str := escapeReservedNames (← getEnv)
+    (tables.flatMap (fun (t, cols) => t.toString.toLower :: cols.map (·.1.toString.toLower))) str
   -- Case-insensitive identifiers: fold the schema and the query's idents to a common (lower) case.
   let tables := tables.map (fun (t, cols) => (lowerName t, cols.map (fun (c, ty) => (lowerName c, ty))))
   let tables := tables.map (fun (tableName, columns) => (tableName, schemaWithFullNames tableName columns))
@@ -718,8 +911,8 @@ def parseSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (str : S
     match tables.find? (fun (n, _) => n == base) with
     | some (_, cols) => acc ++ cols.map (fun (n, _) => n.replacePrefix base al)
     | none => acc) []
-  let stx ← expandNames (baseLabels ++ aliasLabels) stx
-    (subqAliases := collectSubqueryAliases stx ++ collectCteNames stx)
+  let stx ← expandNames (baseLabels ++ aliasLabels) stx (aliases := collectAliases stx)
+    (subqAliases := collectCteNames stx)
   elabSqlQuery tables stx
 
 

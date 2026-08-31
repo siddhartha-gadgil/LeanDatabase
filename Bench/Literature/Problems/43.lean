@@ -4,7 +4,7 @@ open LeanDatabase Lean
 set_option maxHeartbeats 1000000
 set_option maxRecDepth 1000000
 
-namespace Literature_43
+namespace N_43_eq
 
 CREATE TABLE COURSE («COURSE_ID» INT, «TITLE» INT, «DEPT_NAME» INT, «CREDITS» INT)
 CREATE TABLE DEPARTMENT («DEPT_NAME» INT, «BUILDING» INT, «BUDGET» INT)
@@ -19,4 +19,4 @@ theorem eq :
   = sql%([COURSE_schema, DEPARTMENT_schema, INSTRUCTOR_schema, TEACHES_schema, SECTION_schema, TAKES_schema, STUDENT_schema]) "SELECT SUM(T) AS SU FROM (SELECT YEAR AS T FROM TEACHES NATURAL JOIN INSTRUCTOR GROUP BY YEAR HAVING COUNT(ID) > 4) AS TEMP GROUP BY T"
   := by first | sql_equiv | sorry
 
-end Literature_43
+end N_43_eq

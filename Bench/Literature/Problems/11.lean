@@ -4,7 +4,7 @@ open LeanDatabase Lean
 set_option maxHeartbeats 1000000
 set_option maxRecDepth 1000000
 
-namespace Literature_11
+namespace N_11_eq
 
 CREATE TABLE USR («UID» INT, «UNAME» INT, «CITY» INT)
 CREATE TABLE PIC («UID» INT, «SIZE» INT)
@@ -14,4 +14,4 @@ theorem eq :
   = sql%([USR_schema, PIC_schema]) "SELECT X.UID AS XU, X.NAME AS XN, COUNT(*) AS CNT FROM USR AS X, PIC AS Y WHERE X.UID = Y.UID AND Y.SIZE > 100000 GROUP BY X.UID, X.UNAME"
   := by first | sql_equiv | sorry
 
-end Literature_11
+end N_11_eq

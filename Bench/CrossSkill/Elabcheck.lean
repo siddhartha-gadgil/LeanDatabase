@@ -19,11 +19,11 @@ Usage: `lake exe elabcheck [corpus.json]` — prints `ELABORATES n/total`, lists
 -/
 
 unsafe def main (args : List String) : IO UInt32 := do
-  let dataset := "CrossSkill"
+  let dataset := args.headD "CrossSkill"
   enableInitializersExecution
   initSearchPath (← findSysroot)
   let env ← importModules (loadExts := true) #[{module := `Mathlib}, {module := `LeanDatabase}] {}
-  let path := args.headD s!"Bench/{dataset}/corpus_pg.json"
+  let path : System.FilePath := s!"Bench/{dataset}/corpus_pg.json"
   let content ← IO.FS.readFile path
   let .ok (.arr recs) := Json.parse content
     | do IO.eprintln s!"could not parse {path} as a JSON array"; return 1

@@ -45,7 +45,7 @@ def Provider.keyName : Provider → String
 def Provider.defaultModel : Provider → String
   | .gemini => "gemini-pro-latest"
   | .anthropic => "claude-5-sonnet"
-  | .openai => "gpt-5.4"
+  | .openai => "gpt-5.6"
 
 /-- Parse the `sqlEquivLlm.provider` option string; unknown/empty ⇒ `dflt`. -/
 def Provider.ofString? (s : String) (dflt : Provider) : Provider :=

@@ -71,8 +71,13 @@ def sqlOrderCol : TSyntax `sql_order_item → TSyntax `sql_col
 syntax ident : sql_from                               -- 1. Standard table name
 syntax ident "AS" ident : sql_from                    -- 1b. Aliased table (`t AS x`)
 syntax ident ident : sql_from                         -- 1c. Bare alias (`t x`) — the corpus norm
-syntax "(" sql_query ")" "AS" ident : sql_from       -- 2. Subquery with alias (AS)
-syntax "(" sql_query ")" ident : sql_from             -- 2b. Subquery with bare alias
+-- Subquery with alias, and an optional column-alias list `(c1, c2)` (used by `VALUES` and renames).
+syntax "(" sql_query ")" "AS" ident ("(" ident,* ")")? : sql_from       -- 2. Subquery with AS-alias
+syntax "(" sql_query ")" ident ("(" ident,* ")")? : sql_from             -- 2b. Subquery with bare alias
+-- `VALUES (v,…),(v,…)` — an inline literal relation (a query producing constant rows).
+declare_syntax_cat sql_values_row
+syntax "(" term,+ ")" : sql_values_row
+syntax "VALUES" sql_values_row,+ : sql_query
 
 -- `LATERAL FLATTEN` (Snowflake array/VARIANT unnest). The normalizer canonicalises sqlglot's
 -- `, LATERAL UNNEST(input => e) AS h(SEQ, KEY, PATH, INDEX, VALUE, THIS)` (and the no-`input =>` /
@@ -121,6 +126,27 @@ syntax sql_from "RIGHT" "JOIN" ident ident "ON" term : sql_from
 syntax sql_from "RIGHT" "OUTER" "JOIN" ident ident "ON" term : sql_from
 syntax sql_from "FULL" "JOIN" ident ident "ON" term : sql_from
 syntax sql_from "FULL" "OUTER" "JOIN" ident ident "ON" term : sql_from
+-- 7d. `NATURAL JOIN` — equi-join on every shared column name, duplicates projected away
+-- (`naturalJoin` in `Parser/Query.lean`).
+syntax sql_from "NATURAL" "JOIN" ident : sql_from
+syntax sql_from "NATURAL" "JOIN" ident "AS" ident : sql_from
+syntax sql_from "NATURAL" "JOIN" ident ident : sql_from
+-- 7c. Subquery RHS (`… JOIN (subquery) AS x ON …`) for INNER / CROSS joins.
+syntax sql_from "JOIN" "(" sql_query ")" "AS" ident "ON" term : sql_from
+syntax sql_from "JOIN" "(" sql_query ")" ident "ON" term : sql_from
+syntax sql_from "CROSS" "JOIN" "(" sql_query ")" "AS" ident : sql_from
+syntax sql_from "CROSS" "JOIN" "(" sql_query ")" ident : sql_from
+
+-- A **scalar subquery** used as a value (`WHERE x = (SELECT MAX(y) FROM t)`). Only the parenthesised
+-- query shape parses here, so an ordinary parenthesised term is untouched.
+syntax:max (priority := low) "(" sql_query ")" : term
+
+-- An **uninterpreted predicate** over whole rows (`B1(X)`, `B(X, Y)`) — the shape the equivalence
+-- literature writes for "an arbitrary condition". Its arguments are FROM items (or columns); it
+-- elaborates (`Parser/Context.lean`) to an opaque `Bool` of exactly those values, so the same
+-- predicate on the same row agrees and nothing else is assumed. Registered scalar functions
+-- (`SQRT(x)`, `COUNT(*)`, …) are keyword tokens, so they never match this rule.
+syntax:max (priority := low) ident noWs "(" ident,* ")" : term
 
 -- `GROUP BY` items are full terms: a bare column, an expression (`UPPER(col)`, `ROUND(lat, 2)`), or a
 -- positional `1` (nth SELECT column). See `Parser/GroupBy.lean` for how the group *key* is built.

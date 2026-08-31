@@ -198,7 +198,7 @@
     "columns": [
      {
       "name": "DNAME",
-      "type": "INT"
+      "type": "STRING"
      },
      {
       "name": "DPROJ",
@@ -1546,7 +1546,7 @@
      },
      {
       "name": "TITLE",
-      "type": "INT"
+      "type": "STRING"
      },
      {
       "name": "DEPT_NAME",
@@ -3619,7 +3619,7 @@
      },
      {
       "name": "TITLE",
-      "type": "INT"
+      "type": "STRING"
      },
      {
       "name": "DEPT_NAME",

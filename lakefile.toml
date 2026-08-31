@@ -40,35 +40,16 @@ name = "provecheck"
 root = "Bench.CrossSkill.Provecheck"
 supportInterpreter = true
 
-[[lean_lib]]
-name = "CalciteProven"
-globs = ["Bench.Calcite.Proven.+"]
-
-[[lean_lib]]
-name = "LiteratureProven"
-globs = ["Bench.Literature.Proven.+"]
 
 
-[[lean_exe]]
-name = "calcite_elabcheck"
-root = "Bench.Calcite.Elabcheck"
-supportInterpreter = true
+
+
+
+
+
+
 
 [[lean_exe]]
-name = "calcite_provecheck"
-root = "Bench.Calcite.Provecheck"
+name = "runall"
+root = "Bench.RunAll"
 supportInterpreter = true
-
-[[lean_exe]]
-name = "literature_elabcheck"
-root = "Bench.Literature.Elabcheck"
-supportInterpreter = true
-
-[[lean_exe]]
-name = "literature_provecheck"
-root = "Bench.Literature.Provecheck"
-supportInterpreter = true
-
-[[lean_lib]]
-name = "CalciteProblems"
-globs = ["Bench.Calcite.Problems.+"]

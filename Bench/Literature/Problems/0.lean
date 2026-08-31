@@ -4,7 +4,7 @@ open LeanDatabase Lean
 set_option maxHeartbeats 1000000
 set_option maxRecDepth 1000000
 
-namespace Literature_0
+namespace N_0_eq
 
 CREATE TABLE ITP («ITEMN» INT, «PONUM» INT)
 CREATE TABLE ITM («ITEMN» INT, «TYPE» INT)
@@ -15,4 +15,4 @@ theorem eq :
   = sql%([ITP_schema, ITM_schema, PUR_schema]) "SELECT DISTINCT ITM.ITEMN, PUR.VENDN FROM ITM AS ITM, ITP AS ITP, PUR AS PUR WHERE ITP.PONUM = PUR.PONUM AND ITM.ITEMN = ITP.ITEMN AND PUR.ODATE > 85 AND ITM.ITEMN > 1 AND ITM.ITEMN < 20"
   := by first | sql_equiv | sorry
 
-end Literature_0
+end N_0_eq

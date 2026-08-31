@@ -4,9 +4,9 @@ open LeanDatabase Lean
 set_option maxHeartbeats 1000000
 set_option maxRecDepth 1000000
 
-namespace Literature_5
+namespace N_5_eq
 
-CREATE TABLE DEPTS («DNAME» INT, «DPROJ» INT)
+CREATE TABLE DEPTS («DNAME» STRING, «DPROJ» INT)
 CREATE TABLE TEAMS («TMEMBER» INT, «TPROJ» INT)
 CREATE TABLE PAYROLL («EMPL» INT, «PDEPT» INT)
 
@@ -15,4 +15,4 @@ theorem eq :
   = sql%([DEPTS_schema, TEAMS_schema, PAYROLL_schema]) "SELECT V1.E FROM (SELECT D.DNAME AS D, D.DPROJ AS P, P.EMPL AS E FROM DEPTS AS D, PAYROLL AS P WHERE D.DNAME = P.PDEPT) AS V1, (SELECT T.TMEMBER AS E, P.PDEPT AS D, T.TPROJ AS P FROM TEAMS AS T, PAYROLL AS P WHERE T.TMEMBER = P.EMPL) AS V2 WHERE V1.D = 'SECURITY' AND V1.P = V2.P AND V1.E = V2.E AND V1.D = V2.D"
   := by first | sql_equiv | sorry
 
-end Literature_5
+end N_5_eq

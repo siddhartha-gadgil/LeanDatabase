@@ -4,7 +4,7 @@ open LeanDatabase Lean
 set_option maxHeartbeats 1000000
 set_option maxRecDepth 1000000
 
-namespace Literature_45
+namespace N_45_eq
 
 CREATE TABLE COURSE («COURSE_ID» INT, «TITLE» INT, «DEPT_NAME» INT, «CREDITS» INT)
 CREATE TABLE DEPARTMENT («DEPT_NAME» INT, «BUILDING» INT, «BUDGET» INT)
@@ -19,4 +19,4 @@ theorem eq :
   = sql%([COURSE_schema, DEPARTMENT_schema, INSTRUCTOR_schema, TEACHES_schema, SECTION_schema, TAKES_schema, STUDENT_schema]) "SELECT DISTINCT DEPT_NAME FROM COURSE JOIN (SELECT MAX(CREDITS) AS MAX_CREDITS FROM COURSE GROUP BY DEPT_NAME) AS A ON COURSE.CREDITS = A.MAX_CREDITS"
   := by first | sql_equiv | sorry
 
-end Literature_45
+end N_45_eq

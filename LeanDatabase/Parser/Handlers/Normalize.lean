@@ -297,6 +297,9 @@ def normalizeSqlLiterals (s : String) : String :=
   let s := s.replace "JOIN LATERAL" ", LATERAL"
   let s := s.replace ", OUTER => TRUE" ""
   let s := s.replace ", OUTER => FALSE" ""
+  -- `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` is the SQL default frame (a no-op); strip it so
+  -- the window parses. Only the default is stripped — other frames stay unparsed, never equated.
+  let s := s.replace " RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW" ""
   let s := flattenGo s.toList ""
   let s := wrapAliasGo s.toList ""
   let s := String.ofList (pathGo s.toList []).reverse

@@ -4,7 +4,7 @@ open LeanDatabase Lean
 set_option maxHeartbeats 1000000
 set_option maxRecDepth 1000000
 
-namespace Literature_46
+namespace N_46_eq
 
 CREATE TABLE MONTHS («MID» INT, «MONTH» INT)
 CREATE TABLE WEEKDAYS («DID» INT, «DAY_OF_WEEK» INT)
@@ -16,4 +16,4 @@ theorem eq :
   = sql%([MONTHS_schema, WEEKDAYS_schema, CARRIERS_schema, FLIGHTS_schema]) "SELECT C.NAME FROM CARRIERS AS C JOIN FLIGHTS AS F ON C.CID = F.CARRIER_ID GROUP BY C.NAME, F.DAY_OF_MONTH HAVING COUNT(C.CID) > 1000"
   := by first | sql_equiv | sorry
 
-end Literature_46
+end N_46_eq

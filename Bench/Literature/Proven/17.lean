@@ -4,7 +4,7 @@ open LeanDatabase Lean
 set_option maxHeartbeats 1000000
 set_option maxRecDepth 1000000
 
-namespace Literature_17
+namespace N_17_eq
 
 CREATE TABLE R («A1» INT, «A2» INT, «A3» INT)
 
@@ -13,4 +13,4 @@ theorem eq :
   = sql%([R_schema]) "SELECT DISTINCT * FROM R AS X WHERE X.A1 = X.A2 AND X.A1 = X.A3"
   := by sql_equiv
 
-end Literature_17
+end N_17_eq
