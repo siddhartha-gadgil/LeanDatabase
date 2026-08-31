@@ -136,6 +136,10 @@ syntax sql_from "JOIN" "(" sql_query ")" "AS" ident "ON" term : sql_from
 syntax sql_from "JOIN" "(" sql_query ")" ident "ON" term : sql_from
 syntax sql_from "CROSS" "JOIN" "(" sql_query ")" "AS" ident : sql_from
 syntax sql_from "CROSS" "JOIN" "(" sql_query ")" ident : sql_from
+-- 7e. Subquery RHS for LEFT / RIGHT / FULL outer joins (`OUTER` optional).
+syntax sql_from "LEFT" (&"OUTER")? "JOIN" "(" sql_query ")" "AS" ident "ON" term : sql_from
+syntax sql_from "RIGHT" (&"OUTER")? "JOIN" "(" sql_query ")" "AS" ident "ON" term : sql_from
+syntax sql_from "FULL" (&"OUTER")? "JOIN" "(" sql_query ")" "AS" ident "ON" term : sql_from
 
 -- A **scalar subquery** used as a value (`WHERE x = (SELECT MAX(y) FROM t)`). Only the parenthesised
 -- query shape parses here, so an ordinary parenthesised term is untouched.

@@ -151,6 +151,13 @@ partial def liftAggExprs (stx : Syntax) :
       modify (·.push (name, kind, e))
       return some (mkIdent name)
     match node with
+    -- Aggregate `FILTER (WHERE p)` → aggregate over `CASE WHEN p THEN e …` (SUM/COUNT, sound).
+    | `(SUM($e:term) FILTER(WHERE $p:term)) =>
+        do record .sum (← `(CASE WHEN $p THEN $e ELSE 0 END))
+    | `(COUNT(*) FILTER(WHERE $p:term)) =>
+        do record .sum (← `(CASE WHEN $p THEN (1 : Int) ELSE (0 : Int) END))
+    | `(COUNT($e:term) FILTER(WHERE $p:term)) =>
+        do record .count (← `(CASE WHEN $p THEN $e END))
     | `(COUNT(DISTINCT $e:term)) => record .countDistinct e
     | `(APPROX_COUNT_DISTINCT($e:term)) => record .countDistinct e
     | `(SUM(DISTINCT $e:term))   => record .sumDistinct e
@@ -553,6 +560,13 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
     | `(sql_from| $f1:sql_from FULL JOIN $t:ident $x:ident ON $cond:term)
     | `(sql_from| $f1:sql_from FULL OUTER JOIN $t:ident $x:ident ON $cond:term) =>
       outerJoin f1 t (some x) cond ``fullOuterJoin ``ofOuterFull true true
+    -- Outer joins with a subquery RHS.
+    | `(sql_from| $f1:sql_from LEFT $[OUTER]? JOIN ( $sub:sql_query ) AS $x:ident ON $cond:term) =>
+      outerJoinSub f1 sub x.getId cond ``leftOuterJoin ``ofOuterLeft false true
+    | `(sql_from| $f1:sql_from RIGHT $[OUTER]? JOIN ( $sub:sql_query ) AS $x:ident ON $cond:term) =>
+      outerJoinSub f1 sub x.getId cond ``rightOuterJoin ``ofOuterRight true false
+    | `(sql_from| $f1:sql_from FULL $[OUTER]? JOIN ( $sub:sql_query ) AS $x:ident ON $cond:term) =>
+      outerJoinSub f1 sub x.getId cond ``fullOuterJoin ``ofOuterFull true true
     -- Inner `JOIN ON` / `CROSS JOIN` handled here (not just via `escapeJoin`) so they compose with
     -- GROUP BY / ORDER BY / LIMIT, which `escapeJoin`'s whole-query rewrite doesn't reach (C1).
     | `(sql_from| $f1:sql_from JOIN $t:ident ON $cond:term) =>
@@ -669,6 +683,22 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       | some x => s2raw.map (fun (n, ty) => (x.getId ++ (n.components.getLast?).getD n, ty))
       | none => s2raw
     let condExpr ← elabTypedTupleFilter [(.anonymous, s1), (rhsP, s2)] cond
+    let joinExpr ← mkAppM opName #[e1, e2, condExpr]
+    let reindexed ← mkAppM reindexName #[joinExpr]
+    let nul : List (Name × SQLTypeProxy) → List (Name × SQLTypeProxy) :=
+      List.map (fun (n, ty) => (n, .nullable ty))
+    return (reindexed, (if nullLeft then nul s1 else s1) ++ (if nullRight then nul s2 else s2))
+  -- Outer join with a subquery RHS (`… LEFT/RIGHT/FULL JOIN (subquery) AS x ON …`): like `outerJoin`
+  -- but the right side is an elaborated subquery, its columns prefixed under the alias.
+  outerJoinSub (f1 : TSyntax `sql_from) (sub : TSyntax `sql_query) (x : Name) (cond : Term)
+      (opName reindexName : Name) (nullLeft nullRight : Bool) :
+      TermElabM (Expr × List (Name × SQLTypeProxy)) := do
+    let (e1, s1) ← productPair f1
+    let (lamSub, subSchema) ← elabSqlQueryCore tableVars ctes sub
+    let e2 := lamSub.beta (tableVars.map (·.1)).toArray
+    let s2 := subSchema.map (fun (n, ty) => (x ++ (n.components.getLast?).getD n, ty))
+    let cond : Term := ⟨resolveInScope ((s1 ++ s2).map (·.1)) cond⟩
+    let condExpr ← elabTypedTupleFilter [(.anonymous, s1), (x, s2)] cond
     let joinExpr ← mkAppM opName #[e1, e2, condExpr]
     let reindexed ← mkAppM reindexName #[joinExpr]
     let nul : List (Name × SQLTypeProxy) → List (Name × SQLTypeProxy) :=
@@ -799,7 +829,11 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
     | `(sql_cols| $cols:sql_col,*) => do
       let colStxs ← preprocessScalarSubqueries cols.getElems
       let colTerms := colStxs.map sqlColTerm
-      let names := colStxs.map sqlColName |>.toList |>.map (baseifyName aliasMap)
+      -- An unaliased expression column is auto-named from its own text (`X.A + X.B` → `XAXB`), so
+      -- baseify the *idents first*: otherwise two queries differing only in table alias get different
+      -- output labels and stop being equal.
+      let names := colStxs.map (fun c => sqlColName ⟨baseifyIdents aliasMap c.raw⟩)
+        |>.toList |>.map (baseifyName aliasMap)
       let nameStrs := names.map (·.toString)
       let (liftedRaw, selAggs) ← (colTerms.toList.mapM liftAggExprs).run #[]
       if selAggs.isEmpty && !hasGroupBy then

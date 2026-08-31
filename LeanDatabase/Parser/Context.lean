@@ -191,6 +191,12 @@ syntax "STDDEV_SAMP" "(" term ")" : term
 syntax "VARIANCE" "(" term ")" : term
 syntax "VAR_POP" "(" term ")" : term
 syntax "VAR_SAMP" "(" term ")" : term
+-- Aggregate `FILTER (WHERE p)`: `AGG(e) FILTER (WHERE p)` aggregates `e` only over rows where `p`.
+-- Declared as syntax (not a macro) so `liftAggExprs` in `Parser/Query.lean` can match it and emit the
+-- equivalent `AGG(CASE WHEN p THEN e [ELSE 0] END)` — sound for SUM/COUNT, no NULL semantics needed.
+syntax:max "SUM" "(" term ")" &"FILTER" "(" &"WHERE" term ")" : term
+syntax:max "COUNT" "(" "*" ")" &"FILTER" "(" &"WHERE" term ")" : term
+syntax:max "COUNT" "(" term ")" &"FILTER" "(" &"WHERE" term ")" : term
 -- `STRING_AGG(expr, delim [ORDER BY keys])` (and `DISTINCT`) — order-dependent string concat, opaque.
 syntax "STRING_AGG" "(" "DISTINCT" term "," term "ORDER" "BY" term,+ ")" : term
 syntax "STRING_AGG" "(" term "," term "ORDER" "BY" term,+ ")" : term

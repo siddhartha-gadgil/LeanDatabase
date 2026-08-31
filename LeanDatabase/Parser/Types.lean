@@ -54,6 +54,48 @@ otherwise observable under set semantics. Mathlib has no `LinearOrder (Option α
 instance instLinearOrderOption {α : Type} [LinearOrder α] : LinearOrder (Option α) :=
   WithBot.linearOrder
 
+
+/-! ## NULL-propagating arithmetic
+
+SQL evaluates any arithmetic with a `NULL` operand to `NULL`, so a nullable value (`NULLIF`, an
+outer-join column, a nullable `CASE`) has to mix with ordinary arithmetic. These are exactly that
+lifting — `Option.map`/`bind`, no approximation — and they are declared **only** for the numeric
+column types `Option ℤ` / `Option ℚ`, so `WithBot ℕ` (`MAX`/`MIN`) keeps Mathlib's instances. The
+mixed ℤ/ℚ shapes are spelled out because Lean's `binop%` inserts either an `ℤ → ℚ` coercion *or* an
+`α → Option α` one, never both, so `CAST(a AS DOUBLE) / NULLIF(b, 0)` needs the combination named. -/
+
+private def onR (f : α → β → γ) (a : α) (b : Option β) : Option γ := b.map (f a)
+private def onL (f : α → β → γ) (a : Option α) (b : β) : Option γ := a.map (f · b)
+private def on2 (f : α → β → γ) (a : Option α) (b : Option β) : Option γ := do pure (f (← a) (← b))
+
+instance : Add (Option Int) := ⟨on2 (· + ·)⟩
+instance : Add (Option Rat) := ⟨on2 (· + ·)⟩
+instance : HAdd Rat (Option Int) (Option Rat) := ⟨onR (fun a b => a + (b : Rat))⟩
+instance : HAdd (Option Int) Rat (Option Rat) := ⟨onL (fun a b => (a : Rat) + b)⟩
+instance : HAdd Int (Option Rat) (Option Rat) := ⟨onR (fun a b => (a : Rat) + b)⟩
+instance : HAdd (Option Rat) Int (Option Rat) := ⟨onL (fun a b => a + (b : Rat))⟩
+
+instance : Sub (Option Int) := ⟨on2 (· - ·)⟩
+instance : Sub (Option Rat) := ⟨on2 (· - ·)⟩
+instance : HSub Rat (Option Int) (Option Rat) := ⟨onR (fun a b => a - (b : Rat))⟩
+instance : HSub (Option Int) Rat (Option Rat) := ⟨onL (fun a b => (a : Rat) - b)⟩
+instance : HSub Int (Option Rat) (Option Rat) := ⟨onR (fun a b => (a : Rat) - b)⟩
+instance : HSub (Option Rat) Int (Option Rat) := ⟨onL (fun a b => a - (b : Rat))⟩
+
+instance : Mul (Option Int) := ⟨on2 (· * ·)⟩
+instance : Mul (Option Rat) := ⟨on2 (· * ·)⟩
+instance : HMul Rat (Option Int) (Option Rat) := ⟨onR (fun a b => a * (b : Rat))⟩
+instance : HMul (Option Int) Rat (Option Rat) := ⟨onL (fun a b => (a : Rat) * b)⟩
+instance : HMul Int (Option Rat) (Option Rat) := ⟨onR (fun a b => (a : Rat) * b)⟩
+instance : HMul (Option Rat) Int (Option Rat) := ⟨onL (fun a b => a * (b : Rat))⟩
+
+instance : Div (Option Int) := ⟨on2 (· / ·)⟩
+instance : Div (Option Rat) := ⟨on2 (· / ·)⟩
+instance : HDiv Rat (Option Int) (Option Rat) := ⟨onR (fun a b => a / (b : Rat))⟩
+instance : HDiv (Option Int) Rat (Option Rat) := ⟨onL (fun a b => (a : Rat) / b)⟩
+instance : HDiv Int (Option Rat) (Option Rat) := ⟨onR (fun a b => (a : Rat) / b)⟩
+instance : HDiv (Option Rat) Int (Option Rat) := ⟨onL (fun a b => a / (b : Rat))⟩
+
 instance instDecidableEqProxyType : (t : SQLTypeProxy) → DecidableEq t.type
   | .int => inferInstance
   | .bool => inferInstance

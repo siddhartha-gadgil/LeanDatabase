@@ -297,6 +297,11 @@ def normalizeSqlLiterals (s : String) : String :=
   let s := s.replace "JOIN LATERAL" ", LATERAL"
   let s := s.replace ", OUTER => TRUE" ""
   let s := s.replace ", OUTER => FALSE" ""
+  -- `FETCH {FIRST|NEXT} n {ROW|ROWS} ONLY` is standard-SQL `LIMIT n`.
+  let s := s.replace "FETCH NEXT " "LIMIT "
+  let s := s.replace "FETCH FIRST " "LIMIT "
+  let s := s.replace " ROWS ONLY" ""
+  let s := s.replace " ROW ONLY" ""
   -- `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` is the SQL default frame (a no-op); strip it so
   -- the window parses. Only the default is stripped — other frames stay unparsed, never equated.
   let s := s.replace " RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW" ""

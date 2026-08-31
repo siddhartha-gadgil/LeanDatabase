@@ -74,22 +74,32 @@ private def hypothesisProp
   else
     throwError "HYPOTHESIS: expected one of `predicate`/`funcdep`/`unique`/`bijection`"
 
-/-- Run `sql_equiv` on `mvar` and report whether it genuinely closed the goal. `sql_equiv` runs alone
-(no `sorry` fallback) and **errors** if it cannot close, so no leftover goals ⇒ a real proof — trust
-the goal list. Do NOT wrap in `withoutErrToSorry`: that would turn a failing `sql_equiv` into a
-`sorry`-closed (empty-goal) state and report a false success. Inspecting the mvar assignment was also
-wrong — `sql_equiv`'s assignment can be *delayed* and read back as `none`, rejecting valid proofs. -/
+/-- Run `sql_equiv` on `mvar` and report whether it genuinely closed the goal.
+
+An empty goal list is **not** sufficient: `Elab.runTactic` *admits* (i.e. `sorry`-closes) a goal when
+the tactic throws, so a failing `sql_equiv` comes back as "no goals left". That is how the census used
+to report `SELECT B FROM R WHERE A = 5 AND C < 1  ≡  SELECT B FROM R WHERE A < 10` as proved, a pair
+VeriEQL refutes with a counterexample. So we also demand a **complete, `sorry`-free proof term**:
+force the delayed assignments (`synthesizeSyntheticMVarsNoPostponing` — reading the assignment without
+this is what previously *under*-reported valid proofs), then instantiate and inspect. -/
 private def proveMVar (mvar : Expr) : TermElabM Bool := do
   let tac ← `(tacticSeq| sql_equiv)
   try
     let (goals, _) ← Elab.runTactic mvar.mvarId! tac
-    pure goals.isEmpty
+    unless goals.isEmpty do return false
+    let proof ← instantiateMVars mvar
+    return !proof.hasSorry
   catch _ => pure false
 
-/-- Discharge `body₁ = body₂` under `props` as local assumptions (added one at a time). -/
-private def proveUnderHyps (body1 body2 : Expr) : List Expr → TermElabM Bool
-  | [] => do proveMVar (← mkFreshExprMVar (← mkEq body1 body2))
-  | p :: ps => withLocalDeclD `h p fun _ => proveUnderHyps body1 body2 ps
+/-- Discharge `goal` under `props` as local assumptions (added one at a time, so the goal's metavariable
+is created with every hypothesis already in context). -/
+private def proveGoalUnderHyps (goal : Expr) : List Expr → TermElabM Bool
+  | [] => do proveMVar (← mkFreshExprMVar goal)
+  | p :: ps => withLocalDeclD `h p fun _ => proveGoalUnderHyps goal ps
+
+/-- Discharge `body₁ = body₂` under `props` as local assumptions. -/
+private def proveUnderHyps (body1 body2 : Expr) (props : List Expr) : TermElabM Bool := do
+  proveGoalUnderHyps (← mkEq body1 body2) props
 
 /-- Prove `first ≡ second` — either as a plain function equality (no hypotheses) or, when
 `hyps` is non-empty, as `body₁ = body₂` with the table fvars and hypotheses in local context
@@ -136,13 +146,21 @@ def provePair (data : Json) : TermElabM Json := do
     let .ok first := data.getObjValAs? String "first" | return json% {"proved": false, "error": "missing first"}
     let .ok second := data.getObjValAs? String "second" | return json% {"proved": false, "error": "missing second"}
     let dataEq := (data.getObjValAs? Bool "dataEq").toOption.getD true
+    -- Integrity constraints (a key, an FD, a per-row predicate) are *assumptions*, exactly as in a
+    -- file's `HYPOTHESIS` block: most benchmark rewrites (e.g. dropping a `DISTINCT` over a key) are
+    -- only equivalences under them, so a census without them measures the wrong thing.
+    let hyps := (data.getObjValAs? (List Json) "hypotheses").toOption.getD []
     let schemasStr ← schemas.mapM parseSchema
     let (firstExpr, _) ← parseSqlQuery schemasStr first
     let (secondExpr, _) ← parseSqlQuery schemasStr second
     lambdaTelescope (← instantiateMVars firstExpr) fun tvars body1 => do
       let body2 ← instantiateLambda (← instantiateMVars secondExpr) tvars
       let goalType ← if dataEq then mkAppM ``LeanDatabase.dataEq #[body1, body2] else mkEq body1 body2
-      let ok ← proveMVar (← mkFreshExprMVar goalType)
+      let names := schemasStr.map (fun (n, _) => lowerName n)
+      let tvarOf : Name → Option Expr := fun nm =>
+        ((names.zip tvars.toList).find? (·.1 == nm)).map (·.2)
+      let props ← hyps.mapM (hypothesisProp schemasStr tvarOf)
+      let ok ← proveGoalUnderHyps goalType props
       return Json.mkObj [("proved", ok)]
   catch ex => return Json.mkObj [("proved", false), ("error", Json.str (← ex.toMessageData.toString))]
 
@@ -164,10 +182,18 @@ def debugPair (data : Json) : TermElabM String := do
     let goalType ← if dataEq then mkAppM ``LeanDatabase.dataEq #[body1, body2] else mkEq body1 body2
     let mvar ← mkFreshExprMVar goalType
     let tac ← `(tacticSeq| sql_equiv)
+    -- A tactic error inside `runTactic` is *logged* and the goal admitted, so the reason is in the
+    -- message log rather than thrown: remember where the log ends, and report what got added.
+    let logMark := (← Core.getMessageLog).toList.length
     try
       withoutErrToSorry do
         let (goals, _) ← Elab.runTactic mvar.mvarId! tac
-        if goals.isEmpty then return "PROVED"
+        let logged ← ((← Core.getMessageLog).toList.drop logMark).mapM (fun m => m.data.toString)
+        -- Same admitted-goal trap as `proveMVar`: no goals left can still mean `sorry`.
+        if goals.isEmpty then
+          return if (← instantiateMVars mvar).hasSorry
+                 then s!"FAILED (goal admitted by `sorry`):\n" ++ "\n".intercalate logged
+                 else "PROVED"
         let strs ← goals.mapM fun g => do pure (← Meta.ppGoal g).pretty
         return s!"RESIDUAL ({goals.length} goals):\n" ++ "\n".intercalate strs
     catch e => return s!"FAILED: {← e.toMessageData.toString}"

@@ -80,7 +80,12 @@ def baseifyName (aliasMap : List (Name × Name)) (n : Name) : Name :=
 base-qualified output labels. -/
 def baseifyIdents (aliasMap : List (Name × Name)) (stx : Syntax) : Syntax :=
   stx.replaceM (m := Id) fun s => match s with
-    | .ident info raw val pre => some (.ident info raw (baseifyName aliasMap val) pre)
+    | .ident info raw val pre =>
+      let val' := baseifyName aliasMap val
+      -- Rewrite the raw substring too, so a name derived from the *source text* (`autoColName` for an
+      -- unaliased computed column) is alias-independent as well.
+      let raw' := if val' == val then raw else (toString val').toRawSubstring
+      some (.ident info raw' val' pre)
     | _ => none
 
 end LeanDatabase
