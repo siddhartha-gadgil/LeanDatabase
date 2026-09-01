@@ -380,6 +380,13 @@ differing in any of these keep distinct summands. -/
 opaque groupPercentile (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
     (f : TypedTuple colType → Rat) : Rat := 0
 
+/-- `MIN/MAX/AVG(e) FILTER (WHERE p)` — filtered aggregate, opaque (its skip-NULL / row-dropping semantics
+can't be modelled by the `CASE` trick that SUM/COUNT use). The summand `f` folds the MIN/MAX/AVG marker,
+the predicate and the value (via `Scalar.filterTag`), so two filtered aggregates differing in any of
+these keep distinct summands and never wrongly unify. -/
+opaque groupFilterAgg (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
+    (f : TypedTuple colType → Int) : Int := 0
+
 /-- `GROUP BY ROLLUP/CUBE/GROUPING SETS(…)` — an opaque marker over the base grouped relation, tagged
 by a `spec` string capturing the exact construct + columns. Two identical grouping-set queries share
 the same `spec` and base relation, so they prove equal; different constructs/columns (or a plain
@@ -535,6 +542,6 @@ end LeanDatabase.TypedAgg
 /- Re-export the aggregate operators into the top-level `LeanDatabase` namespace-/
 namespace LeanDatabase
 export LeanDatabase.TypedAgg
-  (group groupCount groupSum groupKeys groupMax groupMaxInt groupMinInt groupAvg groupSumDistinct groupCountDistinct groupAvgDistinct groupBoolAnd groupBoolOr groupStddev groupVariance groupStringAgg groupPercentile groupSetMark relCount relSum relMax relMin relCountDistinct relAvg groupBy
+  (group groupCount groupSum groupKeys groupMax groupMaxInt groupMinInt groupAvg groupSumDistinct groupCountDistinct groupAvgDistinct groupBoolAnd groupBoolOr groupStddev groupVariance groupStringAgg groupPercentile groupFilterAgg groupSetMark relCount relSum relMax relMin relCountDistinct relAvg groupBy
    groupSumRat groupMaxRat groupMinRat groupAvgRat groupSumDistinctRat groupAvgDistinctRat groupStddevRat groupVarianceRat)
 end LeanDatabase

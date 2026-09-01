@@ -172,6 +172,50 @@ peel one column at a time and keep the result in `cons` form for `cons_eq_iff`. 
   funext ⟨i, hi⟩
   simp at hi
 
+/-! ### Peeling a join row
+
+`append_cons` rewrites `append a b` into a `cons` whose tail is another `append`, so `simp` will not
+iterate it (the recursion shrinks a type index it cannot see). These peel a whole literal-width left
+row in one step. The `show` matters: written plainly, the statement's type is `[t₀, t₁] ++ l₂`, while
+the goal's type has already been normalised to `t₀ :: t₁ :: l₂` by `List.cons_append` — and then the
+two never unify. Stating it at the reduced type is what makes it fire. Each is `rfl`. -/
+
+@[sql_mem] theorem append_row_1 {t0 : SQLTypeProxy} {l2 : List SQLTypeProxy}
+    (v0 : t0.type) (b : TypedTupleOfList l2) :
+    (TypedTupleOfList.append (TypedTupleOfList.cons t0 v0 (TypedTupleOfList.nil)) b : TypedTupleOfList (t0 :: l2)) = TypedTupleOfList.cons t0 v0 (b) := rfl
+
+@[sql_mem] theorem append_row_2 {t0 t1 : SQLTypeProxy} {l2 : List SQLTypeProxy}
+    (v0 : t0.type) (v1 : t1.type) (b : TypedTupleOfList l2) :
+    (TypedTupleOfList.append (TypedTupleOfList.cons t0 v0 (TypedTupleOfList.cons t1 v1 (TypedTupleOfList.nil))) b : TypedTupleOfList (t0 :: t1 :: l2)) = TypedTupleOfList.cons t0 v0 (TypedTupleOfList.cons t1 v1 (b)) := rfl
+
+@[sql_mem] theorem append_row_3 {t0 t1 t2 : SQLTypeProxy} {l2 : List SQLTypeProxy}
+    (v0 : t0.type) (v1 : t1.type) (v2 : t2.type) (b : TypedTupleOfList l2) :
+    (TypedTupleOfList.append (TypedTupleOfList.cons t0 v0 (TypedTupleOfList.cons t1 v1 (TypedTupleOfList.cons t2 v2 (TypedTupleOfList.nil)))) b : TypedTupleOfList (t0 :: t1 :: t2 :: l2)) = TypedTupleOfList.cons t0 v0 (TypedTupleOfList.cons t1 v1 (TypedTupleOfList.cons t2 v2 (b))) := rfl
+
+@[sql_mem] theorem append_row_4 {t0 t1 t2 t3 : SQLTypeProxy} {l2 : List SQLTypeProxy}
+    (v0 : t0.type) (v1 : t1.type) (v2 : t2.type) (v3 : t3.type) (b : TypedTupleOfList l2) :
+    (TypedTupleOfList.append (TypedTupleOfList.cons t0 v0 (TypedTupleOfList.cons t1 v1 (TypedTupleOfList.cons t2 v2 (TypedTupleOfList.cons t3 v3 (TypedTupleOfList.nil))))) b : TypedTupleOfList (t0 :: t1 :: t2 :: t3 :: l2)) = TypedTupleOfList.cons t0 v0 (TypedTupleOfList.cons t1 v1 (TypedTupleOfList.cons t2 v2 (TypedTupleOfList.cons t3 v3 (b)))) := rfl
+
+@[sql_mem] theorem append_row_5 {t0 t1 t2 t3 t4 : SQLTypeProxy} {l2 : List SQLTypeProxy}
+    (v0 : t0.type) (v1 : t1.type) (v2 : t2.type) (v3 : t3.type) (v4 : t4.type) (b : TypedTupleOfList l2) :
+    (TypedTupleOfList.append (TypedTupleOfList.cons t0 v0 (TypedTupleOfList.cons t1 v1 (TypedTupleOfList.cons t2 v2 (TypedTupleOfList.cons t3 v3 (TypedTupleOfList.cons t4 v4 (TypedTupleOfList.nil)))))) b : TypedTupleOfList (t0 :: t1 :: t2 :: t3 :: t4 :: l2)) = TypedTupleOfList.cons t0 v0 (TypedTupleOfList.cons t1 v1 (TypedTupleOfList.cons t2 v2 (TypedTupleOfList.cons t3 v3 (TypedTupleOfList.cons t4 v4 (b))))) := rfl
+
+@[sql_mem] theorem append_row_6 {t0 t1 t2 t3 t4 t5 : SQLTypeProxy} {l2 : List SQLTypeProxy}
+    (v0 : t0.type) (v1 : t1.type) (v2 : t2.type) (v3 : t3.type) (v4 : t4.type) (v5 : t5.type) (b : TypedTupleOfList l2) :
+    (TypedTupleOfList.append (TypedTupleOfList.cons t0 v0 (TypedTupleOfList.cons t1 v1 (TypedTupleOfList.cons t2 v2 (TypedTupleOfList.cons t3 v3 (TypedTupleOfList.cons t4 v4 (TypedTupleOfList.cons t5 v5 (TypedTupleOfList.nil))))))) b : TypedTupleOfList (t0 :: t1 :: t2 :: t3 :: t4 :: t5 :: l2)) = TypedTupleOfList.cons t0 v0 (TypedTupleOfList.cons t1 v1 (TypedTupleOfList.cons t2 v2 (TypedTupleOfList.cons t3 v3 (TypedTupleOfList.cons t4 v4 (TypedTupleOfList.cons t5 v5 (b)))))) := rfl
+
+@[sql_mem] theorem append_row_7 {t0 t1 t2 t3 t4 t5 t6 : SQLTypeProxy} {l2 : List SQLTypeProxy}
+    (v0 : t0.type) (v1 : t1.type) (v2 : t2.type) (v3 : t3.type) (v4 : t4.type) (v5 : t5.type) (v6 : t6.type) (b : TypedTupleOfList l2) :
+    (TypedTupleOfList.append (TypedTupleOfList.cons t0 v0 (TypedTupleOfList.cons t1 v1 (TypedTupleOfList.cons t2 v2 (TypedTupleOfList.cons t3 v3 (TypedTupleOfList.cons t4 v4 (TypedTupleOfList.cons t5 v5 (TypedTupleOfList.cons t6 v6 (TypedTupleOfList.nil)))))))) b : TypedTupleOfList (t0 :: t1 :: t2 :: t3 :: t4 :: t5 :: t6 :: l2)) = TypedTupleOfList.cons t0 v0 (TypedTupleOfList.cons t1 v1 (TypedTupleOfList.cons t2 v2 (TypedTupleOfList.cons t3 v3 (TypedTupleOfList.cons t4 v4 (TypedTupleOfList.cons t5 v5 (TypedTupleOfList.cons t6 v6 (b))))))) := rfl
+
+@[sql_mem] theorem append_row_8 {t0 t1 t2 t3 t4 t5 t6 t7 : SQLTypeProxy} {l2 : List SQLTypeProxy}
+    (v0 : t0.type) (v1 : t1.type) (v2 : t2.type) (v3 : t3.type) (v4 : t4.type) (v5 : t5.type) (v6 : t6.type) (v7 : t7.type) (b : TypedTupleOfList l2) :
+    (TypedTupleOfList.append (TypedTupleOfList.cons t0 v0 (TypedTupleOfList.cons t1 v1 (TypedTupleOfList.cons t2 v2 (TypedTupleOfList.cons t3 v3 (TypedTupleOfList.cons t4 v4 (TypedTupleOfList.cons t5 v5 (TypedTupleOfList.cons t6 v6 (TypedTupleOfList.cons t7 v7 (TypedTupleOfList.nil))))))))) b : TypedTupleOfList (t0 :: t1 :: t2 :: t3 :: t4 :: t5 :: t6 :: t7 :: l2)) = TypedTupleOfList.cons t0 v0 (TypedTupleOfList.cons t1 v1 (TypedTupleOfList.cons t2 v2 (TypedTupleOfList.cons t3 v3 (TypedTupleOfList.cons t4 v4 (TypedTupleOfList.cons t5 v5 (TypedTupleOfList.cons t6 v6 (TypedTupleOfList.cons t7 v7 (b)))))))) := rfl
+
+@[sql_mem] theorem append_row_9 {t0 t1 t2 t3 t4 t5 t6 t7 t8 : SQLTypeProxy} {l2 : List SQLTypeProxy}
+    (v0 : t0.type) (v1 : t1.type) (v2 : t2.type) (v3 : t3.type) (v4 : t4.type) (v5 : t5.type) (v6 : t6.type) (v7 : t7.type) (v8 : t8.type) (b : TypedTupleOfList l2) :
+    (TypedTupleOfList.append (TypedTupleOfList.cons t0 v0 (TypedTupleOfList.cons t1 v1 (TypedTupleOfList.cons t2 v2 (TypedTupleOfList.cons t3 v3 (TypedTupleOfList.cons t4 v4 (TypedTupleOfList.cons t5 v5 (TypedTupleOfList.cons t6 v6 (TypedTupleOfList.cons t7 v7 (TypedTupleOfList.cons t8 v8 (TypedTupleOfList.nil)))))))))) b : TypedTupleOfList (t0 :: t1 :: t2 :: t3 :: t4 :: t5 :: t6 :: t7 :: t8 :: l2)) = TypedTupleOfList.cons t0 v0 (TypedTupleOfList.cons t1 v1 (TypedTupleOfList.cons t2 v2 (TypedTupleOfList.cons t3 v3 (TypedTupleOfList.cons t4 v4 (TypedTupleOfList.cons t5 v5 (TypedTupleOfList.cons t6 v6 (TypedTupleOfList.cons t7 v7 (TypedTupleOfList.cons t8 v8 (b))))))))) := rfl
+
 /-! ### Indexing a built row
 
 A row reaches the goal applied to a **numeral** index (`t 0`, `t 3`), which is `Fin.ofNat` and does not

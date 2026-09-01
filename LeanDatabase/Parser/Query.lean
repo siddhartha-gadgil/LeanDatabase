@@ -153,11 +153,23 @@ partial def liftAggExprs (stx : Syntax) :
     match node with
     -- Aggregate `FILTER (WHERE p)` → aggregate over `CASE WHEN p THEN e …` (SUM/COUNT, sound).
     | `(SUM($e:term) FILTER(WHERE $p:term)) =>
-        do record .sum (← `(CASE WHEN $p THEN $e ELSE 0 END))
+        do record .sum (← `(CASE WHEN $p THEN $e:term ELSE 0 END))
     | `(COUNT(*) FILTER(WHERE $p:term)) =>
         do record .sum (← `(CASE WHEN $p THEN (1 : Int) ELSE (0 : Int) END))
     | `(COUNT($e:term) FILTER(WHERE $p:term)) =>
-        do record .count (← `(CASE WHEN $p THEN $e END))
+        do record .count (← `(CASE WHEN $p THEN $e:term END))
+    -- `COUNT(DISTINCT e) FILTER(WHERE p)` → `COUNT(DISTINCT CASE WHEN p THEN e END)` (excluded rows NULL,
+    -- which `COUNT` skips).
+    | `(COUNT(DISTINCT $e:term) FILTER(WHERE $p:term)) =>
+        do record .countDistinct (← `(CASE WHEN $p THEN $e:term END))
+    -- MIN/MAX/AVG(e) FILTER(WHERE p): the `CASE` trick can't model their skip-NULL semantics (MIN/MAX/AVG
+    -- reject the `Option`-typed CASE), so capture them opaquely — `groupFilterAgg` over `filterTag mark p e`.
+    | `(MIN($e:term) FILTER(WHERE $p:term)) =>
+        do record .filterAgg (← `($(mkIdent ``LeanDatabase.Scalar.filterTag) "min" ($p : Bool) $e))
+    | `(MAX($e:term) FILTER(WHERE $p:term)) =>
+        do record .filterAgg (← `($(mkIdent ``LeanDatabase.Scalar.filterTag) "max" ($p : Bool) $e))
+    | `(AVG($e:term) FILTER(WHERE $p:term)) =>
+        do record .filterAgg (← `($(mkIdent ``LeanDatabase.Scalar.filterTag) "avg" ($p : Bool) $e))
     | `(COUNT(DISTINCT $e:term)) => record .countDistinct e
     | `(APPROX_COUNT_DISTINCT($e:term)) => record .countDistinct e
     | `(SUM(DISTINCT $e:term))   => record .sumDistinct e
@@ -189,11 +201,18 @@ partial def liftAggExprs (stx : Syntax) :
         -- `SUM(CASE WHEN p THEN 1 … ELSE 0 END)`, the indicator sum that
         -- `groupSum_case_eq_groupSum_where` folds into `COUNT(*) WHERE p`.
         let ones ← cs.mapM fun _ => `(term| (1 : Int))
-        let e ← `(CASE $[WHEN $cs THEN $ones]* ELSE (0 : Int) END)
+        let e ← `(CASE $[WHEN $cs THEN $ones:term]* ELSE (0 : Int) END)
         record .sum e
     | `(COUNT(*))       => record .count ⟨Syntax.mkNumLit "0"⟩
     | `(COUNT($e:term)) => record .count e
     | _ => return none
+
+/-- Flatten a top-level `AND`-conjunction into its conjuncts (`p AND q AND r` → `[p, q, r]`). Used by
+`elabWhere` to peel `[NOT] EXISTS`/`[NOT] IN` subquery predicates out of a compound `WHERE`. -/
+partial def flattenAnd (t : Syntax.Term) : List Syntax.Term :=
+  match t with
+  | `($a AND $b) => flattenAnd a ++ flattenAnd b
+  | _ => [t]
 
 /-- Does `stx` reference the table name `nm` anywhere (i.e. is a CTE self-recursive)? -/
 partial def refsName (nm : Name) : Syntax → Bool
@@ -239,26 +258,46 @@ def proxyOfType (e : Expr) : MetaM (Option SQLTypeProxy) := do
   else if e.isConstOf ``Bool then pure (some .bool)
   else pure none
 
-/-- Build an inline `VALUES` relation: infer each column's type from the first row, elaborate every
-cell to that type, assemble the tuples, and hand them to `valuesRel`. Columns are labelled `alias.col`. -/
-def buildValues (rows : List (List Syntax.Term)) (cols : List Name) (alias_ : Name) :
+/-- Build an inline `VALUES` relation. A cell is `some term` for a value or `none` for a SQL `NULL`.
+Each column's base type comes from its first non-NULL cell; a column with any NULL becomes nullable
+(`.nullable base`, so cells are `Option _`), and an **all-NULL** column defaults to `.nullable .int`
+(the base type is unobservable — every value is `none`). NULL cells → `Option.none`, value cells in a
+nullable column → `some v`. Columns are labelled `alias.col`. -/
+def buildValues (rows : List (List (Option Syntax.Term))) (cols : List Name) (alias_ : Name) :
     TermElabM (Expr × List (Name × SQLTypeProxy)) := do
   let some row0 := rows.head? | throwError "VALUES: no rows"
   unless row0.length == cols.length do throwError "VALUES: row width ≠ column count"
-  -- Column types from the first row.
-  let tys ← row0.mapM fun cell => do
-    let e ← elabTerm cell none
-    Term.synthesizeSyntheticMVarsNoPostponing
-    let some p ← proxyOfType (← instantiateMVars (← inferType e))
-      | throwError "VALUES: unsupported cell type in {cell}"
-    pure p
+  let ncols := row0.length
+  -- Per column: base type from the first non-NULL cell, and whether any cell is NULL.
+  let mut tysArr : Array SQLTypeProxy := #[]
+  for j in [0:ncols] do
+    let mut base? : Option SQLTypeProxy := none
+    let mut hasNull := false
+    for row in rows do
+      match row[j]! with
+      | none => hasNull := true
+      | some cell =>
+        if base?.isNone then
+          let e ← elabTerm cell none
+          Term.synthesizeSyntheticMVarsNoPostponing
+          let some p ← proxyOfType (← instantiateMVars (← inferType e))
+            | throwError "VALUES: unsupported cell type in {cell}"
+          base? := some p
+    let baseTy := base?.getD .int            -- all-NULL column: base is unobservable, default to int
+    tysArr := tysArr.push (if hasNull then .nullable baseTy else baseTy)
+  let tys := tysArr.toList
   let lE ← sqlTypeListExpr tys
   -- Each row → a `TypedTupleOfList tys` (built right-to-left with `cons`), each cell at its column type.
   let tuples ← rows.mapM fun row => do
     unless row.length == tys.length do throwError "VALUES: ragged rows"
     let mut tup ← mkAppOptM ``TypedTupleOfList.nil #[]
-    for (cell, ty) in (row.zip tys).reverse do
-      let v ← elabTermEnsuringType cell (typeExpr ty)
+    for (cell?, ty) in (row.zip tys).reverse do
+      let v ← match ty, cell? with
+        | .nullable baseP, some cell => do                         -- value in a nullable column → `some v`
+          mkAppM ``Option.some #[← elabTermEnsuringType cell (typeExpr baseP)]
+        | .nullable baseP, none => mkAppOptM ``Option.none #[typeExpr baseP]   -- NULL → `none`
+        | _, some cell => elabTermEnsuringType cell (typeExpr ty)
+        | _, none => throwError "VALUES: NULL in a non-nullable column"        -- unreachable
       tup ← mkAppM ``TypedTupleOfList.cons #[toExpr ty, v, tup]
     pure tup
   let tupleTy ← mkAppM ``TypedTupleOfList #[lE]
@@ -309,7 +348,10 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
     -- Inline literal relation: constant in the table vars. Placeholder column names `c0…`; the outer
     -- `(…) AS t(cols)` from-source relabels them.
     let rowLists ← rows.getElems.toList.mapM fun r => match r with
-      | `(sql_values_row| ( $es,* )) => pure es.getElems.toList
+      | `(sql_values_row| ( $es,* )) => es.getElems.toList.mapM fun c => match c with
+          | `(sql_values_cell| NULL)     => pure (none : Option Syntax.Term)
+          | `(sql_values_cell| $t:term)  => pure (some t)
+          | _ => throwError "malformed VALUES cell"
       | _ => throwError "malformed VALUES row"
     let ncols := (rowLists.head?.map (·.length)).getD 0
     let names := (List.range ncols).map (fun i => Name.mkSimple s!"c{i}")
@@ -383,8 +425,8 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
     let opName ← match op with
       -- Set semantics: a query denotes its result SET, so `UNION ALL` and `UNION` coincide
       | `(sql_setop| UNION ALL) | `(sql_setop| UNION) => pure ``union
-      | `(sql_setop| INTERSECT) => pure ``intersection
-      | `(sql_setop| EXCEPT)    => pure ``minus
+      | `(sql_setop| INTERSECT ALL) | `(sql_setop| INTERSECT) => pure ``intersection
+      | `(sql_setop| EXCEPT ALL) | `(sql_setop| EXCEPT)    => pure ``minus
       | _ => throwError "unknown set operation"
     let relL ← coerceRelTo schemaL (lamL.beta vars.toArray) target
     let relR ← coerceRelTo schemaR (lamR.beta vars.toArray) target
@@ -534,10 +576,11 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
         let names := cs.getElems.toList.map (fun c => al.getId ++ c.getId)
         return (lamSub.beta vars.toArray, names.zip (subSchema.map (·.2)))
       | none =>
-        -- Qualify under the alias but **keep** the subquery's own name (`itpv.itp.itemn`): the prefix
-        -- makes `itpv.itemn` resolve here (`resolveInScope`) instead of being ambiguously bare, and the
-        -- retained inner name is what the output label reverts to (`aliasMap` maps the alias away).
-        return (lamSub.beta vars.toArray, subSchema.map (fun (n, ty) => (al.getId ++ n, ty)))
+        -- Qualify each column under the alias by its OUTPUT name (the subquery column's last component,
+        -- e.g. `emp.sal` → `t.sal`) — matching how `alias.col` is written and how `subqueryJoin`/
+        -- `outerJoinSub` label a subquery RHS, so `t.sal` resolves when this subquery is a join operand.
+        return (lamSub.beta vars.toArray,
+          subSchema.map (fun (n, ty) => (al.getId ++ (n.components.getLast?).getD n, ty)))
     -- `LATERAL FLATTEN` — correlated unnest appended to the left FROM (see `flattenArm`). Matched
     -- before the plain comma so `f1 , LATERALFLATTEN(e) …` doesn't fall through to a cross product.
     | `(sql_from| $f1:sql_from , LATERALFLATTEN( $e:term ) AS $h:ident ( $cols:ident,* ))
@@ -740,21 +783,52 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
   -- `semijoin`/`antijoin`; anything else is an ordinary `restriction` by a tuple predicate.
   elabWhere (rel : Expr) (schema : List (Name × SQLTypeProxy)) (filter : Term)
       (usedStx : Syntax) : TermElabM Expr := do
-    match filter with
-    | `(EXISTS ( $inner:sql_query ))     => elabExists rel schema inner none false
-    | `(NOT EXISTS ( $inner:sql_query )) => elabExists rel schema inner none true
-    | `($oc:term IN ( $inner:sql_query ))     => elabExists rel schema inner (some oc) false
-    | `($oc:term NOT IN ( $inner:sql_query )) => elabExists rel schema inner (some oc) true
-    | _ => do
+    -- A single conjunct that is a `[NOT] EXISTS`/`[NOT] IN` subquery predicate → `semijoin`/`antijoin`
+    -- of `rel` with the (correlated) subquery; `none` if `t` is an ordinary tuple predicate. `NOT (x IN
+    -- …)`/`NOT EXISTS(…)` (the `NOT`-macro wrapping the subquery term) are handled too.
+    let trySubqPred (rel : Expr) (t : Syntax.Term) : TermElabM (Option Expr) := do
+      match t with
+      | `(EXISTS ( $inner:sql_query ))          => some <$> elabExists rel schema inner none false
+      | `(NOT EXISTS ( $inner:sql_query ))      => some <$> elabExists rel schema inner none true
+      | `($oc:term IN ( $inner:sql_query ))     => some <$> elabExists rel schema inner (some oc) false
+      | `($oc:term NOT IN ( $inner:sql_query )) => some <$> elabExists rel schema inner (some oc) true
+      | `(NOT $inner:term) =>
+        match inner with
+        | `($oc:term IN ( $q:sql_query ))     => some <$> elabExists rel schema q (some oc) true
+        | `($oc:term NOT IN ( $q:sql_query )) => some <$> elabExists rel schema q (some oc) false
+        | `(EXISTS ( $q:sql_query ))          => some <$> elabExists rel schema q none true
+        | _ => pure none
+      | _ => pure none
+    -- Peel subquery predicates out of a compound `WHERE p₁ AND p₂ AND …`: each `[NOT] EXISTS`/`[NOT] IN`
+    -- conjunct becomes a semi/antijoin, the ordinary ones fold back into a single `restriction`. Sound:
+    -- `σ_{p∧q} = σ_p ∘ σ_q`, and the (anti)joins keep `rel`'s rows so `schema` is unchanged throughout.
+    let conjs := flattenAnd filter
+    let mut relAcc := rel
+    let mut plain : Array Syntax.Term := #[]
+    let mut sawSubq := false
+    for c in conjs do
+      match ← trySubqPred relAcc c with
+      | some r => relAcc := r; sawSubq := true
+      | none   => plain := plain.push c
+    if !sawSubq then
+      -- No subquery predicate: elaborate the original filter as one tuple predicate (unchanged behavior).
       let f ← elabTypedTupleFilter [(.anonymous, schema)] filter usedStx
       mkAppM ``restriction #[f, rel]
+    else if plain.isEmpty then
+      return relAcc
+    else
+      -- re-AND the ordinary conjuncts: seed with the first, fold the rest.
+      let combined ← (plain.toList.tail!).foldlM (fun (acc : Syntax.Term) t => `($acc && $t)) plain[0]!
+      let f ← elabTypedTupleFilter [(.anonymous, schema)] combined usedStx
+      mkAppM ``restriction #[f, relAcc]
 
   elabExists (rel : Expr) (outerSchema : List (Name × SQLTypeProxy)) (inner : TSyntax `sql_query)
       (inCol? : Option Term) (isNeg : Bool) : TermElabM Expr := do
     match inner with
     | `(sql_query| SELECT $[DISTINCT%$_d]? $sel:sql_cols FROM $sdb:sql_from $[WHERE $corr?]? $[;]?) => do
       -- `DISTINCT` in an IN/EXISTS subquery is irrelevant (set membership), so it is accepted and ignored.
-      let some _ := (getIdents sdb).head? | throwError "subquery expects a single inner table"
+      -- `productPair` elaborates any inner FROM (a base table, a subquery `(…) AS t`, a join, or VALUES),
+      -- so no single-table restriction is needed — the correlation resolves against `sSchema` below.
       let (sExpr, sSchema) ← productPair sdb
       let corr ← match inCol?, corr? with
         | some oc, _ => do                                  -- `oc IN (SELECT c FROM …)`  ⇒  `oc = c`

@@ -7,6 +7,7 @@ import LeanDatabase.Constraints
 import LeanDatabase.Parser.Context
 import LeanDatabase.DataEquiv
 import LeanDatabase.Membership
+import LeanDatabase.Plausible.Tactic
 
 open LeanDatabase LeanDatabase.TypedAgg
 
@@ -101,6 +102,14 @@ macro "sql_bijection" : tactic => `(tactic|
      | exact (‹SamePartition _ _ _› : SamePartition _ _ _) a ha b hb
    done))
 
+/-- **Use the integrity constraints in context.** A key (`FuncDepEq k id`) says two rows agreeing on
+`k` are the same row; a foreign key (`ForeignKey f g R S`) *supplies* a parent row for every child row
+— which is exactly the side condition a join-elimination rewrite needs and the one thing no amount of
+rewriting can invent. Both are `∀`/`∃` facts about the table variables, so they are handed to `grind`
+with their definitions unfolded, rather than left as opaque hypotheses it cannot look inside. -/
+macro "sql_constraints" : tactic => `(tactic|
+  grind +locals [LeanDatabase.ForeignKey, LeanDatabase.FuncDepEq, LeanDatabase.SamePartition])
+
 /-- **The membership route** — the informed reduction, and the analogue of what VeriEQL hands to Z3.
 
 `A ~= B` is `A.rows = B.rows`, which `Finset.ext` turns into `∀ x, x ∈ A.rows ↔ x ∈ B.rows`; the
@@ -125,10 +134,24 @@ macro "sql_membership" : tactic => `(tactic|
    try simp only [sql_mem, Finset.mem_image, Finset.mem_filter, Finset.mem_product,
      Finset.mem_union, Finset.mem_inter, Finset.mem_sdiff, Prod.exists,
      decide_eq_true_eq, Bool.and_eq_true, Bool.or_eq_true, Bool.not_eq_true]
-   first | grind +locals | tauto))
+   first | grind +locals | sql_constraints | tauto))
+
+/-- On an oversized goal, go straight to the structural route and finish there — succeeding (and
+closing the goal) or failing outright, so `sql_equiv`'s `try` moves on. Only the size test lives here;
+`sql_membership` does the work. -/
+elab "sql_big_goal" : tactic => do
+  let ty ← Lean.Elab.Tactic.getMainGoal >>= (·.getType)
+  if ty.approxDepth ≤ 96 then Lean.throwError "goal is not oversized"
+  Lean.Elab.Tactic.evalTactic (← `(tactic| sql_membership))
 
 macro "sql_equiv" : tactic => `(tactic|
   (
+   -- Is this even an equivalence? Aborts with the offending database if not; otherwise a no-op.
+   sql_disprove
+   -- On a very large goal (a seven-table join, say) the congruence loop below is dominated by
+   -- `sql_simp`, whose `simp_all` runs out of budget before reaching the closers. The structural
+   -- route rewrites instead of searching, so it is the one worth spending a huge goal's budget on.
+   try sql_big_goal
    -- data-equivalence goal (`A ~= B`): unfold to `A.rows = B.rows` (labels/aliases erased), then reduce.
    try (simp only [LeanDatabase.dataEq])
    repeat (first
@@ -167,6 +190,9 @@ macro "sql_equiv" : tactic => `(tactic|
      -- Last: the structural membership route. Tried after the cheap closers because it rewrites the
      -- goal wholesale; when they fail on a join/projection equality, this is what has a shape `grind`
      -- can actually reason about.
-     | sql_membership)))
+     | sql_membership
+     -- Last resort: the constraints alone (a pair that is an equivalence *only* modulo its keys and
+     -- foreign keys, with no rewriting needed beyond them).
+     | sql_constraints)))
 
 end LeanDatabase.SQLEquiv

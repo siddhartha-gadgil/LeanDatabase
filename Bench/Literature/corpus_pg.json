@@ -786,7 +786,7 @@
   "query": "SELECT DISTINCT X.USRUID AS XID, X.USRNAME AS XNAME FROM USR AS X, PIC AS U, PIC AS V WHERE X.USRUID = U.PICUID AND X.USRUID = V.PICUID AND B1(U) AND B2(V)"
  },
  {
-  "id": "11:q0",
+  "id": "11_fix:q0",
   "schemas": [
    {
     "name": "USR",
@@ -819,10 +819,11 @@
     ]
    }
   ],
-  "query": "SELECT X.UID AS XU, X.UNAME AS XN, (SELECT COUNT(*) AS CT FROM PIC AS Y WHERE X.UID = Y.UID AND Y.SIZE > 100000) AS CNT FROM USR AS X WHERE X.CITY = 3"
+  "query": "SELECT X.UID AS XU, X.UNAME AS XN, (SELECT COUNT(*) AS CT FROM PIC AS Y WHERE X.UID = Y.UID AND Y.SIZE > 100000) AS CNT FROM USR AS X WHERE X.CITY = 3",
+  "repaired": "selects X.NAME, but the schema (and its own GROUP BY, and the sibling query) say UNAME"
  },
  {
-  "id": "11:q1",
+  "id": "11_fix:q1",
   "schemas": [
    {
     "name": "USR",
@@ -855,7 +856,8 @@
     ]
    }
   ],
-  "query": "SELECT X.UID AS XU, X.NAME AS XN, COUNT(*) AS CNT FROM USR AS X, PIC AS Y WHERE X.UID = Y.UID AND Y.SIZE > 100000 GROUP BY X.UID, X.UNAME"
+  "query": "SELECT X.UID AS XU, X.UNAME AS XN, COUNT(*) AS CNT FROM USR AS X, PIC AS Y WHERE X.UID = Y.UID AND Y.SIZE > 100000 GROUP BY X.UID, X.UNAME",
+  "repaired": "selects X.NAME, but the schema (and its own GROUP BY, and the sibling query) say UNAME"
  },
  {
   "id": "12:q0",

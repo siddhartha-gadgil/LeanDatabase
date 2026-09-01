@@ -282,6 +282,27 @@ private partial def flattenGo : List Char → String → String
 
 /-- Normalize SQL surface syntax to what the grammar accepts (C3): path access `v:key`/`v['key']` →
 `VARIANTGET`, `'…'` strings → `"…"`, double-quoted **identifiers** → bare idents, `X::TYPE` → `CAST`. -/
+-- `… OFFSET n LIMIT m` (the order Calcite emits) → `… LIMIT m OFFSET n` (the grammar's clause order).
+-- Purely syntactic — the two clauses are independent, so the swap preserves meaning. Scans the whole
+-- string so occurrences inside subqueries (`… OFFSET 2 LIMIT 10) AS t …`) are reordered too.
+private partial def reorderOffsetLimit : List Char → String → String
+  | [], acc => acc
+  | cs@(c :: rest), acc =>
+    if " OFFSET ".toList.isPrefixOf cs then
+      let r1 := cs.drop " OFFSET ".length
+      let d1 := r1.takeWhile Char.isDigit
+      let r2 := r1.dropWhile Char.isDigit
+      if !d1.isEmpty && " LIMIT ".toList.isPrefixOf r2 then
+        let r3 := r2.drop " LIMIT ".length
+        let d2 := r3.takeWhile Char.isDigit
+        let r4 := r3.dropWhile Char.isDigit
+        if !d2.isEmpty then
+          reorderOffsetLimit r4
+            (acc ++ " LIMIT " ++ String.ofList d2 ++ " OFFSET " ++ String.ofList d1)
+        else reorderOffsetLimit rest (acc.push c)
+      else reorderOffsetLimit rest (acc.push c)
+    else reorderOffsetLimit rest (acc.push c)
+
 def normalizeSqlLiterals (s : String) : String :=
   let s := stripComments s.toList ""
   -- Quantified subquery comparisons: `x <> ALL (subq)` ≡ `x NOT IN (subq)`, `x = ANY/SOME (subq)` ≡
@@ -314,6 +335,11 @@ def normalizeSqlLiterals (s : String) : String :=
   -- `x IS [NOT] DISTINCT FROM y` is the NULL-safe (non-)equality; 2-valued it is `x <> y` / `x = y`.
   let s := s.replace " IS NOT DISTINCT FROM " " = "
   let s := s.replace " IS DISTINCT FROM " " <> "
+  -- `p IS TRUE` / `p IS NOT FALSE` are identities on a 2-valued (non-null) boolean `p`; strip them.
+  -- (The `IS FALSE`/`IS NOT TRUE` negations need a `NOT` wrapper, so they are left unparsed, not equated.)
+  let s := s.replace " IS NOT FALSE" ""
+  let s := s.replace " IS TRUE" ""
+  let s := reorderOffsetLimit s.toList ""
   -- `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` is the SQL default frame (a no-op); strip it so
   -- the window parses. Only the default is stripped — other frames stay unparsed, never equated.
   let s := s.replace " RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW" ""

@@ -459,7 +459,7 @@
   "dataEq": true
  },
  {
-  "id": "11:eq",
+  "id": "11_fix:eq",
   "schemas": [
    {
     "name": "USR",
@@ -493,8 +493,9 @@
    }
   ],
   "first": "SELECT X.UID AS XU, X.UNAME AS XN, (SELECT COUNT(*) AS CT FROM PIC AS Y WHERE X.UID = Y.UID AND Y.SIZE > 100000) AS CNT FROM USR AS X WHERE X.CITY = 3",
-  "second": "SELECT X.UID AS XU, X.NAME AS XN, COUNT(*) AS CNT FROM USR AS X, PIC AS Y WHERE X.UID = Y.UID AND Y.SIZE > 100000 GROUP BY X.UID, X.UNAME",
-  "dataEq": true
+  "second": "SELECT X.UID AS XU, X.UNAME AS XN, COUNT(*) AS CNT FROM USR AS X, PIC AS Y WHERE X.UID = Y.UID AND Y.SIZE > 100000 GROUP BY X.UID, X.UNAME",
+  "dataEq": true,
+  "repaired": "selects X.NAME, but the schema (and its own GROUP BY, and the sibling query) say UNAME"
  },
  {
   "id": "12:eq",

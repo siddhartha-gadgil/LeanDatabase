@@ -44,18 +44,6 @@ def ddlType (t : String) : String :=
   | "TIMESTAMP" | "DATE" | "DATETIME" => "TIMESTAMP"
   | _ => "STRING"
 
-/-- The `SQLTypeProxy` constructor for a DDL keyword — the theorem binds each table at its **literal**
-`TypedRelationOfList [...]` type rather than `TableRel T_schema`: the abbrev hides the column list
-behind a projection, and the membership route (`sql_membership`) then cannot normalise a join's
-`l₁ ++ l₂` type index, so nothing fires. -/
-def proxyOf (ddl : String) : String :=
-  match ddl with
-  | "INT" => "SQLTypeProxy.int"
-  | "FLOAT" => "SQLTypeProxy.float"
-  | "BOOL" => "SQLTypeProxy.bool"
-  | "TIMESTAMP" => "SQLTypeProxy.timestamp"
-  | _ => "SQLTypeProxy.string"
-
 /-- Sanitise an id into a valid identifier component (for the namespace). -/
 def sanitizeIdent (s : String) : String :=
   let cs := s.toList.map fun c => if c.isAlphanum then c else '_'
@@ -76,7 +64,6 @@ def genTheorem (rec : Json) (tactic : String) : String := Id.run do
   let schemas := (rec.getObjValAs? (List Json) "schemas").toOption.getD []
   let mut creates := ""
   let mut refs : List String := []
-  let mut types : List String := []
   for s in schemas do
     let name := (s.getObjValAs? String "name").toOption.getD "T"
     let cols := (s.getObjValAs? (List Json) "columns").toOption.getD []
@@ -86,15 +73,13 @@ def genTheorem (rec : Json) (tactic : String) : String := Id.run do
       s!"«{cn}» {ct}")
     creates := creates ++ s!"CREATE TABLE {name} ({colDdl})\n"
     refs := refs ++ [s!"{name}_schema"]
-    types := types ++ [", ".intercalate (cols.map fun c =>
-      proxyOf (ddlType ((c.getObjValAs? String "type").toOption.getD "STRING")))]
   let ns := sanitizeIdent id
   let reflist := ", ".intercalate refs
   -- The theorem is stated **applied to table binders** (`(t0 : TableRel A_schema) … : q₁ t0 ~= q₂ t0`),
   -- the same goal the census proves: `~=` compares rows only, and it is not defined on the *function*
   -- `sql%` returns, so a bare `q₁ ~= q₂` would not even typecheck. A non-`dataEq` pair keeps `=`.
-  let binders := String.join ((types.zipIdx).map fun (ty, i) =>
-    s!" (t{i} : TypedRelationOfList [{ty}])")
+  let binders := String.join ((refs.zipIdx).map fun (schemaName, i) =>
+    s!" (t{i} : TableRel {schemaName})")
   let args := String.join ((refs.zipIdx).map fun (_, i) => s!" t{i}")
   let op := if (rec.getObjValAs? Bool "dataEq").toOption.getD true then "~=" else "="
   "import LeanDatabase.Parser\nimport LeanDatabase.SQLSyntax\nopen LeanDatabase Lean\n" ++
@@ -154,6 +139,8 @@ unsafe def runProveSync (env : Environment) (ctx : Core.Context) (ds : String) :
   let .ok (.arr recs) := Json.parse (← IO.FS.readFile path) | return
   let mut proved : Nat := 0
   let mut elaborated : Nat := 0
+  let mut refuted : Nat := 0
+  let mut timeouts : Nat := 0
   let mut results : Array Json := #[]
   -- One pass per pair (file-wise): `provePair` parses + elaborates both queries, THEN runs `sql_equiv`
   -- — so a single call gives us both statuses. An exception (`err`) means it never elaborated; no error
@@ -164,26 +151,48 @@ unsafe def runProveSync (env : Environment) (ctx : Core.Context) (ds : String) :
     let base := fileBase id
     let ctx := { ctx with initHeartbeats := (← IO.getNumHeartbeats) }
     let v ← ((provePairCore r).run' ctx { env := env }).toIO'
-    let (ok, err) ← match v with
+    let (ok, err, cex, didElab) ← match v with
       | .ok j => pure ((j.getObjValAs? Bool "proved").toOption.getD false,
-                       (j.getObjValAs? String "error").toOption)
-      | .error e => do pure (false, some s!"exception: {← e.toMessageData.toString}")
-    let didElab := err.isNone
+                       (j.getObjValAs? String "error").toOption,
+                       (j.getObjValAs? String "counterexample").toOption,
+                       -- Reported by `provePair`, not inferred: a proof that ran out of budget
+                       -- elaborated perfectly well, and used to be miscounted as ELAB-FAIL.
+                       (j.getObjValAs? Bool "elaborated").toOption.getD false)
+      | .error e => do pure (false, some s!"exception: {← e.toMessageData.toString}", none, false)
+    let timedOut : Bool := match err with | some e => (e.splitOn "heartbeats").length ≥ 2 | none => false
+    -- A timeout escapes `provePair` before it can report anything, but only the *tactic* raises one:
+    -- a query that fails to elaborate comes back as a clean error instead. So it did elaborate.
+    let didElab := didElab || timedOut
+    if timedOut then timeouts := timeouts + 1
     if didElab then elaborated := elaborated + 1
     if ok then
       proved := proved + 1
       IO.FS.writeFile s!"Bench/{ds}/Proven/{base}.lean" (genTheorem r "sql_equiv")
-    -- One line per pair, flushed. Status: PROVED | UNPROVED (elaborated, tactic failed) | ELAB-FAIL.
-    let tag := if ok then "PROVED  " else if didElab then "UNPROVED" else "ELAB-FAIL"
-    IO.println (s!"[{ds}] {i + 1}/{recs.size} {tag} {id}"
-                ++ (match err with | some e => s!": {firstLine e}" | none => ""))
+    if cex.isSome then refuted := refuted + 1
+    -- One line per pair, flushed. Status: PROVED | COUNTEREX (the search found a database where the
+    -- two queries differ — not an equivalence at all) | TIMEOUT | UNPROVED | ELAB-FAIL.
+    let tag := if ok then "PROVED   " else if cex.isSome then "COUNTEREX"
+               else if timedOut then "TIMEOUT  "
+               else if didElab then "UNPROVED " else "ELAB-FAIL"
+    -- For a counterexample the database itself is the useful part of the message.
+    let note := match cex, err with
+      | some c, _ => " | " ++ " ".intercalate ((c.splitOn "\n").filter (fun l => (l.splitOn ":=").length ≥ 2))
+      | none, some e => s!": {firstLine e}"
+      | none, none => ""
+    IO.println s!"[{ds}] {i + 1}/{recs.size} {tag} {id}{note}"
     (← IO.getStdout).flush
     results := results.push (Json.mkObj [("id", Json.str id), ("proved", Json.bool ok),
-      ("elaborated", Json.bool didElab), ("error", match err with | some e => Json.str e | none => Json.null)])
+      ("elaborated", Json.bool didElab),
+      ("counterexample", match cex with | some c => Json.str c | none => Json.null),
+      ("error", match err with | some e => Json.str e | none => Json.null)])
   IO.FS.writeFile s!"Bench/{ds}/prove_results.json"
     (Json.mkObj [("proved", Json.num proved), ("elaborated", Json.num elaborated),
+                 ("counterexamples", Json.num refuted), ("timeouts", Json.num timeouts),
                  ("total", Json.num recs.size), ("results", Json.arr results)]).pretty
-  IO.println s!"[{ds}] elaborated {elaborated}/{recs.size}, PROVED {proved}/{recs.size} (Proven ⊆ Problems)"
+  -- Timeouts are counted apart from elaboration: when the budget runs out the exception escapes
+  -- before we learn how far it got, so those pairs are "unknown", not "did not elaborate".
+  IO.println s!"[{ds}] elaborated {elaborated}/{recs.size}, PROVED {proved}/{recs.size}, \
+    NOT-EQUIVALENT {refuted}/{recs.size}, TIMEOUT {timeouts}/{recs.size} (Proven ⊆ Problems)"
 
 unsafe def main (args : List String) : IO UInt32 := do
   enableInitializersExecution
@@ -200,7 +209,10 @@ unsafe def main (args : List String) : IO UInt32 := do
   let opts := Lean.maxRecDepth.set (Lean.maxHeartbeats.set {} 800000) 8000
   let ctx : Core.Context :=
     { fileName := "", fileMap := { source := "", positions := #[] },
-      options := opts, maxHeartbeats := 800000000, maxRecDepth := 8000 }
+      -- Wide-schema pairs (the seven-table university queries) elaborate to very large terms; at
+      -- 800M the *proof* ran out of budget on six of them and the census reported them as if the SQL
+      -- were unsupported. Proving is the expensive half, so give it room.
+      options := opts, maxHeartbeats := 3000000000, maxRecDepth := 8000 }
   let requested := if args.isEmpty then ["CrossSkill", "Calcite", "Literature"] else args
   let mut datasets := []
   for ds in requested do

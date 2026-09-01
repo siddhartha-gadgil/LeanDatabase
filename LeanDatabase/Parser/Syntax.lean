@@ -76,9 +76,14 @@ syntax ident ident : sql_from                         -- 1c. Bare alias (`t x`) 
 -- Subquery with alias, and an optional column-alias list `(c1, c2)` (used by `VALUES` and renames).
 syntax "(" sql_query ")" "AS" ident ("(" ident,* ")")? : sql_from       -- 2. Subquery with AS-alias
 syntax "(" sql_query ")" ident ("(" ident,* ")")? : sql_from             -- 2b. Subquery with bare alias
--- `VALUES (v,…),(v,…)` — an inline literal relation (a query producing constant rows).
+-- `VALUES (v,…),(v,…)` — an inline literal relation (a query producing constant rows). A cell is a
+-- `term` OR the literal `NULL` (only here — NULL is never a bare term, so `col = NULL` stays unwritable;
+-- see the `NULL` section below). A column with any `NULL` cell becomes a nullable `Option _` column.
+declare_syntax_cat sql_values_cell
+syntax term : sql_values_cell
+syntax "NULL" : sql_values_cell
 declare_syntax_cat sql_values_row
-syntax "(" term,+ ")" : sql_values_row
+syntax "(" sql_values_cell,+ ")" : sql_values_row
 syntax "VALUES" sql_values_row,+ : sql_query
 
 -- `LATERAL FLATTEN` (Snowflake array/VARIANT unnest). The normalizer canonicalises sqlglot's
@@ -163,7 +168,9 @@ syntax "SELECT " (" DISTINCT ")? sql_cols " FROM " sql_from (" WHERE " term)?  (
 declare_syntax_cat sql_setop
 syntax " UNION " " ALL " : sql_setop
 syntax " UNION " : sql_setop
+syntax " INTERSECT " " ALL " : sql_setop
 syntax " INTERSECT " : sql_setop
+syntax " EXCEPT " " ALL " : sql_setop
 syntax " EXCEPT " : sql_setop
 syntax:40 sql_query:40 sql_setop sql_query:41 : sql_query
 
@@ -398,41 +405,43 @@ syntax:90 term:91 " NOT " " IN " "(" sql_query ")" : term
 macro:85 "NOT" t:term:50 : term =>
   `(!$t)
 
--- SQL `CASE WHEN c1 THEN v1  WHEN c2 THEN v2 … ELSE d END` → nested `if _ then _ else _`.
--- The condition is forced to `Bool` (`($c : Bool)` coerces a `Decidable` `Prop` like `age > 30` to
--- `decide (…)`), so a `CASE` condition has the SAME shape as a `WHERE` predicate — one Bool lemma
--- (`groupSum_case_eq_groupSum_where`) then folds `SUM(CASE)` into the matching `WHERE`+`SUM`.
-syntax:90 "CASE" ( "WHEN" term "THEN" term ) + "ELSE" term "END" : term
+-- SQL searched `CASE WHEN c1 THEN v1 … [ELSE d] END`. A branch value is a `term` OR `NULL` (value
+-- position only — `NULL` is never a standalone term, so `col = NULL` stays unwriteable, the 3VL trap
+-- intact). `($c : Bool)` coerces a `Decidable` `Prop` like `age > 30` to `decide (…)`, so a condition
+-- has the SAME shape as a `WHERE` predicate.
+-- • No `NULL` anywhere AND an `ELSE` present → nested `if ($c : Bool) then vᵢ else …` over the branch
+--   terms (identical shape to before, so `groupSum_case_eq_groupSum_where` still folds `SUM(CASE)`).
+-- • Any `NULL` branch, `ELSE NULL`, or no `ELSE` → `Option`-typed: `some vᵢ` per non-null branch, `none`
+--   for a `NULL`/absent one (the AS-clause probe then finds the `nullable` column type). The
+--   `COUNT(CASE WHEN p THEN _ END)` shape is intercepted by `liftAggExprs` before this macro fires.
+declare_syntax_cat sql_case_val
+syntax term : sql_case_val
+syntax "NULL" : sql_case_val
+syntax:90 "CASE" ( "WHEN" term "THEN" sql_case_val ) + ( "ELSE" sql_case_val )? "END" : term
 macro_rules
-  | `(CASE $[WHEN $cs THEN $vs]* ELSE $d END) => do
-      let mut acc : Term := d
-      for (c, v) in (cs.zip vs).reverse do
-        acc ← `(if ($c : Bool) then $v else $acc)
-      return acc
-
--- `CASE WHEN … THEN … END` with an explicit `ELSE NULL` — the result is `Option`-typed
--- (`some v` on a match, `none` otherwise). `NULL` appears *only* bound here, never as a standalone
--- term, so `col = NULL` still cannot be written (the 3VL trap stays unwriteable).
-syntax:90 "CASE" ( "WHEN" term "THEN" term ) + "ELSE" "NULL" "END" : term
-macro_rules
-  | `(CASE $[WHEN $cs THEN $vs]* ELSE NULL END) => do
-      let mut acc : Term ← `(none)
-      for (c, v) in (cs.zip vs).reverse do
-        acc ← `(if ($c : Bool) then some $v else $acc)
-      return acc
-
--- `CASE WHEN … THEN … END` *without* `ELSE`. Its full semantics is `ELSE NULL`, so it expands
--- exactly like the `ELSE NULL` form to an `Option`-typed term (`some v` on a match, `none`
--- otherwise) — the AS-clause probe discovers the `nullable` column type. The COUNT-argument shape
--- `COUNT(CASE WHEN p THEN _ END)` is intercepted syntactically by `liftAggExprs` (before this macro
--- fires) and rewritten to the indicator sum, so counting still skips the NULLs.
-syntax:90 "CASE" ( "WHEN" term "THEN" term ) + "END" : term
-macro_rules
-  | `(CASE $[WHEN $cs THEN $vs]* END) => do
-      let mut acc : Term ← `(none)
-      for (c, v) in (cs.zip vs).reverse do
-        acc ← `(if ($c : Bool) then some $v else $acc)
-      return acc
+  | `(CASE $[WHEN $cs THEN $vs]* $[ELSE $d]? END) => do
+      let toOpt : TSyntax `sql_case_val → MacroM (Option Term) := fun s => match s with
+        | `(sql_case_val| NULL)    => pure none
+        | `(sql_case_val| $t:term) => pure (some t)
+        | _ => Macro.throwUnsupported
+      let vOpts ← vs.mapM toOpt
+      let dOpt ← d.mapM toOpt                       -- Option (Option Term): outer none = no ELSE
+      let nullable := vOpts.any Option.isNone || (match dOpt with | some (some _) => false | _ => true)
+      let branches := cs.zip vOpts
+      -- The folds are annotated: `foldrM` otherwise infers the accumulator as bare `Syntax` and the
+      -- `if … then … else $acc` quotation then rejects it.
+      if nullable then
+        let base : Term ← match dOpt with | some (some t) => `(some $t) | _ => `(none)
+        let step : (Term × Option Term) → Term → MacroM Term := fun (c, vo) acc => do
+          let v : Term ← match vo with | some x => `(some $x) | none => `(none)
+          `(if ($c : Bool) then $v else $acc)
+        branches.foldrM (β := Term) step base
+      else
+        let some (some base) := dOpt | Macro.throwUnsupported
+        let step : (Term × Option Term) → Term → MacroM Term := fun (c, vo) acc => do
+          let some v := vo | Macro.throwUnsupported
+          `(if ($c : Bool) then $v else $acc)
+        branches.foldrM (β := Term) step base
 
 -- Simple `CASE e WHEN v1 THEN r1 … [ELSE d] END` → the searched form comparing `e == vᵢ`.
 syntax:90 "CASE" term ( "WHEN" term "THEN" term ) + "ELSE" term "END" : term
@@ -440,10 +449,10 @@ syntax:90 "CASE" term ( "WHEN" term "THEN" term ) + "END" : term
 macro_rules
   | `(CASE $e:term $[WHEN $vs THEN $rs]* ELSE $d END) => do
       let cs ← vs.mapM fun v => `($e == $v)
-      `(CASE $[WHEN $cs THEN $rs]* ELSE $d END)
+      `(CASE $[WHEN $cs THEN $rs:term]* ELSE $d:term END)
   | `(CASE $e:term $[WHEN $vs THEN $rs]* END) => do
       let cs ← vs.mapM fun v => `($e == $v)
-      `(CASE $[WHEN $cs THEN $rs]* END)
+      `(CASE $[WHEN $cs THEN $rs:term]* END)
 
 
 /-! ## Scalar functions
@@ -669,11 +678,19 @@ macro:max "EXTRACT" "(" f:ident "FROM" x:term ")" : term => do
   let fs := Syntax.mkStrLit f.getId.toString.toUpper
   `($(mkIdent `LeanDatabase.Scalar.extractOf) $fs $x)
 
+-- `POSITION(sub IN s)` (ANSI) — 1-based index of `sub` in `s`; reuses the opaque `charIndexOf`. `sub`
+-- is parsed above the `IN`-operator precedence (91) so `POSITION('x' IN s)` doesn't read `'x' IN …`.
+macro:max "POSITION" "(" sub:term:91 "IN" s:term ")" : term =>
+  `($(mkIdent `LeanDatabase.Scalar.charIndexOf) $sub $s)
+
 -- `SUBSTRING(x FROM n [FOR m])` (PG/ANSI) — reuses the Snowflake `substr`/`substr2` bodies.
-syntax:max "SUBSTRING" "(" term "FROM" term "FOR" term ")" : term
-syntax:max "SUBSTRING" "(" term "FROM" term ")" : term
-macro_rules
+-- The two arities need named kinds: with both declared, the shorter pattern is ambiguous inside a
+-- single `macro_rules` (`FOR m` could still be pending), so each rule names the syntax it expands.
+syntax:max (name := substringFor) "SUBSTRING" "(" term "FROM" term "FOR" term ")" : term
+syntax:max (name := substringFrom) "SUBSTRING" "(" term "FROM" term ")" : term
+macro_rules (kind := substringFor)
   | `(SUBSTRING($x FROM $n FOR $m)) => `($(mkIdent `LeanDatabase.Scalar.substr) $x $n $m)
+macro_rules (kind := substringFrom)
   | `(SUBSTRING($x FROM $n))        => `($(mkIdent `LeanDatabase.Scalar.substr2) $x $n)
 
 /-! ## Window functions (order-dependent ⇒ opaque)
@@ -683,8 +700,25 @@ macro_rules
 key values. Identical windows cancel; different specs stay unprovable (sound — a `Finset` has no order). -/
 declare_syntax_cat win_ord_item
 syntax term (&"ASC" <|> &"DESC")? ("NULLS" ("FIRST" <|> "LAST"))? : win_ord_item
+-- Optional frame clause `ROWS/RANGE/GROUPS [BETWEEN <bound> AND] <bound>`. The frame keywords are
+-- RESERVED (plain-symbol) so `PARTITION BY term,+` stops before them instead of parsing `RANGE`/`UNBOUNDED`
+-- as columns. The frame is reprinted into the opaque window spec (`elabWindow`) — never dropped — so
+-- windows with different frames get different specs and are never equated (sound); identical frames cancel.
+declare_syntax_cat win_bound
+syntax "UNBOUNDED" "PRECEDING" : win_bound
+syntax "UNBOUNDED" "FOLLOWING" : win_bound
+syntax "CURRENT" "ROW" : win_bound
+syntax num "PRECEDING" : win_bound
+syntax num "FOLLOWING" : win_bound
+declare_syntax_cat win_frame
+syntax "ROWS" "BETWEEN" win_bound "AND" win_bound : win_frame
+syntax "RANGE" "BETWEEN" win_bound "AND" win_bound : win_frame
+syntax "GROUPS" "BETWEEN" win_bound "AND" win_bound : win_frame
+syntax "ROWS" win_bound : win_frame
+syntax "RANGE" win_bound : win_frame
+syntax "GROUPS" win_bound : win_frame
 declare_syntax_cat win_spec
-syntax ("PARTITION" &"BY" term,+)? (&"ORDER" &"BY" win_ord_item,*)? : win_spec
+syntax ("PARTITION" &"BY" term,+)? (&"ORDER" &"BY" win_ord_item,*)? (win_frame)? : win_spec
 
 syntax:max "ROW_NUMBER" "(" ")" &"OVER" "(" win_spec ")" : term
 syntax:max "RANK" "(" ")" &"OVER" "(" win_spec ")" : term
@@ -711,6 +745,10 @@ def elabWindow (marker : String) (args : Array Syntax) (spec : Syntax) : TermEla
   let keys := if sa.size < 1 || sa[0]!.getArgs.isEmpty then #[] else sa[0]!.getArgs[2]!.getSepArgs
   let ordKeys := if sa.size < 2 || sa[1]!.getArgs.isEmpty then #[]
                  else sa[1]!.getArgs[2]!.getSepArgs.map (·[0])
+  -- Fold any explicit frame (`ROWS/RANGE … BETWEEN …`) into the marker so distinct frames don't collapse
+  -- to the same opaque window (sound — the frame text is part of the spec's identity).
+  let marker := if sa.size < 3 || sa[2]!.getArgs.isEmpty then marker
+                else marker ++ "|frame:" ++ ((sa[2]!.reprint.getD "").trim)
   let terms := args ++ keys ++ ordKeys
   let mut tup : Term ← `(term| $(Syntax.mkStrLit marker))
   for t in terms.reverse do
@@ -777,8 +815,8 @@ macro_rules
         cs := cs.push (← `($e == $(a[i]!)))
         vs := vs.push a[i+1]!
         i := i + 2
-      if i < a.size then `(CASE $[WHEN $cs THEN $vs]* ELSE $(a[i]!) END)
-      else `(CASE $[WHEN $cs THEN $vs]* ELSE NULL END)
+      if i < a.size then `(CASE $[WHEN $cs THEN $vs:term]* ELSE $(a[i]!):term END)
+      else `(CASE $[WHEN $cs THEN $vs:term]* ELSE NULL END)
 macro:max "NVL" "(" x:term "," d:term ")" : term => `(Option.getD $x $d)
 macro:max "NVL2" "(" x:term "," a:term "," b:term ")" : term => `(bif Option.isSome $x then $a else $b)
 macro:max "IFF" "(" c:term "," a:term "," b:term ")" : term => `(bif ($c : Bool) then $a else $b)
@@ -803,6 +841,7 @@ syntax "TEXT" : sql_cast_type
 syntax "VARCHAR" : sql_cast_type
 syntax "DATE" : sql_cast_type
 syntax "TIMESTAMP" : sql_cast_type
+syntax "TIMESTAMPTZ" : sql_cast_type          -- timestamp-with-time-zone; `String`-valued like TIMESTAMP
 syntax "DATETIME" : sql_cast_type
 syntax "BOOLEAN" : sql_cast_type
 syntax "VARIANT" : sql_cast_type
@@ -818,10 +857,15 @@ syntax "CHAR" : sql_cast_type
 -- bare forms don't win and leave `(n)` dangling.
 syntax (priority := high) "VARCHAR(" num ")" : sql_cast_type   -- `VARCHAR(` is a glued DDL token
 syntax (priority := high) "CHAR" "(" num ")" : sql_cast_type
+syntax (priority := high) "TIMESTAMP" "(" num ")" : sql_cast_type      -- fractional-seconds precision (discarded)
+syntax (priority := high) "TIMESTAMPTZ" "(" num ")" : sql_cast_type
 syntax (priority := high) "NUMBER" "(" num,+ ")" : sql_cast_type
 syntax (priority := high) "NUMERIC" "(" num,+ ")" : sql_cast_type
 syntax (priority := high) "DECIMAL" "(" num,+ ")" : sql_cast_type
 syntax:max "CAST" "(" term "AS" sql_cast_type ")" : term
+-- `CAST(NULL AS τ)` — a typed SQL NULL (value position), elaborated to `(none : Option τ)` in `Context`.
+-- NULL stays a non-term elsewhere (so `col = NULL` remains unwritable); this is the standard typed-null.
+syntax:max "CAST" "(" "NULL" "AS" sql_cast_type ")" : term
 -- `TRY_CAST(x AS ty)` — same coercion as `CAST` (failure semantics not modelled).
 macro:max "TRY_CAST" "(" x:term "AS" ty:sql_cast_type ")" : term => `(CAST($x AS $ty))
 

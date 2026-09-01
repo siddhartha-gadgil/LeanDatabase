@@ -54,7 +54,9 @@ name = "runall"
 root = "Bench.RunAll"
 supportInterpreter = true
 
+# Counterexample search (`plausible`) over a dataset — says "not equivalent", which the proving
+# census cannot.
 [[lean_exe]]
-name = "refute"
-root = "Bench.Refute"
+name = "counterexample"
+root = "Bench.Counterexample"
 supportInterpreter = true

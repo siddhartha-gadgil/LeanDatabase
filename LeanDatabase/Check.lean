@@ -98,25 +98,29 @@ the tactic throws, so a failing `sql_equiv` comes back as "no goals left". That 
 to report `SELECT B FROM R WHERE A = 5 AND C < 1  ≡  SELECT B FROM R WHERE A < 10` as proved, a pair
 VeriEQL refutes with a counterexample. So we also demand a **complete, `sorry`-free proof term**:
 force the delayed assignments (`synthesizeSyntheticMVarsNoPostponing` — reading the assignment without
-this is what previously *under*-reported valid proofs), then instantiate and inspect. -/
-private def proveMVar (mvar : Expr) : TermElabM Bool := do
+this is what previously *under*-reported valid proofs), then instantiate and inspect.
+
+Returns the tactic's message on failure: `sql_equiv` now begins with a counterexample search, so a
+failure can mean "these queries differ, here is the database" — which the census should report rather
+than throw away. -/
+private def proveMVar (mvar : Expr) : TermElabM (Bool × Option String) := do
   let tac ← `(tacticSeq| sql_equiv)
   try
     let (goals, _) ← Elab.runTactic mvar.mvarId! tac
-    unless goals.isEmpty do return false
+    unless goals.isEmpty do return (false, none)
     let proof ← instantiateMVars mvar
-    return !proof.hasSorry
-  catch _ => pure false
+    return (!proof.hasSorry, none)
+  catch ex => pure (false, some (← ex.toMessageData.toString))
 
 /-- Discharge `goal` under `props` as local assumptions (added one at a time, so the goal's metavariable
 is created with every hypothesis already in context). -/
-private def proveGoalUnderHyps (goal : Expr) : List Expr → TermElabM Bool
+private def proveGoalUnderHyps (goal : Expr) : List Expr → TermElabM (Bool × Option String)
   | [] => do proveMVar (← mkFreshExprMVar goal)
   | p :: ps => withLocalDeclD `h p fun _ => proveGoalUnderHyps goal ps
 
 /-- Discharge `body₁ = body₂` under `props` as local assumptions. -/
 private def proveUnderHyps (body1 body2 : Expr) (props : List Expr) : TermElabM Bool := do
-  proveGoalUnderHyps (← mkEq body1 body2) props
+  return (← proveGoalUnderHyps (← mkEq body1 body2) props).1
 
 /-- Prove `first ≡ second` — either as a plain function equality (no hypotheses) or, when
 `hyps` is non-empty, as `body₁ = body₂` with the table fvars and hypotheses in local context
@@ -127,7 +131,7 @@ private def checkPair (schemasStr : List (Name × List (Name × SQLTypeProxy)))
   let (secondExpr, _) ← parseSqlQuery schemasStr secondStr
   if hyps.isEmpty then
     let mvar ← mkFreshExprMVar (← mkEq firstExpr secondExpr)
-    proveMVar mvar
+    return (← proveMVar mvar).1
   else
     lambdaTelescope (← instantiateMVars firstExpr) fun tvars body1 => do
       let body2 ← instantiateLambda (← instantiateMVars secondExpr) tvars
@@ -158,28 +162,59 @@ def checkEquivCore (data : Json) : CoreM Bool := do
 /-- Proving census: one `{schemas, first, second, dataEq}` pair → does `sql_equiv` close the goal
 `∀ tables, first ~= second` (when `dataEq`) or `first = second`? Mirrors a Problems `eq_i_j` theorem. -/
 def provePair (data : Json) : TermElabM Json := do
-  try
-    let .ok schemas := data.getObjValAs? (List Json) "schemas" | return json% {"proved": false, "error": "missing schemas"}
-    let .ok first := data.getObjValAs? String "first" | return json% {"proved": false, "error": "missing first"}
-    let .ok second := data.getObjValAs? String "second" | return json% {"proved": false, "error": "missing second"}
-    let dataEq := (data.getObjValAs? Bool "dataEq").toOption.getD true
-    -- Integrity constraints (a key, an FD, a per-row predicate) are *assumptions*, exactly as in a
-    -- file's `HYPOTHESIS` block: most benchmark rewrites (e.g. dropping a `DISTINCT` over a key) are
-    -- only equivalences under them, so a census without them measures the wrong thing.
-    let hyps := (data.getObjValAs? (List Json) "hypotheses").toOption.getD []
-    let schemasStr ← schemas.mapM parseSchema
-    let (firstExpr, _) ← parseSqlQuery schemasStr first
-    let (secondExpr, _) ← parseSqlQuery schemasStr second
-    lambdaTelescope (← instantiateMVars firstExpr) fun tvars body1 => do
-      let body2 ← instantiateLambda (← instantiateMVars secondExpr) tvars
-      let goalType ← if dataEq then mkAppM ``LeanDatabase.dataEq #[body1, body2] else mkEq body1 body2
-      let names := schemasStr.map (fun (n, _) => lowerName n)
-      let tvarOf : Name → Option Expr := fun nm =>
-        ((names.zip tvars.toList).find? (·.1 == nm)).map (·.2)
-      let props ← hyps.mapM (hypothesisProp schemasStr tvarOf)
-      let ok ← proveGoalUnderHyps goalType props
-      return Json.mkObj [("proved", ok)]
-  catch ex => return Json.mkObj [("proved", false), ("error", Json.str (← ex.toMessageData.toString))]
+  let .ok schemas := data.getObjValAs? (List Json) "schemas" | return json% {"proved": false, "error": "missing schemas"}
+  let .ok first := data.getObjValAs? String "first" | return json% {"proved": false, "error": "missing first"}
+  let .ok second := data.getObjValAs? String "second" | return json% {"proved": false, "error": "missing second"}
+  let dataEq := (data.getObjValAs? Bool "dataEq").toOption.getD true
+  -- Integrity constraints (a key, an FD, a per-row predicate) are *assumptions*, exactly as in a
+  -- file's `HYPOTHESIS` block: most benchmark rewrites (e.g. dropping a `DISTINCT` over a key) are
+  -- only equivalences under them, so a census without them measures the wrong thing.
+  let hyps := (data.getObjValAs? (List Json) "hypotheses").toOption.getD []
+  -- Elaboration and proving are reported separately: a pair whose *proof* runs out of budget did not
+  -- fail to elaborate, and lumping the two together made timeouts look like unsupported SQL.
+  let elab? : TermElabM (Except String (List (Name × List (Name × SQLTypeProxy)) × Expr × Expr)) := do
+    try
+      let schemasStr ← schemas.mapM parseSchema
+      -- `sql_equiv` opens with a counterexample search; give its samplers the literals these queries
+      -- mention, or every database it tries falls on the wrong side of `= 5` / `> 100000` / `= 'HELLO'`.
+      LeanDatabase.Plausible.setPoolFrom first second
+      let (firstExpr, _) ← parseSqlQuery schemasStr first
+      let (secondExpr, _) ← parseSqlQuery schemasStr second
+      return .ok (schemasStr, firstExpr, secondExpr)
+    catch ex => return .error (← ex.toMessageData.toString)
+  match ← elab? with
+  | .error e => return Json.mkObj [("proved", false), ("elaborated", false), ("error", Json.str e)]
+  | .ok (schemasStr, firstExpr, secondExpr) =>
+    try
+      lambdaTelescope (← instantiateMVars firstExpr) fun tvars body1 => do
+        let body2 ← instantiateLambda (← instantiateMVars secondExpr) tvars
+        -- Building the goal can fail on its own: if the two queries have different *output column
+        -- types* (a `LEFT JOIN` makes its right columns nullable, a plain join does not) there is no
+        -- proposition to state, and the pair is not an equivalence for that reason alone.
+        let goalType? ← try
+            pure (some (← if dataEq then mkAppM ``LeanDatabase.dataEq #[body1, body2]
+                          else mkEq body1 body2))
+          catch _ => pure none
+        let some goalType := goalType?
+          | return Json.mkObj [("proved", false), ("elaborated", true),
+              ("counterexample", Json.str "the two queries have different output column types \
+                (one side is nullable), so no database can make them equal")]
+        let names := schemasStr.map (fun (n, _) => lowerName n)
+        let tvarOf : Name → Option Expr := fun nm =>
+          ((names.zip tvars.toList).find? (·.1 == nm)).map (·.2)
+        let props ← hyps.mapM (hypothesisProp schemasStr tvarOf)
+        let (ok, msg?) ← proveGoalUnderHyps goalType props
+        -- `sql_equiv` starts with a counterexample search, so one kind of failure is worth far more
+        -- than the rest: the pair is *not* an equivalence, and here is the database that shows it.
+        let counterexample? := msg?.filter (fun m => (m.splitOn "not equivalent").length ≥ 2)
+        return Json.mkObj [("proved", ok), ("elaborated", true),
+          ("counterexample", match counterexample? with | some c => Json.str c | none => Json.null),
+          -- A proof that ran out of budget is not a proof that failed on the merits.
+          ("error", match msg?.filter (fun m => (m.splitOn "heartbeats").length ≥ 2) with
+            | some m => Json.str m | none => Json.null)]
+    catch ex =>
+      return Json.mkObj [("proved", false), ("elaborated", true),
+        ("error", Json.str (← ex.toMessageData.toString))]
 
 def provePairCore (data : Json) : CoreM Json :=
   Core.withCurrHeartbeats (provePair data |>.run' {} |>.run' {})

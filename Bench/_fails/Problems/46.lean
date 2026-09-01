@@ -1,0 +1,19 @@
+import LeanDatabase.Parser
+import LeanDatabase.SQLSyntax
+open LeanDatabase Lean
+set_option maxHeartbeats 1000000
+set_option maxRecDepth 1000000
+
+namespace N_46_eq
+
+CREATE TABLE MONTHS («MID» INT, «MONTH» INT)
+CREATE TABLE WEEKDAYS («DID» INT, «DAY_OF_WEEK» INT)
+CREATE TABLE CARRIERS («CID» INT, «NAME» INT)
+CREATE TABLE FLIGHTS («FID» INT, «YEAR» INT, «MONTH_ID» INT, «DAY_OF_MONTH» INT, «CARRIER_ID» INT)
+
+theorem eq (t0 : TableRel MONTHS_schema) (t1 : TableRel WEEKDAYS_schema) (t2 : TableRel CARRIERS_schema) (t3 : TableRel FLIGHTS_schema) :
+    (sql%([MONTHS_schema, WEEKDAYS_schema, CARRIERS_schema, FLIGHTS_schema]) "SELECT C.NAME FROM CARRIERS AS C JOIN FLIGHTS AS F ON C.CID = F.CARRIER_ID GROUP BY C.NAME, F.YEAR, F.MONTH_ID, F.DAY_OF_MONTH HAVING COUNT(F.FID) > 1000") t0 t1 t2 t3
+  ~= (sql%([MONTHS_schema, WEEKDAYS_schema, CARRIERS_schema, FLIGHTS_schema]) "SELECT C.NAME FROM CARRIERS AS C JOIN FLIGHTS AS F ON C.CID = F.CARRIER_ID GROUP BY C.NAME, F.DAY_OF_MONTH HAVING COUNT(C.CID) > 1000") t0 t1 t2 t3
+  := by first | sql_equiv | sorry
+
+end N_46_eq

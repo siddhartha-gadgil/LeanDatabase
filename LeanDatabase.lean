@@ -13,3 +13,6 @@ import LeanDatabase.Operators
 import LeanDatabase.Parser
 import LeanDatabase.Hypothesis
 import LeanDatabase.Check
+-- Sampling instances, so `by plausible` can hunt for a counterexample database on any goal about
+-- relations (see `LeanDatabase/Plausible.lean`).
+import LeanDatabase.Plausible

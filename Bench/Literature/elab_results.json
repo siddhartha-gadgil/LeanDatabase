@@ -1,4 +1,5 @@
 {"total": 122,
+ "timeout": 0,
  "results":
  [{"status": "ok", "id": "0:q0", "error": null},
   {"status": "ok", "id": "0:q1", "error": null},
@@ -22,10 +23,8 @@
   {"status": "ok", "id": "9:q1", "error": null},
   {"status": "ok", "id": "10:q0", "error": null},
   {"status": "ok", "id": "10:q1", "error": null},
-  {"status": "ok", "id": "11:q0", "error": null},
-  {"status": "fail",
-   "id": "11:q1",
-   "error": "AS clause `x.name`: Unknown identifier `x.name`"},
+  {"status": "ok", "id": "11_fix:q0", "error": null},
+  {"status": "ok", "id": "11_fix:q1", "error": null},
   {"status": "ok", "id": "12:q0", "error": null},
   {"status": "ok", "id": "12:q1", "error": null},
   {"status": "ok", "id": "13:q0", "error": null},
@@ -124,4 +123,4 @@
   {"status": "ok", "id": "62:q1", "error": null},
   {"status": "ok", "id": "63:q0", "error": null},
   {"status": "ok", "id": "63:q1", "error": null}],
- "elaborates": 121}
+ "elaborates": 122}

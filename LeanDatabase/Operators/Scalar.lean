@@ -67,6 +67,9 @@ opaque toNumber {α : Type} (x : α) : Rat := 0
 -- Tags a `PERCENTILE_CONT/DISC` order value with its percentile + a CONT/DISC marker, so the opaque
 -- ordered-set aggregate stays distinct across different percentiles and the two kinds.
 opaque pctTag (marker : String) (p v : Rat) : Rat := v
+-- Folds a filtered aggregate's marker (MIN/MAX/AVG), predicate and value into one opaque `Int` summand,
+-- for `groupFilterAgg` — two `AGG(e) FILTER(WHERE p)` agree iff marker, predicate and value all agree.
+opaque filterTag {α : Type} (marker : String) (p : Bool) (e : α) : Int := 0
 -- `GROUPING(a, …)` — the grouping-set bitmask flag; opaque over its (folded) arguments so identical
 -- calls agree and different ones stay distinct.
 opaque groupingOf {α : Type} (x : α) : Int := 0

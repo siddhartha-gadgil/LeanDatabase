@@ -43,6 +43,12 @@ def elabAsSql (stx: Syntax) : TermElabM (SQLTypeProxy × Expr) := do
 CAST inspects the *source* type: `Int → FLOAT` is the genuine `Int → Rat` coercion (so a division
 downstream is real, not integer — ROADMAP 2.4), while lossy directions stay opaque. -/
 elab_rules : term
+  | `(CAST(NULL AS $ty:sql_cast_type)) => do
+    -- Typed SQL NULL → `(none : Option τ)`. Recover τ by casting a dummy `0` to the same type (reusing the
+    -- coercion arm below), then take `Option` of its result type — no duplication of the type mapping.
+    let probe ← elabTerm (← `(CAST((0 : Int) AS $ty))) none
+    Term.synthesizeSyntheticMVarsNoPostponing
+    mkAppOptM ``Option.none #[← instantiateMVars (← inferType probe)]
   | `(CAST($x AS $ty:sql_cast_type)) => do
     let xe ← elabTerm x none
     Term.synthesizeSyntheticMVarsNoPostponing
@@ -81,6 +87,7 @@ elab_rules : term
     | `(sql_cast_type| STRING) | `(sql_cast_type| TEXT) | `(sql_cast_type| VARCHAR)
     | `(sql_cast_type| CHAR) | `(sql_cast_type| VARCHAR($_)) | `(sql_cast_type| CHAR($_))
     | `(sql_cast_type| DATE) | `(sql_cast_type| TIMESTAMP) | `(sql_cast_type| DATETIME)
+    | `(sql_cast_type| TIMESTAMPTZ) | `(sql_cast_type| TIMESTAMP($_)) | `(sql_cast_type| TIMESTAMPTZ($_))
     | `(sql_cast_type| VARIANT) | `(sql_cast_type| GEOGRAPHY) | `(sql_cast_type| GEOMETRY)
     | `(sql_cast_type| JSON) | `(sql_cast_type| JSONB) | `(sql_cast_type| OBJECT)
     | `(sql_cast_type| ARRAY) => toStr
@@ -197,6 +204,12 @@ syntax "VAR_SAMP" "(" term ")" : term
 syntax:max "SUM" "(" term ")" &"FILTER" "(" &"WHERE" term ")" : term
 syntax:max "COUNT" "(" "*" ")" &"FILTER" "(" &"WHERE" term ")" : term
 syntax:max "COUNT" "(" term ")" &"FILTER" "(" &"WHERE" term ")" : term
+-- `COUNT(DISTINCT e) FILTER(WHERE p)` → `COUNT(DISTINCT CASE WHEN p THEN e END)`; COUNT tolerates the NULL.
+syntax:max "COUNT" "(" &"DISTINCT" term ")" &"FILTER" "(" &"WHERE" term ")" : term
+-- MIN/MAX/AVG(e) FILTER(WHERE p) → opaque `groupFilterAgg` over `filterTag marker p e` (see liftAggExprs).
+syntax:max "MIN" "(" term ")" &"FILTER" "(" &"WHERE" term ")" : term
+syntax:max "MAX" "(" term ")" &"FILTER" "(" &"WHERE" term ")" : term
+syntax:max "AVG" "(" term ")" &"FILTER" "(" &"WHERE" term ")" : term
 -- `STRING_AGG(expr, delim [ORDER BY keys])` (and `DISTINCT`) — order-dependent string concat, opaque.
 syntax "STRING_AGG" "(" "DISTINCT" term "," term "ORDER" "BY" term,+ ")" : term
 syntax "STRING_AGG" "(" term "," term "ORDER" "BY" term,+ ")" : term
@@ -319,6 +332,7 @@ inductive AggKind where
   | boolAnd | boolOr
   | stddev | variance
   | stringAgg | percentile
+  | filterAgg   -- opaque MIN/MAX/AVG(e) FILTER(WHERE p)
   deriving DecidableEq, Inhabited
 
 /-- The summand shape: `void` (no argument, `COUNT(*)`), an `Int`/`Bool`/`String`/`Rat` expression, or
@@ -341,6 +355,7 @@ def AggKind.op : AggKind → Name
   | .variance => ``groupVariance
   | .stringAgg => ``groupStringAgg
   | .percentile => ``groupPercentile
+  | .filterAgg => ``groupFilterAgg
 
 /-- The `Rat`-valued operator for a numeric aggregate over a `FLOAT`/`NUMBER` column (see
 `groupAggExprsE`). Non-numeric kinds reuse `.op` (never selected — they don't probe to `Rat`). -/
