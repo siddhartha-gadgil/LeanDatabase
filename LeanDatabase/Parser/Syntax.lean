@@ -100,6 +100,10 @@ syntax sql_from "," "LATERAL" "SPLIT_TO_TABLE" "(" term "," term ")" "AS" ident 
 syntax sql_from "," "LATERAL" "SPLIT_TO_TABLE" "(" term "," term ")" ident : sql_from
 
 -- Recursive Cases (Chaining joins from left to right)
+-- Parenthesised join group as a JOIN RHS: `f INNER JOIN (a CROSS JOIN b) ON …` — the group elaborates
+-- to its own product, then joins `f`. Distinct from the `(sql_query) AS x` subquery RHS (a group starts
+-- with a table name, a subquery with `SELECT`).
+syntax sql_from "JOIN" "(" sql_from ")" "ON" term : sql_from
 syntax sql_from "JOIN" ident "ON" term : sql_from     -- 3. Explicit Inner Join
 syntax sql_from "JOIN" ident "USING" "(" ident,* ")" : sql_from   -- 3b. USING (shared columns)
 syntax sql_from "CROSS" "JOIN" ident : sql_from       -- 4. Cross Join

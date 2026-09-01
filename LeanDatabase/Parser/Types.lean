@@ -206,6 +206,42 @@ def TypedTupleOfList (l: List SQLTypeProxy) : Type :=
 def TypedRelationOfList (l: List SQLTypeProxy) : Type :=
   TypedRelation (colTypeOfList l)
 
+/-! ### Nullability-tolerant row erasure
+
+To compare two queries that denote the same answer but whose OUTPUT types differ only in declared
+nullability (one column `Int`, the other `Option Int` — e.g. a `VALUES (NULL,…)`, `LEFT JOIN`, or a
+`CAST`/`COALESCE` that our model tracks as nullable), we erase each row to a monomorphic `List UCell`:
+`5 : Int` and `some 5 : Option Int` both erase to `.int 5`, `none` to `.null`. The comparison
+(`dataEqErased`) then typechecks regardless of the two column-type lists — SQL's "same values" notion. -/
+inductive UCell where
+  | null | int (n : Int) | rat (q : Rat) | str (s : String) | bool (b : Bool)
+  deriving DecidableEq, Inhabited
+
+/-- Erase one column value to a `UCell`, collapsing the `Option τ` vs `τ` distinction. -/
+def eraseCell : (t : SQLTypeProxy) → t.type → UCell
+  | .int, v => .int v
+  | .float, v => .rat v
+  | .string, v => .str v
+  | .timestamp, v => .str v
+  | .bool, v => .bool v
+  | .nullable _, none => .null
+  | .nullable t, some v => eraseCell t v
+
+/-- Erase the `i`-th column value, indexing `l` structurally so the type matches `colTypeOfList l i`
+**definitionally** (no `▸` cast) — keeping `eraseRow` computable, so `decide` closes concrete cases. -/
+def eraseAt : (l : List SQLTypeProxy) → (i : Fin l.length) → colTypeOfList l i → UCell
+  | t :: _, ⟨0, _⟩, v => eraseCell t v
+  | _ :: rest, ⟨i + 1, h⟩, v => eraseAt rest ⟨i, by simp only [List.length_cons] at h; omega⟩ v
+
+/-- Erase a whole row to `List UCell` (monomorphic — independent of the column-type list). -/
+def eraseRow (l : List SQLTypeProxy) (t : TypedTupleOfList l) : List UCell :=
+  (List.finRange l.length).map (fun i => eraseAt l i (t i))
+
+/-- `A` and `B` denote the same answer **up to declared nullability**: their rows erase to the same set
+of `UCell` lists. Well-typed for any two column-type lists (unlike `~=`, which needs identical types). -/
+def dataEqErased {l1 l2 : List SQLTypeProxy} (A : TypedRelationOfList l1) (B : TypedRelationOfList l2) :
+    Prop := A.rows.image (eraseRow l1) = B.rows.image (eraseRow l2)
+
 @[reducible]
 def TypedTupleOfList.nil : TypedTupleOfList [] := fun ⟨i, hi⟩ => by simp at hi
 
@@ -258,9 +294,30 @@ theorem TypedTupleOfList.cons_inj {t : SQLTypeProxy} {rest : List SQLTypeProxy}
       rwa [TypedTupleOfList.cons_succ, TypedTupleOfList.cons_succ] at this
   · rintro ⟨rfl, rfl⟩; rfl
 
+/-- Column-list concatenation for a join's output schema.
+
+Deliberately **not** `List.append`: `++` does not reduce at the `instances` transparency `simp`
+type-checks a goal at, so a join row's type `l₁ ++ l₂` never agrees with the literal column list the
+rest of the goal is stated at. The goal is then ill-typed at that level and `simp` abandons it —
+silently, as "no progress" — which stranded the membership route on every goal containing a join.
+Reducible and structurally recursive, this one computes wherever `++` would not. -/
+@[reducible]
+def colsAppend : List SQLTypeProxy → List SQLTypeProxy → List SQLTypeProxy
+  | [], l2 => l2
+  | t :: rest, l2 => t :: colsAppend rest l2
+
+@[simp] theorem colsAppend_nil (l : List SQLTypeProxy) : colsAppend [] l = l := rfl
+
+-- NOT `@[simp]`: rewriting `colsAppend` back to `++` puts the non-reducing form this exists to
+-- avoid straight back into the goal, and the membership route stalls again.
+theorem colsAppend_eq (l1 l2 : List SQLTypeProxy) : colsAppend l1 l2 = l1 ++ l2 := by
+  induction l1 with
+  | nil => rfl
+  | cons _ _ ih => simp [colsAppend, ih]
+
 @[reducible]
 def TypedTupleOfList.append (ts1 : TypedTupleOfList l1) (ts2 : TypedTupleOfList l2) :
-  TypedTupleOfList (l1 ++ l2) := match l1 with
+  TypedTupleOfList (colsAppend l1 l2) := match l1 with
   | [] => ts2
   | t :: rest => TypedTupleOfList.cons t (ts1 ⟨0, by simp⟩) (TypedTupleOfList.append (fun ⟨i, hi⟩ => ts1 ⟨i+1, by grind⟩)  ts2)
 
@@ -270,9 +327,9 @@ def TypedRelationOfList.nil : TypedRelationOfList [] :=
 
 @[reducible]
 def TypedRelationOfList.append (r1 : TypedRelationOfList l1) (r2 : TypedRelationOfList l2) :
-  TypedRelationOfList (l1 ++ l2) :=
+  TypedRelationOfList (colsAppend l1 l2) :=
   {labels := fun ⟨i, hi⟩ => by
-    simp at hi
+    simp [colsAppend_eq] at hi
     exact if h : i < l1.length then r1.labels ⟨i, h⟩ else r2.labels ⟨i - l1.length, by grind⟩,
    rows := (r1.rows ×ˢ r2.rows).image (fun ((ts1 : TypedTupleOfList l1), (ts2 : TypedTupleOfList l2)) => TypedTupleOfList.append ts1 ts2)}
 
@@ -297,7 +354,7 @@ as `String`. -/
 flatten's six columns, appended to the row. Opaque — sound by congruence (see the section note). -/
 opaque lateralFlatten {l : List SQLTypeProxy}
     (R : TypedRelationOfList l) (f : TypedTupleOfList l → String) :
-    TypedRelationOfList (l ++ flattenCols) :=
+    TypedRelationOfList (colsAppend l flattenCols) :=
   TypedRelationOfList.append R (emptyRel (fun _ => ""))
 
 /-- `WITH RECURSIVE cte AS (anchor UNION ALL step) …` — the recursive CTE's value is the least

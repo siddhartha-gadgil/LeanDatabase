@@ -177,7 +177,7 @@ def provePair (data : Json) : TermElabM Json := do
       let schemasStr ← schemas.mapM parseSchema
       -- `sql_equiv` opens with a counterexample search; give its samplers the literals these queries
       -- mention, or every database it tries falls on the wrong side of `= 5` / `> 100000` / `= 'HELLO'`.
-      LeanDatabase.Plausible.setPoolFrom first second
+      LeanDatabase.Plausible.setPoolInEnv first second
       let (firstExpr, _) ← parseSqlQuery schemasStr first
       let (secondExpr, _) ← parseSqlQuery schemasStr second
       return .ok (schemasStr, firstExpr, secondExpr)
@@ -191,14 +191,18 @@ def provePair (data : Json) : TermElabM Json := do
         -- Building the goal can fail on its own: if the two queries have different *output column
         -- types* (a `LEFT JOIN` makes its right columns nullable, a plain join does not) there is no
         -- proposition to state, and the pair is not an equivalence for that reason alone.
+        -- On a type mismatch (one side nullable, `Option τ` vs `τ`) fall back to the nullability-tolerant
+        -- comparison `dataEqErased` (rows erased to monomorphic `UCell` lists), which is well-typed for
+        -- any two column-type lists — SQL's "same values" notion, ignoring declared nullability.
         let goalType? ← try
             pure (some (← if dataEq then mkAppM ``LeanDatabase.dataEq #[body1, body2]
                           else mkEq body1 body2))
-          catch _ => pure none
+          catch _ => try pure (some (← mkAppM ``LeanDatabase.dataEqErased #[body1, body2]))
+                     catch _ => pure none
         let some goalType := goalType?
           | return Json.mkObj [("proved", false), ("elaborated", true),
-              ("counterexample", Json.str "the two queries have different output column types \
-                (one side is nullable), so no database can make them equal")]
+              ("counterexample", Json.str "the two queries have different output column types, \
+                and not merely by nullability, so no database can make them equal")]
         let names := schemasStr.map (fun (n, _) => lowerName n)
         let tvarOf : Name → Option Expr := fun nm =>
           ((names.zip tvars.toList).find? (·.1 == nm)).map (·.2)

@@ -58,7 +58,7 @@ variable {n : Nat} {colType : Fin n → Type} [∀ i, DecidableEq (colType i)]
 /-- `x ∈ R × S` ↔ `x` is the concatenation of a row of `R` and a row of `S`. This is the law that was
 missing: a join is `image append (R ×ˢ S)`, and without it the product never reaches `∃`-form. -/
 @[sql_mem] theorem mem_append_rows {l1 l2 : List SQLTypeProxy}
-    (r : TypedRelationOfList l1) (s : TypedRelationOfList l2) (x : TypedTupleOfList (l1 ++ l2)) :
+    (r : TypedRelationOfList l1) (s : TypedRelationOfList l2) (x : TypedTupleOfList (colsAppend l1 l2)) :
     x ∈ (TypedRelationOfList.append r s).rows ↔
       ∃ a ∈ r.rows, ∃ b ∈ s.rows, TypedTupleOfList.append a b = x := by
   simp [Finset.mem_image, Finset.mem_product]

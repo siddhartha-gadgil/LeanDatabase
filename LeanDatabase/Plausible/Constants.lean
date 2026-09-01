@@ -62,6 +62,21 @@ def setPoolFrom (first second : String) : IO Unit := do
   let (i2, s2) := mineLiterals second
   constantPool.set (i1 ++ i2, s1 ++ s2)
 
+/-- Fill the pool **in the elaborator's environment**, by evaluating `setPoolFrom` there.
+
+A census driver runs `importModules`, which re-runs this module's initialiser: the driver's linked copy
+of `constantPool` and the copy the tactic's samplers read are then two different refs. Calling
+`setPoolFrom` directly fills the wrong one — which is why mined literals had no effect on the search
+even though the miner and the samplers both worked in isolation. -/
+unsafe def setPoolInEnvUnsafe (first second : String) : Lean.Meta.MetaM Unit := do
+  let ty ← Lean.Meta.mkAppM ``IO #[Lean.mkConst ``Unit]
+  let e ← Lean.Meta.mkAppM ``setPoolFrom #[Lean.mkStrLit first, Lean.mkStrLit second]
+  let act ← Lean.Meta.evalExpr (IO Unit) ty e
+  act
+
+@[implemented_by setPoolInEnvUnsafe]
+def setPoolInEnv (first second : String) : Lean.Meta.MetaM Unit := setPoolFrom first second
+
 open _root_.Plausible
 
 /-- Draw from the mined pool, falling back to `g` when the pool is empty. Mixing rather than replacing

@@ -143,6 +143,66 @@ theorem restriction_const_prop {α : Type} [DecidableEq α]
   apply restriction_congr; intro t _
   by_cases hk : k t = c <;> simp [hk]
 
+/-! ### GROUP-BY key normalization (`group_congr` + the per-aggregate congruences)
+
+Two groupings that induce the **same per-row membership** on `rel` yield the same group — even at
+different key *types*. This is the general law behind GROUP-BY key elimination: a **constant** key
+component (`GROUP BY x, 2+3`) or a **functionally-determined** one (`GROUP BY deptno, sal` under
+`WHERE deptno = 10`, so `deptno` is fixed) doesn't refine the partition. `sql_group_key` (in
+`SQLEquiv`) applies the matching aggregate congruence, then `group_congr`, leaving the per-row key
+equivalence for `grind` — which `t ∈ rel` (incl. a `WHERE` restriction) discharges. -/
+theorem group_congr {K₁ K₂ : Type} [DecidableEq K₁] [DecidableEq K₂]
+    (key₁ : TypedTuple colType → K₁) (k₁ : K₁) (key₂ : TypedTuple colType → K₂) (k₂ : K₂)
+    (rel : TypedRelation colType)
+    (h : ∀ t ∈ rel.rows, decide (key₁ t = k₁) = decide (key₂ t = k₂)) :
+    group key₁ k₁ rel = group key₂ k₂ rel := by
+  simp only [TypedAgg.group]; exact restriction_congr _ _ rel h
+
+variable {K₁ K₂ : Type} [DecidableEq K₁] [DecidableEq K₂]
+  (key₁ : TypedTuple colType → K₁) (k₁ : K₁) (key₂ : TypedTuple colType → K₂) (k₂ : K₂)
+  (rel : TypedRelation colType) (f : TypedTuple colType → Int)
+
+theorem groupCount_congr (h : group key₁ k₁ rel = group key₂ k₂ rel) :
+    groupCount key₁ k₁ rel = groupCount key₂ k₂ rel := by simp only [TypedAgg.groupCount, h]
+theorem groupSum_congr (h : group key₁ k₁ rel = group key₂ k₂ rel) :
+    groupSum key₁ k₁ rel f = groupSum key₂ k₂ rel f := by simp only [TypedAgg.groupSum, h]
+theorem groupMaxInt_congr (h : group key₁ k₁ rel = group key₂ k₂ rel) :
+    groupMaxInt key₁ k₁ rel f = groupMaxInt key₂ k₂ rel f := by simp only [TypedAgg.groupMaxInt, h]
+theorem groupMinInt_congr (h : group key₁ k₁ rel = group key₂ k₂ rel) :
+    groupMinInt key₁ k₁ rel f = groupMinInt key₂ k₂ rel f := by simp only [TypedAgg.groupMinInt, h]
+theorem groupAvg_congr (h : group key₁ k₁ rel = group key₂ k₂ rel) :
+    groupAvg key₁ k₁ rel f = groupAvg key₂ k₂ rel f := by
+  simp only [TypedAgg.groupAvg, TypedAgg.groupSum, TypedAgg.groupCount, h]
+
+/-! ### Aggregate arithmetic (`SUM` linearity)
+
+`grind` cannot reason inside a `∑`, so these are the laws behind optimizer rewrites like
+`SUM(a + b) = SUM(a) + SUM(b)`, `SUM(c * x) = c * SUM(x)`. `@[simp]` (a valid normalizing direction —
+split/pull sums out) so `sql_simp` fires them on a residual `groupSum …`. -/
+section AggArith
+variable {K : Type} [DecidableEq K] (key : TypedTuple colType → K) (k : K)
+  (rel' : TypedRelation colType) (f g : TypedTuple colType → Int) (c : Int)
+
+@[simp] theorem groupSum_add :
+    groupSum key k rel' (fun t => f t + g t) = groupSum key k rel' f + groupSum key k rel' g := by
+  simp only [TypedAgg.groupSum, Finset.sum_add_distrib]
+@[simp] theorem groupSum_sub :
+    groupSum key k rel' (fun t => f t - g t) = groupSum key k rel' f - groupSum key k rel' g := by
+  simp only [TypedAgg.groupSum, Finset.sum_sub_distrib]
+@[simp] theorem groupSum_mul_left :
+    groupSum key k rel' (fun t => c * f t) = c * groupSum key k rel' f := by
+  simp only [TypedAgg.groupSum, ← Finset.mul_sum]
+@[simp] theorem groupSum_neg :
+    groupSum key k rel' (fun t => -f t) = -groupSum key k rel' f := by
+  simp only [TypedAgg.groupSum, Finset.sum_neg_distrib]
+@[simp] theorem groupSum_zero : groupSum key k rel' (fun _ => 0) = 0 := by
+  simp only [TypedAgg.groupSum, Finset.sum_const_zero]
+/-- `COUNT(*)` of a group is `SUM(1)`. `@[grind]` (not `@[simp]`, to leave `COUNT` alone by default). -/
+@[grind =] theorem groupCount_eq_groupSum_one :
+    (groupCount key k rel' : Int) = groupSum key k rel' (fun _ => 1) := by
+  simp [TypedAgg.groupCount, TypedAgg.groupSum, Finset.sum_const]
+end AggArith
+
 
 attribute [grind =]
   restriction_idempotence          -- σ_p(σ_p R) = σ_p R

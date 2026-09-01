@@ -545,6 +545,13 @@ def TypedRelation.mapByList {colType : Fin n → Type} [∀ i, DecidableEq (colT
     (f : TypedTuple colType → TypedTupleOfList types) : TypedRelationOfList types :=
   { labels := fun i => names.getD i.val "", rows := r.rows.image f }
 
+/-- `(r.mapByList names f).rows = r.rows.image f` — exposes the image so a projection/GROUP BY equality
+reduces to a per-row one (`Finset.image_congr`). Used by `sql_group_key`. -/
+theorem TypedRelation.mapByList_rows {colType : Fin n → Type} [∀ i, DecidableEq (colType i)]
+    {types : List SQLTypeProxy} (r : TypedRelation colType) (names : List String)
+    (f : TypedTuple colType → TypedTupleOfList types) :
+    (r.mapByList names f).rows = r.rows.image f := rfl
+
 -- (`HYPOTHESIS` handling and its enabler lemmas live in `LeanDatabase/Hypothesis.lean`.)
 
 /-- **Projection fusion.** Two stacked `mapByList`s (e.g. `SELECT … FROM (CTE that projects)`)

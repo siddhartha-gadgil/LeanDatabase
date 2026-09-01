@@ -1634,6 +1634,72 @@
   "query": "SELECT Y.A1 AS A1, Y.A2 AS A2, X.B1 AS B1, X.B2 AS B2 FROM B AS X, A AS Y WHERE Y.A1 = X.B1"
  },
  {
+  "id": "30:q0",
+  "schemas": [
+   {
+    "name": "R1",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "R2",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "R3",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT * FROM R1 AS X, (SELECT * FROM R2 UNION ALL SELECT * FROM R3) AS Y"
+ },
+ {
+  "id": "30:q1",
+  "schemas": [
+   {
+    "name": "R1",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "R2",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "R3",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "(SELECT * FROM R1 AS X, R2 AS Y) UNION ALL (SELECT * FROM R1 AS X, R3 AS Y)"
+ },
+ {
   "id": "31:q0",
   "schemas": [
    {
@@ -1696,6 +1762,54 @@
    }
   ],
   "query": "SELECT X1.XB AS XB, Y1.YB AS YB FROM (SELECT X.B AS XB FROM R1 AS X) AS X1, (SELECT Y.B AS YB FROM R2 AS Y) AS Y1"
+ },
+ {
+  "id": "32:q0",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "S",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT * FROM (SELECT * FROM R UNION ALL SELECT * FROM S) AS X"
+ },
+ {
+  "id": "32:q1",
+  "schemas": [
+   {
+    "name": "R",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "S",
+    "columns": [
+     {
+      "name": "X",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "(SELECT * FROM R AS X) UNION ALL (SELECT * FROM S AS Y)"
  },
  {
   "id": "33:q0",
@@ -4844,6 +4958,138 @@
    }
   ],
   "query": "SELECT C.NAME FROM CARRIERS AS C JOIN FLIGHTS AS F ON C.CID = F.CARRIER_ID GROUP BY C.NAME, F.DAY_OF_MONTH HAVING COUNT(F.FID) > 1000"
+ },
+ {
+  "id": "48:q0",
+  "schemas": [
+   {
+    "name": "MONTHS",
+    "columns": [
+     {
+      "name": "MID",
+      "type": "INT"
+     },
+     {
+      "name": "MONTH",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "WEEKDAYS",
+    "columns": [
+     {
+      "name": "DID",
+      "type": "INT"
+     },
+     {
+      "name": "DAY_OF_WEEK",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "CARRIERS",
+    "columns": [
+     {
+      "name": "CID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "FLIGHTS",
+    "columns": [
+     {
+      "name": "FID",
+      "type": "INT"
+     },
+     {
+      "name": "ORIGIN_CITY",
+      "type": "INT"
+     },
+     {
+      "name": "DEST_CITY",
+      "type": "INT"
+     },
+     {
+      "name": "ACTUAL_TIME",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT DISTINCT F.ORIGIN_CITY, F.DEST_CITY, F.ACTUAL_TIME FROM FLIGHTS AS F JOIN (SELECT A.ORIGIN_CITY, MAX(A.ACTUAL_TIME) AS MAX_TIME FROM FLIGHTS AS A GROUP BY A.ORIGIN_CITY) AS X ON F.ORIGIN_CITY = X.ORIGIN_CITY AND F.ACTUAL_TIME = X.MAX_TIME"
+ },
+ {
+  "id": "48:q1",
+  "schemas": [
+   {
+    "name": "MONTHS",
+    "columns": [
+     {
+      "name": "MID",
+      "type": "INT"
+     },
+     {
+      "name": "MONTH",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "WEEKDAYS",
+    "columns": [
+     {
+      "name": "DID",
+      "type": "INT"
+     },
+     {
+      "name": "DAY_OF_WEEK",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "CARRIERS",
+    "columns": [
+     {
+      "name": "CID",
+      "type": "INT"
+     },
+     {
+      "name": "NAME",
+      "type": "INT"
+     }
+    ]
+   },
+   {
+    "name": "FLIGHTS",
+    "columns": [
+     {
+      "name": "FID",
+      "type": "INT"
+     },
+     {
+      "name": "ORIGIN_CITY",
+      "type": "INT"
+     },
+     {
+      "name": "DEST_CITY",
+      "type": "INT"
+     },
+     {
+      "name": "ACTUAL_TIME",
+      "type": "INT"
+     }
+    ]
+   }
+  ],
+  "query": "SELECT S.ORIGIN_CITY, F2.DEST_CITY, MAX(F2.ACTUAL_TIME) FROM (SELECT F1.ORIGIN_CITY, MAX(F1.ACTUAL_TIME) AS MAX_TIME FROM FLIGHTS AS F1 GROUP BY F1.ORIGIN_CITY) AS S JOIN FLIGHTS AS F2 ON S.ORIGIN_CITY = F2.ORIGIN_CITY AND F2.ACTUAL_TIME = S.MAX_TIME GROUP BY S.ORIGIN_CITY, F2.DEST_CITY"
  },
  {
   "id": "49:q0",

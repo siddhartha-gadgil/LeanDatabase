@@ -80,22 +80,22 @@ variable {lA lB : List SQLTypeProxy}
 /-- `LEFT JOIN` result → `lA ++ lB.map .nullable`. -/
 def ofOuterLeft
     (r : TypedRelation (Fin.append (colTypeOfList lA) (fun i => Option (colTypeOfList lB i)))) :
-    TypedRelationOfList (lA ++ lB.map .nullable) :=
-  { labels := fun j => r.labels (Fin.cast (by simp) j),
+    TypedRelationOfList (colsAppend lA (lB.map .nullable)) :=
+  { labels := fun j => r.labels (Fin.cast (by simp [colsAppend_eq]) j),
     rows := r.rows.image (fun t => TypedTupleOfList.append (splitTuple t).1 (ofOption (splitTuple t).2)) }
 
 /-- `RIGHT JOIN` result → `lA.map .nullable ++ lB`. -/
 def ofOuterRight
     (r : TypedRelation (Fin.append (fun i => Option (colTypeOfList lA i)) (colTypeOfList lB))) :
-    TypedRelationOfList (lA.map .nullable ++ lB) :=
-  { labels := fun j => r.labels (Fin.cast (by simp) j),
+    TypedRelationOfList (colsAppend (lA.map .nullable) lB) :=
+  { labels := fun j => r.labels (Fin.cast (by simp [colsAppend_eq]) j),
     rows := r.rows.image (fun t => TypedTupleOfList.append (ofOption (splitTuple t).1) (splitTuple t).2) }
 
 /-- `FULL JOIN` result → `lA.map .nullable ++ lB.map .nullable`. -/
 def ofOuterFull
     (r : TypedRelation (Fin.append (fun i => Option (colTypeOfList lA i)) (fun i => Option (colTypeOfList lB i)))) :
-    TypedRelationOfList (lA.map .nullable ++ lB.map .nullable) :=
-  { labels := fun j => r.labels (Fin.cast (by simp) j),
+    TypedRelationOfList (colsAppend (lA.map .nullable) (lB.map .nullable)) :=
+  { labels := fun j => r.labels (Fin.cast (by simp [colsAppend_eq]) j),
     rows := r.rows.image (fun t => TypedTupleOfList.append (ofOption (splitTuple t).1) (ofOption (splitTuple t).2)) }
 
 def parseTypedTupleFilter  (schemaStr : List (String × String)) (str : String) : TermElabM Expr := do
@@ -642,6 +642,10 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       outerJoinSub f1 sub x.getId cond ``rightOuterJoin ``ofOuterRight true false
     | `(sql_from| $f1:sql_from FULL $[OUTER]? JOIN ( $sub:sql_query ) AS $x:ident ON $cond:term) =>
       outerJoinSub f1 sub x.getId cond ``fullOuterJoin ``ofOuterFull true true
+    -- Parenthesised join group RHS: `f JOIN (g) ON cond` — `g` (e.g. `a CROSS JOIN b`) is its own FROM,
+    -- so `innerJoin` elaborates it via `productPair` and joins the product to `f`.
+    | `(sql_from| $f1:sql_from JOIN ( $g:sql_from ) ON $cond:term) =>
+      innerJoin f1 g (some cond)
     -- Inner `JOIN ON` / `CROSS JOIN` handled here (not just via `escapeJoin`) so they compose with
     -- GROUP BY / ORDER BY / LIMIT, which `escapeJoin`'s whole-query rewrite doesn't reach (C1).
     | `(sql_from| $f1:sql_from JOIN $t:ident ON $cond:term) =>

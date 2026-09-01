@@ -32,15 +32,19 @@ integrity constraints — it succeeds silently and the proving pipeline runs exa
 
 It never closes a goal, so it cannot report a proof that does not exist. -/
 elab "sql_disprove" : tactic => do
+  -- An earlier step may already have closed the goal; there is then nothing to disprove. Without
+  -- this the tactic errors on the empty goal list and takes the whole pipeline down with it.
+  if (← Elab.Tactic.getGoals).isEmpty then return
   let goal ← Elab.Tactic.getMainGoal
   -- Back off on very large goals. Sampling a database means *evaluating both queries on it*, and on a
   -- seven-table join that costs more than the proof attempt it is supposed to save; those goals were
   -- timing out with the budget spent on testing rather than proving.
   if (← goal.getType).approxDepth > 96 then return
-  -- A fixed seed keeps the check (and therefore every build that runs it) reproducible. It is
-  -- deliberately small: this runs before *every* proof, and on a seven-table goal each sampled
-  -- database costs real work, so the budget it spends has to come out of the proof's.
-  let tac ← `(tacticSeq| plausible (config := { maxSize := 4, numInst := 40, randomSeed := some 271828 }))
+  -- A fixed seed keeps the check (and therefore every build that runs it) reproducible. The size
+  -- guard above already excludes the goals where sampling is expensive, so on everything that
+  -- reaches here the search should be *generous* — cutting it back to 40 instances lost two
+  -- counterexamples that need a specific mined value in the row.
+  let tac ← `(tacticSeq| plausible (config := { maxSize := 6, numInst := 120, randomSeed := some 271828 }))
   -- Anything the probe logs ("Unable to find a counter-example") is its own business, not the
   -- user's: remember where the log ends and drop whatever it added.
   let log ← Core.getMessageLog

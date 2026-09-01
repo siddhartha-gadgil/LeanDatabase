@@ -38,7 +38,7 @@ def counterexamplePair (data : Json) : TermElabM Json := do
     -- Feed the samplers the literals these two queries mention: a predicate like `SIZE > 100000` or
     -- `YX = 'HELLO'` is false on essentially every random value, so without this the search never
     -- gets past it (`Plausible/Constants.lean`).
-    LeanDatabase.Plausible.setPoolFrom first second
+    LeanDatabase.Plausible.setPoolInEnv first second
     let (firstExpr, _) ← parseSqlQuery schemasStr first
     let (secondExpr, _) ← parseSqlQuery schemasStr second
     lambdaTelescope (← instantiateMVars firstExpr) fun tvars body1 => do

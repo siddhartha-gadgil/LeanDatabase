@@ -1,4 +1,5 @@
 import LeanDatabase.Operators.Aggregate
+import LeanDatabase.Operators.Join
 
 /-!
 # Data constraints (hypotheses) — turning data-dependent equivalences into provable ones
@@ -97,5 +98,61 @@ def ForeignKey {α : Type} {m : Nat} {parentCT : Fin m → Type}
     (f : TypedTuple colType → α) (g : TypedTuple parentCT → α)
     (R : TypedRelation colType) (S : TypedRelation parentCT) : Prop :=
   ∀ r ∈ R.rows, ∃ s ∈ S.rows, f r = g s
+
+/-- **FD `key → det` collapses `GROUP BY (det, key)` to `GROUP BY key` — for EVERY aggregate.** The two
+keys induce the same partition (given the FD), so the *group relations* are equal; hence `SUM`/`MAX`/
+`AVG`/… over them agree, not just `COUNT` (which `cnt_collapse_of_FD` covers). `@[simp]` in the finer→
+coarser direction, so with the FD in context `sql_simp` rewrites any `AGG` over `GROUP BY id, name` to
+`GROUP BY name`. -/
+@[simp, grind] theorem group_collapse_of_FD {α β : Type} [DecidableEq α] [DecidableEq β]
+    (key : TypedTuple colType → α) (det : TypedTuple colType → β)
+    (R : TypedRelation colType) (hfd : FuncDepEq key det R)
+    (t : TypedTuple colType) (ht : t ∈ R.rows) :
+    TypedAgg.group (fun s => (det s, key s)) (det t, key t) R = TypedAgg.group key (key t) R := by
+  apply TypedRelation.ext (by rfl)
+  simp only [TypedAgg.group, restriction]
+  apply Finset.filter_congr
+  intro s hs
+  by_cases hk : key s = key t
+  · simp [hk, hfd s hs t ht hk]
+  · simp [hk]
+
+/-- **UNIQUE key: `COUNT(DISTINCT key) = COUNT(*)`.** If `key` is injective on `R`'s rows (a UNIQUE /
+PRIMARY KEY constraint), the distinct key values are exactly the rows. -/
+@[simp, grind] theorem relCountDistinct_eq_relCount_of_unique {α : Type} [DecidableEq α]
+    (key : TypedTuple colType → α) (R : TypedRelation colType)
+    (hu : ∀ a ∈ R.rows, ∀ b ∈ R.rows, key a = key b → a = b) :
+    TypedAgg.relCountDistinct key R = TypedAgg.relCount R := by
+  simp only [TypedAgg.relCountDistinct, TypedAgg.relCount]
+  exact Finset.card_image_of_injOn hu
+
+/-- **Foreign key eliminates a semijoin.** `R ⋉ S on f = g` = `R` when every child value `f r` occurs
+in the parent `S` on `g` (`ForeignKey f g R S`): the `EXISTS`/`IN` against the parent never drops a row.
+This is the join- and `EXISTS`-elimination equivalence VeriEQL's FK-heavy Calcite pairs need. -/
+@[simp, grind] theorem semijoin_eq_of_ForeignKey {α : Type} [DecidableEq α] {m : Nat}
+    {parentCT : Fin m → Type} [∀ i, DecidableEq (parentCT i)]
+    (f : TypedTuple colType → α) (g : TypedTuple parentCT → α)
+    (R : TypedRelation colType) (S : TypedRelation parentCT) (hfk : ForeignKey f g R S) :
+    semijoin R S (fun r s => decide (f r = g s)) = R := by
+  apply TypedRelation.ext (by rfl)
+  simp only [semijoin, restriction]
+  apply Finset.filter_true_of_mem
+  intro r hr
+  have ⟨s, hs, hfg⟩ := hfk r hr
+  grind
+
+/-- **Foreign key empties the matching antijoin.** `R ▷ S on f = g` (a `NOT EXISTS`/`NOT IN` against the
+parent) is empty under `ForeignKey f g R S`: no child row lacks a parent match. -/
+@[simp, grind] theorem antijoin_empty_of_ForeignKey {α : Type} [DecidableEq α] {m : Nat}
+    {parentCT : Fin m → Type} [∀ i, DecidableEq (parentCT i)]
+    (f : TypedTuple colType → α) (g : TypedTuple parentCT → α)
+    (R : TypedRelation colType) (S : TypedRelation parentCT) (hfk : ForeignKey f g R S) :
+    antijoin R S (fun r s => decide (f r = g s)) = emptyRel R.labels := by
+  apply TypedRelation.ext (by rfl)
+  simp only [antijoin, restriction, emptyRel]
+  apply Finset.filter_false_of_mem
+  intro r hr
+  have ⟨s, hs, hfg⟩ := hfk r hr
+  grind
 
 end LeanDatabase
