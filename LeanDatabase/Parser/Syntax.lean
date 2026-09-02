@@ -244,10 +244,14 @@ partial def getIdents (stx : TSyntax `sql_from) : List Name :=
 -- macro "SELECT" " * " "FROM" ident "WHERE" t:term : term =>
 --     return t
 
-macro:30 t:term "AND" s:term : term =>
+-- SQL binds `AND` tighter than `OR`, and both associate to the left: `a AND b OR c` is
+-- `(a AND b) OR c`. Both used to sit at level 30 with a default-precedence right operand, which made
+-- them *equal* and right-associative — so that same expression parsed as `a AND (b OR c)`, a
+-- different predicate. `BETWEEN`'s operands are `:51`, so its inner `AND` is still not swallowed.
+macro:35 t:term:35 " AND " s:term:36 : term =>
   `($t && $s)
 
-macro:30 t:term "OR" s:term : term =>
+macro:30 t:term:30 " OR " s:term:31 : term =>
   `($t || $s)
 
 -- SQL `<>` (not-equal), at comparison precedence.

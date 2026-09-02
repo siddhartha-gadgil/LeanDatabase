@@ -56,7 +56,16 @@ elab_rules : term
       | some cond => do mkAppM ``restriction #[← elabTypedTupleFilter [(.anonymous, d.innerSchema)] cond, d.innerRel]
       | none => pure d.innerRel
     match d.kind with
-    | .count => mkAppM ``Int.ofNat #[← mkAppM ``relCount #[rel]]
+    -- `COUNT(e)` skips rows where `e IS NULL`. The arg is recorded only for a NULL-able column; for
+    -- `COUNT(*)` / non-nullable args `summand` is `none` and this is a plain row count.
+    | .count => match d.summand with
+      | none => mkAppM ``Int.ofNat #[← mkAppM ``relCount #[rel]]
+      | some s => do
+          let (tupleTy, _, _) ← columnProjectionsE d.innerSchema
+          let pred ← withLocalDeclD `t tupleTy fun t => do
+            let notNull ← mkAppM ``Bool.not #[← mkAppM ``SqlNullable.isNull #[← mkAppM' s #[t]]]
+            mkLambdaFVars #[t] notNull
+          mkAppM ``Int.ofNat #[← mkAppM ``relCount #[← mkAppM ``restriction #[pred, rel]]]
     | .sum => mkAppM ``relSum #[d.summand.get!, rel]
     | .countDistinct => mkAppM ``Int.ofNat #[← mkAppM ``relCountDistinct #[d.summand.get!, rel]]
     -- MAX / MIN reuse the grouped operators under a constant key (that group *is* the whole relation),
@@ -246,6 +255,33 @@ partial def resolveInScope (scopeLabels : List Name) (stx : Syntax) : Syntax := 
           | _ => match sameLast with
             | [uniq] => return some (.ident info raw uniq [])
             | _ => return none
+        else return none
+      | _ => return none
+
+/-- Qualify a **bare** column reference to a given scope: `deptno` → `dept.deptno` when that scope has
+exactly one column with that last component.
+
+SQL resolves an unqualified name *innermost-first*, so a subquery's own columns have to be pinned to
+the subquery before the outer scope gets a chance at them. Without this, `EMP.DEPTNO IN (SELECT DEPTNO
+FROM DEPT)` elaborates as `EMP.DEPTNO = EMP.DEPTNO` — true whenever `DEPT` is non-empty — because both
+occurrences are the same bare name and the outer scope is searched first. Halts at a nested
+`sql_query`, whose names belong to its own scope. -/
+partial def qualifyToScope (scopeLabels : List Name) (stx : Syntax) : Syntax := Id.run do
+  let lastOf : Name → Name := fun n => (n.components.getLast?).getD n
+  stx.replaceM (m := Id) fun s => do
+    match s with
+    | `(sql_col| ( $_:sql_query ) AS $_:ident)
+    | `(term| EXISTS ( $_:sql_query ))
+    | `(term| NOT EXISTS ( $_:sql_query ))
+    | `(term| $_:term IN ( $_:sql_query ))
+    | `(term| $_:term NOT IN ( $_:sql_query )) => return some s
+    | _ =>
+      match s with
+      | .ident info raw val _ =>
+        if val.components.length == 1 && !(scopeLabels.contains val) then
+          match scopeLabels.filter (fun l => lastOf l == val) with
+          | [uniq] => return some (.ident info raw uniq [])
+          | _ => return none
         else return none
       | _ => return none
 
@@ -833,15 +869,39 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       -- `DISTINCT` in an IN/EXISTS subquery is irrelevant (set membership), so it is accepted and ignored.
       -- `productPair` elaborates any inner FROM (a base table, a subquery `(…) AS t`, a join, or VALUES),
       -- so no single-table restriction is needed — the correlation resolves against `sSchema` below.
+      -- `EXISTS (SELECT <aggregate> …)` is a *constant*: an ungrouped aggregate returns exactly one
+      -- row whatever its input, so the test is always true (and `NOT EXISTS` always false). This
+      -- branch never has a `GROUP BY` — a grouped subquery does not match the pattern — so an
+      -- aggregate in the SELECT list is necessarily ungrouped. Modelling it as a semijoin instead
+      -- made `EXISTS (SELECT COUNT(*) …)` false on an empty inner table, where SQL says true.
+      if inCol?.isNone then
+        let selTerms := match sel with
+          | `(sql_cols| $c:sql_col,*) => c.getElems.map sqlColTerm
+          | _ => #[]
+        let (_, aggs) ← (selTerms.toList.mapM liftAggExprs).run #[]
+        unless aggs.isEmpty do
+          if isNeg then
+            let f ← elabTypedTupleFilter [(.anonymous, outerSchema)] (← `(false))
+            return ← mkAppM ``restriction #[f, rel]
+          else
+            return rel
       let (sExpr, sSchema) ← productPair sdb
+      let innerLabels := sSchema.map (·.1)
+      let outerLabels := outerSchema.map (·.1)
       let corr ← match inCol?, corr? with
         | some oc, _ => do                                  -- `oc IN (SELECT c FROM …)`  ⇒  `oc = c`
           match sel with
           | `(sql_cols| $c:sql_col,*) =>
             let #[col] := c.getElems | throwError "IN subquery must SELECT exactly one column"
-            `($oc = $(sqlColTerm col))
+            -- The `IN` operand is the *outer* query's, the SELECT column the subquery's. Pin each to
+            -- its own scope first: otherwise a name they share (`DEPTNO`) binds to the same side twice.
+            -- `expandNames` has already pinned bare names globally (to whichever table came first),
+            -- so re-qualifying a *wrongly* pinned one matters as much as qualifying a bare one.
+            let ocQ : Term := ⟨resolveInScope outerLabels (qualifyToScope outerLabels oc)⟩
+            let colQ : Term := ⟨resolveInScope innerLabels (qualifyToScope innerLabels (sqlColTerm col))⟩
+            `($ocQ = $colQ)
           | _ => throwError "IN subquery must SELECT exactly one column"
-        | none, some corr => pure corr                      -- `EXISTS (… WHERE corr)`
+        | none, some corr => pure ⟨qualifyToScope innerLabels corr⟩   -- `EXISTS (… WHERE corr)`
         | none, none => throwError "EXISTS subquery needs a correlating WHERE condition"
       -- `.anonymous` for both: `productPair` already qualified the inner columns (`y.loc` under
       -- `DEPT AS Y`), so re-prefixing them by the base table would hide them from the correlation.
@@ -872,7 +932,9 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
           mkLambdaLetsFVars vars (if asInt then elabTermEnsuringType argStx (mkConst ``Int)
                                   else Prod.snd <$> elabAsSql argStx)
       let summand? ← match kind with
-        | .count => pure none
+        | .count => do   -- keep the arg only when NULL-able, so COUNT(col) skips its NULLs; else COUNT(*)
+            let (argTy, _) ← withSchemasTupleVars [(.anonymous, schema)] (fun _ => true) fun _ => elabAsSql argStx
+            match argTy with | .nullable _ => some <$> mkSummand false | _ => pure none
         | .sum => some <$> mkSummand true
         | .countDistinct => some <$> mkSummand false
         | .max | .min => some <$> mkSummand true
@@ -970,8 +1032,11 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
               [(.anonymous, combinedSchema)] having groupTerms filteredExpr havAggs.toList
             mkAppM ``restriction #[h, filteredExpr]
           | none => pure filteredExpr
-        pure (← mkAppM ``TypedRelation.mapByList #[havingFilteredExpr, toExpr nameStrs, m],
-              names.zip types)
+        -- With no `GROUP BY` this is an *ungrouped* aggregate, which SQL evaluates to exactly one
+        -- row even over an empty relation (`TypedRelation.aggOne`). A real `GROUP BY` over an empty
+        -- relation correctly has no groups, so that keeps the plain projection.
+        let former := if hasGroupBy then ``TypedRelation.mapByList else ``TypedRelation.aggOne
+        pure (← mkAppM former #[havingFilteredExpr, toExpr nameStrs, m], names.zip types)
     | _ => throwError "Unexpected SELECT column syntax"
 
 def elabSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (stx: Syntax) :

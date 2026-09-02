@@ -1,5 +1,6 @@
 import LeanDatabase.SQLEquiv
 import LeanDatabase.LlmTactic.SQLEquivLLMPrompt
+import LeanDatabase.LlmTactic.SQLEquivCounterex
 import Lean.Meta.Tactic.TryThis
 
 /-!
@@ -119,9 +120,12 @@ def getUsage (json : Json) (pk ck : String) : Nat × Nat :=
 abbrev LLMResult := String × Nat × Nat
 
 def callOpenAI (key prompt model : String) (maxTokens : Nat) : IO LLMResult := do
-  -- Newer OpenAI models (gpt-5.x) reject `max_tokens` and require `max_completion_tokens`.
+  -- Newer OpenAI models (gpt-5.x) reject `max_tokens` and require `max_completion_tokens`; reasoning
+  -- tokens count against it, so the budget must comfortably cover reasoning *and* the emitted proof, or
+  -- `content` comes back empty. `reasoning_effort: medium` keeps the reasoning spend bounded.
   let body := Json.mkObj [("model", model),
     ("messages", Json.arr #[Json.mkObj [("role", "user"), ("content", prompt)]]),
+    ("reasoning_effort", "high"),
     ("max_completion_tokens", maxTokens)]
   let json ← curlPostJson "https://api.openai.com/v1/chat/completions"
     #[s!"Authorization: Bearer {key}", "Content-Type: application/json"] body
@@ -131,7 +135,11 @@ def callOpenAI (key prompt model : String) (maxTokens : Nat) : IO LLMResult := d
   | .error e => throw (IO.userError s!"OpenAI: no choices ({e})")
   | .ok cs => match cs[0]? >>= (·.getObjVal? "message" |>.toOption) >>=
       (·.getObjValAs? String "content" |>.toOption) with
-    | some t => pure (t, pt, ct) | none => throw (IO.userError "OpenAI: no message.content")
+    | some t =>
+      if t.trim.isEmpty then
+        throw (IO.userError s!"OpenAI: empty content (finish/usage: {ct} completion tokens — likely the reasoning+output budget was exhausted)")
+      else pure (t, pt, ct)
+    | none => throw (IO.userError "OpenAI: no message.content")
 
 def callAnthropic (key prompt model : String) (maxTokens : Nat) : IO LLMResult := do
   let body := Json.mkObj [("model", model), ("max_tokens", maxTokens),
@@ -162,8 +170,9 @@ def callGemini (key prompt model : String) (maxTokens : Nat) : IO LLMResult := d
       (·.getObjValAs? String "content" |>.toOption) with
     | some t => pure (t, pt, ct) | none => throw (IO.userError "Gemini: no message.content")
 
-/-- One completion from `p`, with its token usage. -/
-def callLLM (p : Provider) (prompt model : String) (maxTokens : Nat := 8192) : IO LLMResult := do
+/-- One completion from `p`, with its token usage. Budget must cover a reasoning model's hidden
+reasoning tokens plus the emitted proof. -/
+def callLLM (p : Provider) (prompt model : String) (maxTokens : Nat := 32768) : IO LLMResult := do
   let key ← getKey p
   match p with
   | .openai => callOpenAI key prompt model maxTokens
@@ -179,6 +188,13 @@ def stripFence (s : String) : String := Id.run do
     let s := (s.dropWhile (· != '\n')).trimAscii.toString
     return if s.endsWith "```" then (s.dropEnd 3).trimAscii.toString else s
   return s
+
+/-- The repo's own high-level tactics, which a candidate must not call: `sql_equiv`/`sql_equiv_safe`
+have already been run (Step 0) without closing the goal, and `sql_membership`/`sql_big_goal` can hit an
+*uncatchable* deterministic timeout that would abort the whole tactic. Returns the offending name, if
+any (`sql_equiv` also matches `sql_equiv_safe`/`sql_equiv_llm`). -/
+def usesBannedTactic (code : String) : Option String :=
+  ["sql_equiv", "sql_membership", "sql_big_goal"].find? (fun n => (code.splitOn n).length > 1)
 
 /-- Estimated cost **in cents** for a problem from its accumulated token usage and the per-1M-token
 cent prices: `(promptTok × inputCents + completionTok × outputCents) / 1e6`. -/
@@ -212,11 +228,17 @@ def parseCandidate (t : String) : CoreM (Option Syntax) := do
 
 /-- Trial `tac` on `goal`, state reverted; `.ok` only if it closes it with a **`sorry`-free** proof,
 else the error/left-goals message. Rejecting `sorry` is a soundness gate — a model that
-replies `sorry` "closes" any goal, even a false one. -/
-def trialCapture (goal : MVarId) (tac : Syntax) : TermElabM (Except String Unit) :=
-  withoutModifyingState do
-    try
-      let (goals, _) ← Term.withoutErrToSorry do Elab.runTactic goal tac (← read) (← get)
+replies `sorry` "closes" any goal, even a false one. Runs via `evalTactic` in `TacticM` (not
+`Elab.runTactic`, which caps the trial at the default heartbeats and times a heavy proof out
+uncatchably before it closes); the ambient budget is the file's. -/
+def trialCapture (goal : MVarId) (tac : Syntax) : TacticM (Except String Unit) := do
+  let saved ← saveState
+  -- Delaborating the residual `~=`/join goal for the feedback message drives heavy instance search;
+  -- the default `synthInstance.maxHeartbeats` (20000) trips there and its timeout is uncatchable, so
+  -- raise it. (The candidate's own budget is the ambient one, already the file's.)
+  let res ← withOptions (Lean.Meta.synthInstance.maxHeartbeats.set · 1000000) <| (try
+      evalTactic tac
+      let goals ← getUnsolvedGoals
       if !goals.isEmpty then
         -- Report the *residual* goal state, not just "left open goals" — that's what lets the model
         -- fix its next attempt.
@@ -225,7 +247,9 @@ def trialCapture (goal : MVarId) (tac : Syntax) : TermElabM (Except String Unit)
       else if (← instantiateMVars (mkMVar goal)).hasSorry then
         pure (.error "closed the goal with `sorry` — that is not a proof; prove it for real")
       else pure (.ok ())
-    catch e => pure (.error (← e.toMessageData.toString))
+    catch e => pure (.error (← e.toMessageData.toString)))
+  saved.restore
+  pure res
 
 /-- Run `tac` on `goal` (the main goal); return `true` iff it fully closes it with a **`sorry`-free**
 proof. On failure, a partial result, or a `sorry`-based closure the state is rolled back and no error
@@ -233,7 +257,7 @@ escapes — so the caller can safely try another tactic. (A bare `evalTactic` wo
 candidate's `grind`/`apply` error propagate to the call site, and a `sorry` reply would be accepted.) -/
 def tryClose (goal : MVarId) (tac : Syntax) : TacticM Bool := do
   let saved ← saveState
-  let ok ← (try
+  let ok ← (withOptions (Lean.Meta.synthInstance.maxHeartbeats.set · 1000000) <| try
       evalTactic tac
       if (← getUnsolvedGoals).isEmpty then
         pure !(← instantiateMVars (mkMVar goal)).hasSorry
@@ -258,7 +282,7 @@ def suggestProof (code : String) : TacticM Unit := do
 
 /-! ## The tactic -/
 
-def maxRounds : Nat := 5
+def maxRounds : Nat := 3
 def defaultProvider : Provider := .openai
 
 /-- LLM-assisted fallback. Order: (0) try the deterministic `sql_equiv`; (1) if that fails, run the
@@ -267,13 +291,16 @@ candidate closes it, try the LLM's last code with `sql_equiv` appended (`… <;>
 model got partway; (3) else leave a `sorry`. Concise status to the infoview; code to `Try this:`. -/
 elab "sql_equiv_llm" : tactic => do
   let goal ← getMainGoal
-  -- Step 0: deterministic `sql_equiv` first. Run it once; if it doesn't fully close the goal (fails
-  -- or leaves subgoals), roll the state back cleanly so the LLM sees the original goal — a bare
-  -- `evalTactic` here would let `sql_equiv`'s internal `grind`/`apply` failure escape to the call site.
-  let sqlEq ← `(tactic| sql_equiv)
+  -- Step 0: the deterministic prover first, but the membership-free `sql_equiv_safe` — its structural
+  -- route can hit an *uncatchable* deterministic timeout, which no `tryClose` can roll back, so it
+  -- would abort before the LLM ever runs. `sql_equiv_safe` only ever fails cleanly, so a hard pair
+  -- reliably falls through to the model.
+  let sqlEq ← `(tactic| sql_equiv_safe)
   if ← tryClose goal sqlEq then
     logInfo "LlmTactic: sql_equiv tactic PROVED the goal."
-    TryThis.addSuggestion (← getRef) { suggestion := "sql_equiv" }
+    logInfo "<<<SQLLLM>>>OUTCOME=PROVED;METHOD=sql_equiv"
+    logInfo "<<<SQLLLM_PROOF_BEGIN>>>\nsql_equiv\n<<<SQLLLM_PROOF_END>>>"
+    TryThis.addSuggestion (← getRef) { suggestion := "sql_equiv  -- generated by `sql_equiv_llm`" }
     return
   -- Step 1: LLM refinement loop.
   let goalText := (← Meta.ppGoal goal).pretty
@@ -287,6 +314,7 @@ elab "sql_equiv_llm" : tactic => do
   let mut status : Array String := #["sql_equiv: failed"]
   let mut winner : Option Syntax := none
   let mut stop := false
+  let mut unprovable := false
   -- Accumulated across ALL rounds for this problem, so the cost is per-problem (not per-send).
   let mut totPrompt : Nat := 0
   let mut totCompletion : Nat := 0
@@ -302,15 +330,37 @@ elab "sql_equiv_llm" : tactic => do
     | .ok (raw, pt, ct) =>
       totPrompt := totPrompt + pt; totCompletion := totCompletion + ct
       lastCode := stripFence raw
+      if (lastCode.trim.replace "`" "").toUpper == "UNPROVABLE" then
+        -- The model judged the goal unprovable as stated (needs an absent constraint, or the queries
+        -- genuinely differ). Stop now and leave a clean `sorry` rather than burning the remaining rounds.
+        status := status.push s!"call{round}: 200 OK, model reports UNPROVABLE"
+        lastCode := ""; stop := true; unprovable := true
+      else
       match ← parseCandidate raw with
       | none => status := status.push s!"call{round}: 200 OK, parse-fail"
                 feedback := "Your response did not parse as a Lean 4 tactic."
       | some stx =>
-        match ← trialCapture goal stx with
-        | .ok _ => status := status.push s!"call{round}: 200 OK, PROVED"; winner := some stx; break
-        | .error e =>
-          status := status.push s!"call{round}: 200 OK, failed"
-          feedback := s!"Tactic:\n{lastCode}\nfailed with:\n{e.take 1500}"
+        if let some bad := usesBannedTactic lastCode then
+          -- Reject before running it: `sql_equiv` already failed in Step 0, and running it (or the
+          -- membership tactics) again risks an uncatchable timeout that would abort everything.
+          status := status.push s!"call{round}: 200 OK, used `{bad}` (rejected)"
+          feedback := s!"Your script called `{bad}`, which is off-limits: `sql_equiv`/`sql_equiv_safe` \
+            have ALREADY been run on this goal and did not close it, and `sql_membership`/`sql_big_goal` \
+            can loop. Write a primitive proof from Mathlib and basic tactics only (e.g. `apply \
+            TypedRelation.ext (by rfl)`, `apply Finset.ext`/`Finset.image_congr`, `refine \
+            restriction_congr _ _ _ (fun _ _ => ?_)`, `simp only [...]`, `intro`, `rcases`, `grind`, \
+            `ring`, `omega`, `decide`) — never call any `sql_*` tactic."
+        else
+          match ← trialCapture goal stx with
+          | .ok _ => status := status.push s!"call{round}: 200 OK, PROVED"; winner := some stx; break
+          | .error e =>
+            status := status.push s!"call{round}: 200 OK, failed"
+            -- Prove like a human would: feed back the FULL residual proof state (`trialCapture`
+            -- reports the leftover goals), not just a one-line error, so the model can advance the
+            -- proof step by step from where it actually got stuck rather than restarting blind.
+            feedback := s!"Your tactic:\n{lastCode}\n\ndid not close the goal. Here is the resulting \
+              Lean proof state (continue the proof from HERE — reuse the part of your script that \
+              worked and only fix/extend the rest):\n{e.take 6000}"
   -- Per-problem token/cost summary (net over all rounds).
   let inC := sqlEquivLlm.inputCentsPerMTok.get opts
   let outC := sqlEquivLlm.outputCentsPerMTok.get opts
@@ -318,22 +368,57 @@ elab "sql_equiv_llm" : tactic => do
     s!"cost: {fmtCents (estCostCents totPrompt totCompletion inC outC)}"
   let hdr := s!"LlmTactic: {p.name} ({model})\n" ++
     String.intercalate "\n" status.toList ++ "\n" ++ costLine
+  -- If the model declared the goal UNPROVABLE, ask (a second prompt) for a concrete counterexample
+  -- database and let Lean `decide` the negation. A verified counterexample is a real DISPROOF; the goal
+  -- itself can't be closed (it's false), so we report it and leave a `sorry`.
+  if unprovable then
+    let binders ← getTableBinders
+    let goalTy ← getMainTarget
+    let mut cxFb := ""
+    let mut cxJson : Option String := none
+    for _ in [1:3] do
+      match ← (do try pure (some (← callLLM p s!"{counterexPrompt}\n\nGOAL:\n{goalText}{cxFb}" model))
+                  catch _ => pure none : TacticM (Option LLMResult)) with
+      | none => break
+      | some (raw, pt, ct) =>
+        totPrompt := totPrompt + pt; totCompletion := totCompletion + ct
+        match parseDb raw with
+        | none => cxFb := "\nReturn ONLY a JSON array of tables (one row-list per table binder)."
+        | some db => match ← checkCounterexample goalTy binders db with
+          | some _ => cxJson := some ((raw.replace "\n" " ").replace "```json" "" |>.replace "```" ""); break
+          | none => cxFb := "\nThat database did NOT make the queries differ (set semantics: rows dedup). Give a different one."
+    match cxJson with
+    | some j =>
+      logInfo s!"{hdr}\n→ DISPROVED (not equivalent) — decide-verified counterexample\ncounterexample rows: {j.take 400}"
+      logInfo "<<<SQLLLM>>>OUTCOME=DISPROVED;METHOD=plausible_sql"
+      logInfo s!"<<<SQLLLM_CX_BEGIN>>>\n{j}\n<<<SQLLLM_CX_END>>>"
+    | none =>
+      logInfo s!"{hdr}\n→ model reported UNPROVABLE; no verified counterexample found (inconclusive)"
+      logInfo "<<<SQLLLM>>>OUTCOME=INCONCLUSIVE;METHOD=unprovable-unverified"
+    evalTactic (← `(tactic| sorry)); return
   -- Apply the winner if one closed the goal on trial (reapplied safely).
   if let some stx := winner then
     if ← tryClose goal stx then
       logInfo s!"{hdr} → PROVED"
-      suggestProof lastCode
+      logInfo "<<<SQLLLM>>>OUTCOME=PROVED;METHOD=llm"
+      logInfo s!"<<<SQLLLM_PROOF_BEGIN>>>\n{lastCode}\n<<<SQLLLM_PROOF_END>>>"
+      suggestProof s!"{lastCode}\n-- generated by `sql_equiv_llm`"
       return
-  -- Step 2: append `sql_equiv` to whatever the LLM last produced (in case it got partway).
-  unless lastCode.isEmpty do
-    if let some cstx ← parseCandidate s!"(\n{lastCode}\n) <;> sql_equiv" then
+  -- Step 2: append `sql_equiv_safe` to whatever the LLM last produced (in case it got partway). Safe,
+  -- not full `sql_equiv`, so a residual goal it cannot close fails cleanly rather than timing out.
+  -- Skip when the last reply itself called a banned tactic (running it could loop uncatchably).
+  unless lastCode.isEmpty || (usesBannedTactic lastCode).isSome do
+    if let some cstx ← parseCandidate s!"(\n{lastCode}\n) <;> sql_equiv_safe" then
       if ← tryClose goal cstx then
-        logInfo s!"{hdr} → PROVED by LLM code `<;> sql_equiv`"
-        suggestProof s!"({lastCode}) <;> sql_equiv"
+        logInfo s!"{hdr} → PROVED by LLM code `<;> sql_equiv_safe`"
+        logInfo "<<<SQLLLM>>>OUTCOME=PROVED;METHOD=llm+safe"
+        logInfo s!"<<<SQLLLM_PROOF_BEGIN>>>\n({lastCode}) <;> sql_equiv_safe\n<<<SQLLLM_PROOF_END>>>"
+        suggestProof s!"({lastCode}) <;> sql_equiv_safe\n-- generated by `sql_equiv_llm`"
         return
   -- Step 3: give up cleanly with a `sorry`.
   evalTactic (← `(tactic| sorry))
   logInfo s!"{hdr} → FAILED; left `sorry`"
+  logInfo "<<<SQLLLM>>>OUTCOME=INCONCLUSIVE;METHOD=exhausted"
   unless lastCode.isEmpty do suggestProof lastCode
 
 elab "dump_llm_ctx" : tactic => do

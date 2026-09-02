@@ -172,26 +172,40 @@ macro "sql_membership" : tactic => `(tactic|
      decide_eq_true_eq, Bool.and_eq_true, Bool.or_eq_true, Bool.not_eq_true]
    first | grind +locals | sql_constraints | tauto))
 
-/-- `sql_membership` under a hard budget — a *probe*, run on goals that may well not close.
+-- Subquery-flattening (a derived table / subquery in FROM ≡ the inlined join). Like `sql_membership`,
+-- but adds the `exists_eq_*`/`exists_and_*` laws — which collapse the intermediate row the derived
+-- table introduces (`∃ v, … ∧ cons(…) = v`) so both sides reduce to the same first-order formula — and
+-- closes with `aesop`, whose existential-witness search matches the join witnesses `grind` will not
+-- chain. Kept SEPARATE from `sql_membership` (and tried after it): the extra `exists_*` rewrites derail
+-- `grind` on some aggregate goals, and `aesop` is dear, so this only runs when the cheaper routes fail.
+-- `synthInstance.maxHeartbeats` is raised because the wide membership `simp`/`aesop` blow the default.
+-- `done`-guarded, so it backtracks and stays harmless to everything it does not fully close.
+macro "sql_flatten" : tactic => `(tactic|
+  set_option synthInstance.maxHeartbeats 1000000 in
+  (try simp only [LeanDatabase.dataEq]
+   first
+     | apply Finset.ext
+     | (apply TypedRelation.ext (by rfl); apply Finset.ext)
+   try intro _
+   try simp only [List.cons_append, List.nil_append]
+   try simp only [sql_mem, Finset.mem_image, Finset.mem_filter, Finset.mem_product,
+     Finset.mem_union, Finset.mem_inter, Finset.mem_sdiff, Prod.exists,
+     decide_eq_true_eq, Bool.and_eq_true, Bool.or_eq_true, Bool.not_eq_true,
+     exists_and_left, exists_and_right, exists_eq_left, exists_eq_right,
+     exists_eq_left', exists_eq_right']
+   aesop
+   done))
 
-`set_option maxHeartbeats … in` does not bound a macro-expanded tactic here, so the budget is imposed
-directly; `withCurrHeartbeats` restarts the count so it is measured from this point rather than from
-whatever the pipeline already spent. The bound is the whole point: unbounded, this spends a full
-`grind` on the membership expansion of every goal it cannot close, minutes at a time on a join-heavy
-pair — and a membership proof that has not landed within this much is not going to. -/
+-- `sql_membership` under a hard heartbeat budget: bounds the `grind` on the membership expansion so a
+-- join-heavy pair it cannot close gives up instead of spending the whole (very large) budget. The
+-- budget's timeout is a *deterministic* one and is uncatchable, so this branch is only for the
+-- standalone census; `sql_equiv_safe` (used by `sql_equiv_llm`) omits it. See `sql_equiv_safe`.
 elab "sql_membership_probe" n:(num)? : tactic => do
   let budget := (n.map (·.getNat)).getD 20000
-  let tac ← `(tactic| sql_membership)
-  -- Exhausting the budget must read as "this branch did not work", not as an error: a `deterministic
-  -- timeout` thrown from here propagates straight through the enclosing `try` and aborts the whole
-  -- proof, which is what turned every pair the probe could not close into a reported timeout.
-  try
-    Lean.Core.withCurrHeartbeats <|
-      withTheReader Lean.Core.Context
-        (fun ctx => { ctx with maxHeartbeats := budget * 1000 }) <|
-        Lean.Elab.Tactic.evalTactic tac
-  catch _ =>
-    throwError "sql_membership_probe: did not close the goal within its budget"
+  Lean.Core.withCurrHeartbeats <|
+    withTheReader Lean.Core.Context
+      (fun ctx => { ctx with maxHeartbeats := budget * 1000 }) <|
+      Lean.Elab.Tactic.evalTactic (← `(tactic| sql_membership))
 
 /-- On an oversized goal, go straight to the structural route and finish there — succeeding (and
 closing the goal) or failing outright, so `sql_equiv`'s `try` moves on. Only the size test lives here;
@@ -223,79 +237,67 @@ elab "sql_guard_erased" : tactic => do
   unless ty.isAppOf ``LeanDatabase.dataEqErased do
     throwError "not an erased-equivalence goal"
 
+-- Shared head: unfold erased/data-eq goals, refute non-equivalences, settle constant relations, and
+-- run the deterministic GROUP-BY key elimination before the loop can reshape the goal.
+macro "sql_equiv_head" : tactic => `(tactic|
+  (try (simp only [LeanDatabase.dataEqErased])
+   sql_disprove
+   try sql_decide
+   try (simp only [LeanDatabase.dataEq])
+   try sql_group_key))
+
+-- The congruence/normalisation loop: repeatedly reshape both sides toward a comparable form. The
+-- WHERE-congruence (`σ_p R = σ_q R` ↦ per-row `p t = q t`) precedes `ext`, which would hide that shape.
+macro "sql_equiv_loop" : tactic => `(tactic|
+  repeat (first
+    | refine limit_congr ?_
+    | sql_outer_join | sql_hypothesis | sql_bijection | sql_funcdep | sql_project
+    | refine restriction_congr _ _ _ (fun _ _ => ?_)
+    | (apply TypedRelation.ext <;> try rfl)
+    | refine Finset.filter_congr (fun _ _ => ?_)
+    | refine Finset.image_congr (fun _ _ => ?_)
+    | sql_simp
+    | (apply funext; intro _)))
+
+-- Cheap closing fallbacks (relation/function/Finset equalities, GROUP-BY key elimination, arithmetic
+-- residues) — each closes the goal or backtracks. No membership route: these can only fail *cleanly*.
+macro "sql_cheap_closers" : tactic => `(tactic|
+  first
+    | grind +locals
+    | (apply Finset.ext; (try sql_simp); grind +locals)
+    | (apply Finset.ext; intro _; (try sql_simp); grind +locals)
+    | (apply TypedRelation.ext (by rfl); (try sql_simp); grind +locals)
+    | (funext _; (try sql_simp); grind +locals)
+    | (apply Finset.ext; intro _
+       simp only [Finset.mem_filter, Finset.mem_image, Finset.mem_union, Finset.mem_inter,
+         Finset.mem_sdiff]
+       (try sql_simp); first | grind +locals | tauto)
+    | (sql_simp; first | grind +locals | tauto | omega)
+    | (funext _; apply Finset.ext; intro _; (try sql_simp); first | grind +locals | tauto)
+    | sql_group_key)
+
+-- Full `sql_equiv`: head + the structural membership route (bounded probe up front on the clean
+-- `A.rows = B.rows` shape, unbounded in the closers) + loop + closers. The membership branches can hit
+-- an *uncatchable* deterministic timeout on a pair they cannot close, so this is for standalone use and
+-- the census; `sql_equiv_llm` runs `sql_equiv_safe`, which omits them and so always fails cleanly.
 macro "sql_equiv" : tactic => `(tactic|
   first
-  -- Nullability-tolerant goal (`dataEqErased`, from a `Option τ` vs `τ` output-type mismatch): unfold to
-  -- the erased-row image equality. Erasure is computable, so a constant-relation erased goal `decide`s
-  -- outright here (a terminal branch, since it fully closes); non-constant erased goals fall through to
-  -- the pipeline, which unfolds `dataEqErased` again and reduces the image equality like any set equality.
   | (sql_guard_erased; simp only [LeanDatabase.dataEqErased]; sql_erased_decide; done)
-  | (
-   try (simp only [LeanDatabase.dataEqErased])
-   -- Is this even an equivalence? Aborts with the offending database if not; otherwise a no-op.
-   sql_disprove
-   -- Constant relations (`VALUES` with no table reference) are a *decidable* finite computation — settle
-   -- them directly rather than searching. No-op (fails fast) once any base table is involved.
-   try sql_decide
-   -- data-equivalence goal (`A ~= B`): unfold to `A.rows = B.rows` (labels/aliases erased), then reduce.
-   try (simp only [LeanDatabase.dataEq])
-   -- GROUP-BY key elimination on the clean projection goal, before the loop reshapes it. Deterministic,
-   -- and ahead of the structural route: on a wide `NATURAL JOIN` with a `HAVING`, the membership
-   -- expansion is enormous while this closes the goal outright.
-   try sql_group_key
-   -- On a very large goal (a seven-table join, say) the congruence loop below is dominated by
-   -- `sql_simp`, whose `simp_all` runs out of budget before reaching the closers. The structural
-   -- route rewrites instead of searching, so it is the one worth spending a huge goal's budget on.
-   try sql_big_goal
-   -- The structural route, on the goal as it stands. It is also a closing fallback below, but by then
-   -- the loop has applied `TypedRelation.ext`/`Finset.image_congr` and the `A.rows = B.rows` shape the
-   -- membership laws need is gone — a join equivalence closes here or not at all. Closes or backtracks.
-   -- Capped: this runs on *every* goal, and on one it cannot close its `grind` would otherwise spend
-   -- the whole (very large) budget before the rest of the pipeline gets a turn.
-   try sql_membership_probe
-   -- WHERE-congruence, deterministically, before the loop can reshape the per-row goal.
-   try sql_where
-   repeat (first
-     | refine limit_congr ?_
-     | sql_outer_join
-     | sql_hypothesis
-     | sql_bijection
-     | sql_funcdep
-     | sql_project
-     -- WHERE-congruence: reduce `σ_p R = σ_q R` to the per-row predicate equality `p t = q t`, which
-     -- `grind +locals` then closes — this is where optimizer-style rewrites land (constant propagation
-     -- into opaque scalars, absorption/comparison-merge under a HYPOTHESIS). See `restriction_*` in
-     -- SQLToolbox. Must precede `TypedRelation.ext`, which would first split off `.rows` and hide the
-     -- `σ_p R = σ_q R` shape.
-     | refine restriction_congr _ _ _ (fun _ _ => ?_)
-     | (apply TypedRelation.ext <;> try rfl)
-     | refine Finset.filter_congr (fun _ _ => ?_)
-     | refine Finset.image_congr (fun _ _ => ?_)
-     | sql_simp
-     | (apply funext; intro _))
-   -- Closing fallbacks — tried in order, each fully closes the goal or backtracks (so appending more
-   -- only ever proves *more*, never breaks an existing proof). Covers: relation/function/Finset
-   -- equalities, the membership route (`x ∈ σ/π/∪` unfolds to `∧`/`∨`), and arithmetic residues.
-   all_goals (first
-     | grind +locals
-     | (apply Finset.ext; (try sql_simp); grind +locals)
-     | (apply Finset.ext; intro _; (try sql_simp); grind +locals)
-     | (apply TypedRelation.ext (by rfl); (try sql_simp); grind +locals)
-     | (funext _; (try sql_simp); grind +locals)
-     | (apply Finset.ext; intro _
-        simp only [Finset.mem_filter, Finset.mem_image, Finset.mem_union, Finset.mem_inter,
-          Finset.mem_sdiff]
-        (try sql_simp); first | grind +locals | tauto)
-     | (sql_simp; first | grind +locals | tauto | omega)
-     | (funext _; apply Finset.ext; intro _; (try sql_simp); first | grind +locals | tauto)
-     -- GROUP-BY key elimination, in case the loop reshaped the goal past the early attempt.
-     | sql_group_key
-     -- Last: the structural membership route. Tried after the cheap closers because it rewrites the
-     -- goal wholesale; when they fail on a join/projection equality, this is what has a shape `grind`
-     -- can actually reason about.
-     | sql_membership
-     -- Last resort: the constraints alone (a pair that is an equivalence *only* modulo its keys and
-     -- foreign keys, with no rewriting needed beyond them).
-     | sql_constraints)))
+  | (sql_equiv_head
+     try sql_big_goal
+     try sql_membership_probe
+     try sql_where
+     sql_equiv_loop
+     all_goals (first | sql_cheap_closers | sql_membership | sql_constraints | sql_flatten)))
+
+-- Membership-free `sql_equiv`: same pipeline without the structural route, so it can only fail
+-- cleanly. `sql_equiv_llm` runs this first (then the LLM), so a genuine failure falls through reliably.
+macro "sql_equiv_safe" : tactic => `(tactic|
+  first
+  | (sql_guard_erased; simp only [LeanDatabase.dataEqErased]; sql_erased_decide; done)
+  | (sql_equiv_head
+     try sql_where
+     sql_equiv_loop
+     all_goals (first | sql_cheap_closers | sql_constraints)))
 
 end LeanDatabase.SQLEquiv

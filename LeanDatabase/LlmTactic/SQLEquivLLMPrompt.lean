@@ -53,17 +53,15 @@ def coreDeclsByModule : CoreM (Std.HashMap Name (Array Name)) := do
       acc := acc.insert modName names
   pure acc
 
+-- Name + type only (no docstring): the signature is what the model reasons from, and dropping the
+-- per-entry prose cuts ~20% of the prompt's input tokens (the dominant cost) with no loss on the
+-- standard proof shapes.
 def ppDeclEntry (n : Name) : MetaM String := do
   let env ← getEnv
   let some info := env.find? n | return ""
   let kind := if info.isTheorem then "theorem" else "def"
   let ty ← ppExpr info.type
-  match ← findDocString? env n with
-  | some doc =>
-    -- first line of the docstring only (the gist), capped — full multi-line rationale is just bulk
-    let line := ((doc.replace "\n" " ").take 140).toString
-    pure s!"{kind} {n} : {ty}  -- {line}"
-  | none => pure s!"{kind} {n} : {ty}"
+  pure s!"{kind} {n} : {ty}"
 
 /-- Modules whose `def`s are dropped: the opaque, uninterpreted scalar/string functions (~160). Their
 theorems are still kept; opaque values are reasoned about by congruence, and the concrete scalar terms
@@ -138,8 +136,15 @@ def buildRepoContextFor (goalExpr : Expr) : MetaM String := do
   let relevant := cands.filter fun (n, tc) =>
     always.contains n || goalConsts.contains n || tc.any goalKeys.contains
   let isThm (n : Name) : Bool := (env.find? n).any (·.isTheorem)
+  -- Cap the block: input tokens dominate the per-call cost, and the context is almost all of them.
+  -- Keep every structurally-essential (`always`) entry, then fill to `cap` with the goal-relevant rest
+  -- (theorems first). Beyond this the extra lemmas rarely change the proof but keep growing the prompt.
+  let cap := 45
   let names := (relevant.map (·.1)).qsort (fun a b => isThm a && !isThm b)
-  let entries ← names.mapM ppDeclEntry
+  let keep := names.filter (fun n => always.contains n)
+  let rest := names.filter (fun n => !always.contains n)
+  let fill := if keep.size ≥ cap then #[] else rest.take (cap - keep.size)
+  let entries ← (keep ++ fill).mapM ppDeclEntry
   pure (String.intercalate "\n" entries.toList)
 
 /-! ## Prompt template + assembly -/
@@ -155,23 +160,73 @@ def promptPreamble : String :=
     "are assumed duplicate-free). The goal below is an equality of two elaborated queries, either",
     "`A = B` or `A ~= B` (`dataEq`: rows equal, ignoring output column *labels*).",
     "",
-    "You may use any Mathlib lemma or standard tactic (simp, grind, ring, omega, Finset lemmas). The",
-    "REPO CONTEXT below is this project's own vocabulary — its **theorems** are lemmas you can `apply`",
-    "or feed to `simp`; its **defs** are the operators the goal is built from. It is additional",
-    "information, not a restriction.",
+    "The repo's own automation `sql_equiv` (its full reduction + `grind` pipeline) has ALREADY been run",
+    "on this goal and did NOT close it. So do NOT call `sql_equiv`, `sql_equiv_safe`, `sql_equiv_llm`,",
+    "`sql_membership`, or `sql_big_goal` — a script that does is rejected. Write a PRIMITIVE proof.",
     "",
-    "Useful facts for this domain:",
-    "- `UNION`/`INTERSECT`/`EXCEPT` are SET operations: arm ORDER and DUPLICATES do not matter, and",
-    "  `sql_equiv` ALREADY normalizes arm order — so two queries differing only in the order of",
-    "  `UNION [ALL]` arms are closed by `sql_equiv` alone. Do NOT hand-reorder with `union_comm`/",
-    "  `union_assoc`; just call `sql_equiv`.",
-    "- For an `A ~= B` goal, output column *labels* are already ignored, so alias-only differences",
-    "  (a renamed column or CTE) need NO work — do not try to rewrite labels.",
-    "- Try `sql_equiv` FIRST (it runs the repo's whole reduction+grind pipeline); only add a targeted",
-    "  step when it leaves a specific residual goal it cannot discharge, then finish with `sql_equiv`.",
-    "- If the two queries genuinely differ in an output VALUE (a different string/number literal, a",
-    "  different column selected, a different filter), they are NOT equal — do not force a proof; a",
-    "  `sorry`-free failure is the correct, sound outcome."
+    "You may use any Mathlib lemma or standard tactic (simp, grind, ring, omega, Finset lemmas) and the",
+    "repo's *component* lemmas/defs from the REPO CONTEXT below — its **theorems** are lemmas you can",
+    "`apply` or feed to `simp`; its **defs** are the operators the goal is built from.",
+    "",
+    "PICK THE RECIPE BY GOAL SHAPE (these are the moves the repo's own tactic uses; they are reliable):",
+    "",
+    "(A) JOIN / SUBQUERY / FLATTENING — a multi-table FROM, a derived table or subquery in FROM, EXISTS,",
+    "  IN, or a correlated scalar subquery. Push membership through the algebra, then let `aesop` match",
+    "  the `∃` witnesses. Emit exactly:",
+    "      apply Finset.ext",
+    "      intro x",
+    "      simp only [dataEq, List.cons_append, List.nil_append, sql_mem, Finset.mem_image,",
+    "        Finset.mem_filter, Finset.mem_product, Finset.mem_union, Finset.mem_inter, Finset.mem_sdiff,",
+    "        Prod.exists, decide_eq_true_eq, Bool.and_eq_true, Bool.or_eq_true, Bool.not_eq_true,",
+    "        exists_and_left, exists_and_right, exists_eq_left, exists_eq_right, exists_eq_left',",
+    "        exists_eq_right']",
+    "      aesop",
+    "  `sql_mem` is the repo's row-membership simp SET (allowed — NOT `sql_membership`): it turns",
+    "  `x ∈ σ/π/×/∪` into first-order `∧`/`∨`/`∃` over base-table membership and splits row equalities",
+    "  into per-column scalars; the `exists_*` laws collapse the intermediate row a derived table adds",
+    "  (`∃ v, … ∧ cons(…) = v`). **Use `aesop`, NOT `grind`** — `grind` cannot chain the join witnesses.",
+    "  If `aesop` leaves a residual, retry as `aesop` after `constructor`, or `<;> omega` / `<;> grind`.",
+    "",
+    "(B) AGGREGATE — SELECT with SUM / AVG / COUNT / MIN / MAX (usually + GROUP BY), where the two sides",
+    "  differ only in a dropped/constant GROUP-BY key or in aggregate arithmetic. Reduce to the per-group",
+    "  equality then apply the matching congruence:",
+    "      simp only [TypedRelation.mapByList_rows]",
+    "      apply Finset.image_congr; intro x hx",
+    "      simp only [TypedTupleOfList.cons_inj, TypedTupleOfList.cons_nil_inj, true_and, and_true,",
+    "        Nat.cast_inj, Int.ofNat.injEq]",
+    "      first",
+    "        | simp only [groupSum_add, groupSum_sub, groupSum_mul_left, groupSum_neg, groupSum_zero]",
+    "        | (first | apply groupSum_congr | apply groupCount_congr | apply groupAvg_congr",
+    "             | apply groupMaxInt_congr | apply groupMinInt_congr",
+    "           apply group_congr; intro _ _; grind +locals)",
+    "  `SUM(a+b)=SUM(a)+SUM(b)` etc. are the `groupSum_*` simp laws; a dropped key uses `group_congr`",
+    "  (same partition). COUNT is `Nat` cast to `Int` — peel with `Nat.cast_inj`/`Int.ofNat.injEq`.",
+    "",
+    "(C) PROJECTION / WHERE ONLY — one table (or same FROM), differing by a rearranged SELECT expression",
+    "  or an equivalent WHERE. For a WHERE difference: `refine restriction_congr _ _ _ (fun _ _ => ?_)`",
+    "  then `grind +locals` (this closes the per-row predicate `p t = q t`; good for arithmetic/CASE). For",
+    "  a SELECT difference: `apply TypedRelation.ext (by rfl); simp only [TypedRelation.mapByList,",
+    "  restriction]; apply Finset.image_congr; intro x hx; simp only [TypedTupleOfList.cons_inj,",
+    "  TypedTupleOfList.cons_nil_inj, true_and, and_true]; grind +locals` (or `ring`/`omega` per column).",
+    "",
+    "PER-CONSTRUCT TIPS:",
+    "- NULL / CASE: `CASE WHEN NOT c IS NULL THEN a ELSE b` elaborates to `if !SqlNullable.isNull (t i)",
+    "  then a else b`; `simp [SqlNullable.isNull]` reduces it (a non-nullable INT column is never null).",
+    "- ORDER BY / LIMIT: order is irrelevant under SET semantics — ignore `ORDER BY`; a `LIMIT` difference",
+    "  reduces with `refine limit_congr ?_`.",
+    "- COUNT(col) on a NON-nullable column equals COUNT(*) = the group size (`groupCount`).",
+    "- CONSTRAINT-DEPENDENT (IMPORTANT): some equivalences hold ONLY given an integrity constraint — e.g.",
+    "  `COUNT GROUP BY key ~= per-row value` needs `key` to be UNIQUE; `WHERE EXISTS(subquery) ~= no filter`",
+    "  needs a FOREIGN KEY. If the theorem's binder has NO such hypothesis (`FuncDepEq …`, a `UNIQUE`/`∀ a b,",
+    "  … → a = b` fact, or a `HYPOTHESIS`), the goal is UNPROVABLE and actually FALSE — do not invent a proof.",
+    "  Reply with just `skip` so the tool records a clean `sorry`; that is the correct outcome, and it saves",
+    "  the wasted rounds. Only attempt such a pair when the needed constraint IS a hypothesis you can use.",
+    "  To signal this, reply with the single word `UNPROVABLE` (nothing else) — the tool then stops and",
+    "  records a clean `sorry` without burning more rounds.",
+    "- GENERAL: `UNION`/`INTERSECT`/`EXCEPT` are SET ops (arm order & duplicates do not matter); for `A ~= B`",
+    "  output labels are already ignored, so alias-only differences need NO work. If two queries differ in an",
+    "  output VALUE (different literal, column, filter) they are NOT equal — reply `UNPROVABLE`. When unsure",
+    "  which recipe fits, try (A) first — its membership reduction + `aesop` is the most general."
   ]
 
 /-- Delimits the repo-context block so it reads as reference material, not instructions or the goal. -/
@@ -184,10 +239,12 @@ def contextEndMarker : String := "=== END REPO CONTEXT ==="
 after the context block and goal, not just up front. -/
 def outputFormatInstruction : String :=
   String.intercalate "\n" [
-    "Respond with ONLY the tactic script — e.g. `simp only [restriction]; grind +locals` or",
-    "`apply TypedRelation.ext (by rfl); apply Finset.image_congr; intro x hx; grind`.",
-    "No markdown code fences. No explanation. Nothing before or after the script.",
-    "Never use `sorry`, `admit`, or `sorryAx` — a script that leaves them is rejected as no proof."
+    "OUTPUT: the raw Lean 4 tactic script and NOTHING else. Your entire reply is parsed directly as",
+    "tactic syntax, so any prose, heading, restatement, or trailing remark makes it fail to parse.",
+    "- No markdown, no ``` fences, no `by`, no comments, no blank explanation lines.",
+    "- Nothing before the first tactic and nothing after the last; do not echo the goal.",
+    "- One tactic per line (or separated by `;`); e.g. `apply Finset.ext; intro x` then `aesop`.",
+    "- Never `sorry`/`admit`/`sorryAx`, and never `sql_equiv`/`sql_membership` — such replies are rejected."
   ]
 
 /-- Assemble the full prompt (framing / context / goal[+feedback] / restated instruction). -/

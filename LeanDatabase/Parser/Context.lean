@@ -441,10 +441,23 @@ def groupAggExprsE (schema : List (Name × SQLTypeProxy)) (groupTerms : List Syn
             pure (kind.op, kind.resultType, some p)
           catch _ =>
             pure (kind.ratOp, .float, some (← mkSummand exprStx (mkConst ``Rat)))
+    -- `COUNT(e)` counts only rows where `e IS NOT NULL` (SQL semantics). For `COUNT(*)` (the `0`
+    -- sentinel) and any non-nullable column `SqlNullable.isNull` is always `false`, so the filter keeps
+    -- every row and this stays `COUNT(*)`; only a NULL-able argument drops its NULL rows. Modelling
+    -- `COUNT(col)` as `COUNT(*)` was unsound (it proved `COUNT(x) ~= COUNT(*)` on `{1, NULL}`).
+    let relForAgg ← if kind != .count then pure relE else
+        withSchemasTupleVars [(.anonymous, schema)] (fun _ => true) fun vars => do
+          let (argTy, argVal) ← elabAsSql exprStx
+          match argTy with
+          | .nullable _ =>   -- only a NULL-able arg needs filtering; for `COUNT(*)`/non-null this is a no-op
+            let predE ← mkLambdaLetsFVars vars
+              (do mkAppM ``Bool.not #[← mkAppM ``SqlNullable.isNull #[argVal]])
+            mkAppM ``restriction #[predE, relE]
+          | _ => pure relE
     let aggE ← withLocalDeclD `k codomainE fun keyVar => do
       let base ← match projE? with
-        | none => mkAppM opName #[keyMapE, keyVar, relE]
-        | some projE => mkAppM opName #[keyMapE, keyVar, relE, projE]
+        | none => mkAppM opName #[keyMapE, keyVar, relForAgg]
+        | some projE => mkAppM opName #[keyMapE, keyVar, relForAgg, projE]
       let call ← if kind.wrapNat then mkAppM ``Int.ofNat #[base] else pure base
       mkLambdaFVars #[keyVar] call
     let aggValue ← mkAppM' aggE #[keyValue]
@@ -544,6 +557,32 @@ def TypedRelation.mapByList {colType : Fin n → Type} [∀ i, DecidableEq (colT
     {types : List SQLTypeProxy} (r : TypedRelation colType) (names : List String)
     (f : TypedTuple colType → TypedTupleOfList types) : TypedRelationOfList types :=
   { labels := fun i => names.getD i.val "", rows := r.rows.image f }
+
+/-- `SELECT AGG(…) FROM R` with **no** `GROUP BY` — the ungrouped aggregate.
+
+SQL returns exactly **one** row here even when `R` is empty (`COUNT(*)` is then `0`; it is not "no
+rows"). Modelling it as a group over a constant key — which is what the rest of the grouping machinery
+does — returns nothing on an empty `R`, and that is what made `EXISTS (SELECT COUNT(*) …)` come out
+false where SQL says true.
+
+Only the empty case differs from `mapByList`, so every existing grouped proof is untouched. With no
+`GROUP BY` the key is the empty tuple, hence `f` is constant and any witness row computes it; `default`
+serves when `R` has none. -/
+def TypedRelation.aggOne {colType : Fin n → Type} [∀ i, DecidableEq (colType i)]
+    [∀ i, Inhabited (colType i)] {types : List SQLTypeProxy}
+    (r : TypedRelation colType) (names : List String)
+    (f : TypedTuple colType → TypedTupleOfList types) : TypedRelationOfList types :=
+  { labels := fun i => names.getD i.val "",
+    rows := if r.rows.card = 0 then {f (fun i => default)} else r.rows.image f }
+
+/-- On a non-empty relation the ungrouped aggregate *is* the projection — the shape every existing
+grouped-aggregate proof is stated in. -/
+@[simp] theorem TypedRelation.aggOne_of_nonempty {colType : Fin n → Type}
+    [∀ i, DecidableEq (colType i)] [∀ i, Inhabited (colType i)] {types : List SQLTypeProxy}
+    (r : TypedRelation colType) (names : List String)
+    (f : TypedTuple colType → TypedTupleOfList types) (h : r.rows.card ≠ 0) :
+    (r.aggOne names f).rows = r.rows.image f := by
+  simp [TypedRelation.aggOne, h]
 
 /-- `(r.mapByList names f).rows = r.rows.image f` — exposes the image so a projection/GROUP BY equality
 reduces to a per-row one (`Finset.image_congr`). Used by `sql_group_key`. -/
