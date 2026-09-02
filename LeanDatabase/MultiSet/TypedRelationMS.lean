@@ -59,6 +59,20 @@ theorem query_bagEquiv_imp_setEquiv {DB : Type} (Q₁ Q₂ : DB → TypedRelatio
     (h : ∀ db, dataEqMS (Q₁ db) (Q₂ db)) : ∀ db, dataEqSet (Q₁ db) (Q₂ db) :=
   fun db => dataEqMS_imp_dataEqSet (h db)
 
+/-- **The bridge that rescues proofs.** If BOTH query results are already duplicate-free (`Nodup` —
+e.g. `SELECT DISTINCT`, a `UNION`, or an output carrying a key), then set equivalence UPGRADES to bag
+equivalence: a duplicate-free bag *equals* its own dedup, so `set-equal ⇒ bag-equal`.
+
+So we never need a bag evaluator: prove set-equivalence as usual, then separately certify the two
+outputs have no duplicates (a syntactic check — a top-level `DISTINCT`/`UNION`, or an output key). That
+turns a set-proof into a genuine SQL (multiset) equivalence for the common case (duplicate-free
+outputs — the norm when base tables have primary keys). -/
+theorem bagEq_of_setEq_of_nodup {A B : TypedRelationMS colType}
+    (hA : A.rows.Nodup) (hB : B.rows.Nodup) (h : dataEqSet A B) : dataEqMS A B := by
+  have hd : A.rows.dedup = B.rows.dedup := by
+    rw [← Multiset.toFinset_val, ← Multiset.toFinset_val]; exact congrArg Finset.val h
+  rwa [Multiset.dedup_eq_self.2 hA, Multiset.dedup_eq_self.2 hB] at hd
+
 /-- **The converse fails**: set-equal does *not* imply bag-equal. Witness (one `Unit` column): the bag
 `{r}` and the bag `{r, r}` both deduplicate to `{r}` (so `dataEqSet`), yet differ as multisets (so
 `¬ dataEqMS`). This is why our set-*proofs* are only SQL-equivalences on the multiplicity-insensitive

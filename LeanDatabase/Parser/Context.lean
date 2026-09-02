@@ -39,6 +39,59 @@ def elabAsSql (stx: Syntax) : TermElabM (SQLTypeProxy × Expr) := do
     catch e =>
       throwError s!"AS clause `{pp}`: {← e.toMessageData.toString}"
 
+/-- `CAST(x AS τ)` on an already-elaborated `x`.
+
+Split out of the `elab_rules` below so the **nullable** case can recurse: SQL propagates NULL through
+a cast, so casting an `Option σ` is `Option.map` of the cast of the underlying value. Without this a
+nullable source was rejected outright ("unsupported source type Option ℤ"), which is one of the larger
+elaboration-failure classes in the CrossSkill corpus. -/
+partial def castTo (ty : TSyntax `sql_cast_type) (xe : Expr) : TermElabM Expr := do
+  let xt ← whnf (← instantiateMVars (← inferType xe))
+  -- NULL propagates through a cast: `CAST(nullable AS τ)` is nullable.
+  if let (``Option, #[inner]) := xt.getAppFnArgs then
+    let f ← withLocalDeclD `v inner fun v => do mkLambdaFVars #[v] (← castTo ty v)
+    return ← mkAppM ``Option.map #[f, xe]
+  -- A bare numeric literal defaults to `ℕ`; coerce to `Int` so `CAST(10 AS …)` is handled.
+  let isNat := xt.isConstOf ``Nat
+  let xe ← if isNat then mkAppM ``Int.ofNat #[xe] else pure xe
+  let isInt := xt.isConstOf ``Int || isNat
+  let isRat := xt.isConstOf ``Rat
+  let isStr := xt.isConstOf ``String
+  let toFloat : TermElabM Expr := do
+    if isRat then pure xe
+    else if isInt then mkAppM ``LeanDatabase.Scalar.castIntToFloat #[xe]
+    else if isStr then mkAppM ``LeanDatabase.Scalar.strToFloat #[xe]
+    else throwError s!"CAST(_ AS FLOAT): unsupported source type {← ppExpr xt}"
+  let toInt : TermElabM Expr := do
+    if isInt then pure xe
+    else if isRat then mkAppM ``LeanDatabase.Scalar.truncToInt #[xe]
+    else if isStr then mkAppM ``LeanDatabase.Scalar.strToInt #[xe]
+    else throwError s!"CAST(_ AS INT): unsupported source type {← ppExpr xt}"
+  let toStr : TermElabM Expr := do
+    if isStr then pure xe
+    else if isInt then mkAppM ``LeanDatabase.Scalar.intToStr #[xe]
+    else if isRat then mkAppM ``LeanDatabase.Scalar.floatToStr #[xe]
+    else throwError s!"CAST(_ AS STRING): unsupported source type {← ppExpr xt}"
+  -- `DATE`/`TIMESTAMP`/`VARIANT` are `String`-valued in our model; `BOOLEAN` is opaque.
+  let toBool : TermElabM Expr := do
+    if xt.isConstOf ``Bool then pure xe else mkAppM ``LeanDatabase.Scalar.toBoolOpaque #[xe]
+  match ty with
+  | `(sql_cast_type| INT) | `(sql_cast_type| INTEGER) | `(sql_cast_type| BIGINT)
+  | `(sql_cast_type| NUMBER) => toInt
+  | `(sql_cast_type| FLOAT) | `(sql_cast_type| DOUBLE) | `(sql_cast_type| DOUBLE PRECISION)
+  | `(sql_cast_type| REAL) | `(sql_cast_type| NUMERIC) | `(sql_cast_type| DECIMAL)
+  | `(sql_cast_type| NUMBER($_,*)) | `(sql_cast_type| NUMERIC($_,*))
+  | `(sql_cast_type| DECIMAL($_,*)) => toFloat
+  | `(sql_cast_type| STRING) | `(sql_cast_type| TEXT) | `(sql_cast_type| VARCHAR)
+  | `(sql_cast_type| CHAR) | `(sql_cast_type| VARCHAR($_)) | `(sql_cast_type| CHAR($_))
+  | `(sql_cast_type| DATE) | `(sql_cast_type| TIMESTAMP) | `(sql_cast_type| DATETIME)
+  | `(sql_cast_type| TIMESTAMPTZ) | `(sql_cast_type| TIMESTAMP($_)) | `(sql_cast_type| TIMESTAMPTZ($_))
+  | `(sql_cast_type| VARIANT) | `(sql_cast_type| GEOGRAPHY) | `(sql_cast_type| GEOMETRY)
+  | `(sql_cast_type| JSON) | `(sql_cast_type| JSONB) | `(sql_cast_type| OBJECT)
+  | `(sql_cast_type| ARRAY) => toStr
+  | `(sql_cast_type| BOOLEAN) => toBool
+  | _ => throwUnsupportedSyntax
+
 /-- `CAST(x AS <type>)` — type-directed (see `Operators/Scalar.lean`). Unlike the opaque scalars,
 CAST inspects the *source* type: `Int → FLOAT` is the genuine `Int → Rat` coercion (so a division
 downstream is real, not integer — ROADMAP 2.4), while lossy directions stay opaque. -/
@@ -52,47 +105,7 @@ elab_rules : term
   | `(CAST($x AS $ty:sql_cast_type)) => do
     let xe ← elabTerm x none
     Term.synthesizeSyntheticMVarsNoPostponing
-    let xt ← whnf (← instantiateMVars (← inferType xe))
-    -- A bare numeric literal defaults to `ℕ`; coerce to `Int` so `CAST(10 AS …)` is handled.
-    let isNat := xt.isConstOf ``Nat
-    let xe ← if isNat then mkAppM ``Int.ofNat #[xe] else pure xe
-    let isInt := xt.isConstOf ``Int || isNat
-    let isRat := xt.isConstOf ``Rat
-    let isStr := xt.isConstOf ``String
-    let toFloat : TermElabM Expr := do
-      if isRat then pure xe
-      else if isInt then mkAppM ``LeanDatabase.Scalar.castIntToFloat #[xe]
-      else if isStr then mkAppM ``LeanDatabase.Scalar.strToFloat #[xe]
-      else throwError s!"CAST(_ AS FLOAT): unsupported source type {← ppExpr xt}"
-    let toInt : TermElabM Expr := do
-      if isInt then pure xe
-      else if isRat then mkAppM ``LeanDatabase.Scalar.truncToInt #[xe]
-      else if isStr then mkAppM ``LeanDatabase.Scalar.strToInt #[xe]
-      else throwError s!"CAST(_ AS INT): unsupported source type {← ppExpr xt}"
-    let toStr : TermElabM Expr := do
-      if isStr then pure xe
-      else if isInt then mkAppM ``LeanDatabase.Scalar.intToStr #[xe]
-      else if isRat then mkAppM ``LeanDatabase.Scalar.floatToStr #[xe]
-      else throwError s!"CAST(_ AS STRING): unsupported source type {← ppExpr xt}"
-    -- `DATE`/`TIMESTAMP`/`VARIANT` are `String`-valued in our model; `BOOLEAN` is opaque.
-    let toBool : TermElabM Expr := do
-      if xt.isConstOf ``Bool then pure xe else mkAppM ``LeanDatabase.Scalar.toBoolOpaque #[xe]
-    match ty with
-    | `(sql_cast_type| INT) | `(sql_cast_type| INTEGER) | `(sql_cast_type| BIGINT)
-    | `(sql_cast_type| NUMBER) => toInt
-    | `(sql_cast_type| FLOAT) | `(sql_cast_type| DOUBLE) | `(sql_cast_type| DOUBLE PRECISION)
-    | `(sql_cast_type| REAL) | `(sql_cast_type| NUMERIC) | `(sql_cast_type| DECIMAL)
-    | `(sql_cast_type| NUMBER($_,*)) | `(sql_cast_type| NUMERIC($_,*))
-    | `(sql_cast_type| DECIMAL($_,*)) => toFloat
-    | `(sql_cast_type| STRING) | `(sql_cast_type| TEXT) | `(sql_cast_type| VARCHAR)
-    | `(sql_cast_type| CHAR) | `(sql_cast_type| VARCHAR($_)) | `(sql_cast_type| CHAR($_))
-    | `(sql_cast_type| DATE) | `(sql_cast_type| TIMESTAMP) | `(sql_cast_type| DATETIME)
-    | `(sql_cast_type| TIMESTAMPTZ) | `(sql_cast_type| TIMESTAMP($_)) | `(sql_cast_type| TIMESTAMPTZ($_))
-    | `(sql_cast_type| VARIANT) | `(sql_cast_type| GEOGRAPHY) | `(sql_cast_type| GEOMETRY)
-    | `(sql_cast_type| JSON) | `(sql_cast_type| JSONB) | `(sql_cast_type| OBJECT)
-    | `(sql_cast_type| ARRAY) => toStr
-    | `(sql_cast_type| BOOLEAN) => toBool
-    | _ => throwUnsupportedSyntax
+    castTo ty xe
 
 /-- `B1(X)` / `B(X, Y)` — an uninterpreted predicate over the named rows. Each argument expands to the
 in-scope columns it owns (a FROM item) or to itself (a column); the values are folded, through the
@@ -422,10 +435,25 @@ def groupAggExprsE (schema : List (Name × SQLTypeProxy)) (groupTerms : List Syn
   let mkSummand (exprStx : Syntax.Term) (ty : Expr) : TermElabM Expr :=
     withSchemasTupleVars [(.anonymous, schema)] (fun _ => true) fun vars =>
       mkLambdaLetsFVars vars (elabTermEnsuringType exprStx ty)
+  -- The same summand for a NULL-able argument: elaborate at `Option ty` and unwrap. The NULL rows are
+  -- filtered out of the relation below, so the `0` default is never actually folded in.
+  let mkSummandOpt (exprStx : Syntax.Term) (ty : Expr) : TermElabM Expr :=
+    withSchemasTupleVars [(.anonymous, schema)] (fun _ => true) fun vars =>
+      mkLambdaLetsFVars vars do
+        let v ← elabTermEnsuringType exprStx (← mkAppM ``Option #[ty])
+        mkAppM ``Option.getD #[v, ← mkAppOptM ``OfNat.ofNat #[some ty, some (mkNatLit 0), none]]
   aggs.mapM fun (name, kind, exprStx) => do
     -- Choose operator, result type, and summand. Numeric aggregates (`.int` summand) probe the
     -- argument's SQL type and dispatch to the `Int` or the `Rat` operator, so `SUM`/`AVG`/`MIN`/`MAX`
     -- over a `FLOAT`/`NUMBER` column type-check (and stay exact) rather than failing `_ : ℚ = ℤ`.
+    -- SQL aggregates SKIP NULLs — every one of them, not just `COUNT`. Establish that once here: it
+    -- picks the unwrapping summand below and filters the NULL rows out of the relation, without which
+    -- a NULL would fold in as `0` — changing `AVG`'s denominator and letting `0` win a `MAX`.
+    let argIsNullable ← withSchemasTupleVars [(.anonymous, schema)] (fun _ => true) fun _ => do
+      try
+        let (argTy, _) ← withoutErrToSorry (elabAsSql exprStx)
+        pure (match argTy with | .nullable _ => true | _ => false)
+      catch _ => pure false
     let (opName, resType, projE?) ← match kind.summand with
       | .void => pure (kind.op, kind.resultType, none)
       | .bool => pure (kind.op, kind.resultType, some (← mkSummand exprStx (mkConst ``Bool)))
@@ -436,24 +464,22 @@ def groupAggExprsE (schema : List (Name × SQLTypeProxy)) (groupTerms : List Syn
             mkLambdaLetsFVars vars (Prod.snd <$> elabAsSql exprStx)
           pure (kind.op, kind.resultType, some projE)
       | .int => do            -- numeric: `Int` first (identical to the prior path), else `Rat`
+          let mk (nullable : Bool) := if nullable then mkSummandOpt else mkSummand
           try
-            let p ← withoutErrToSorry (mkSummand exprStx (mkConst ``Int))
+            let p ← withoutErrToSorry (mk argIsNullable exprStx (mkConst ``Int))
             pure (kind.op, kind.resultType, some p)
           catch _ =>
-            pure (kind.ratOp, .float, some (← mkSummand exprStx (mkConst ``Rat)))
+            pure (kind.ratOp, .float, some (← mk argIsNullable exprStx (mkConst ``Rat)))
     -- `COUNT(e)` counts only rows where `e IS NOT NULL` (SQL semantics). For `COUNT(*)` (the `0`
     -- sentinel) and any non-nullable column `SqlNullable.isNull` is always `false`, so the filter keeps
     -- every row and this stays `COUNT(*)`; only a NULL-able argument drops its NULL rows. Modelling
     -- `COUNT(col)` as `COUNT(*)` was unsound (it proved `COUNT(x) ~= COUNT(*)` on `{1, NULL}`).
-    let relForAgg ← if kind != .count then pure relE else
+    let relForAgg ← if !argIsNullable then pure relE else
         withSchemasTupleVars [(.anonymous, schema)] (fun _ => true) fun vars => do
-          let (argTy, argVal) ← elabAsSql exprStx
-          match argTy with
-          | .nullable _ =>   -- only a NULL-able arg needs filtering; for `COUNT(*)`/non-null this is a no-op
-            let predE ← mkLambdaLetsFVars vars
-              (do mkAppM ``Bool.not #[← mkAppM ``SqlNullable.isNull #[argVal]])
-            mkAppM ``restriction #[predE, relE]
-          | _ => pure relE
+          let (_, argVal) ← elabAsSql exprStx
+          let predE ← mkLambdaLetsFVars vars
+            (do mkAppM ``Bool.not #[← mkAppM ``SqlNullable.isNull #[argVal]])
+          mkAppM ``restriction #[predE, relE]
     let aggE ← withLocalDeclD `k codomainE fun keyVar => do
       let base ← match projE? with
         | none => mkAppM opName #[keyMapE, keyVar, relForAgg]

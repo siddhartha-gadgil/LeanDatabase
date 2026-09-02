@@ -25,8 +25,15 @@ unsafe def main (args : List String) : IO UInt32 := do
   let env ← importModules (loadExts := true) #[{module := `Mathlib}, {module := `LeanDatabase}] {}
   let path : System.FilePath := s!"Bench/{dataset}/corpus_pg.json"
   let content ← IO.FS.readFile path
-  let .ok (.arr recs) := Json.parse content
+  let .ok (.arr recs0) := Json.parse content
     | do IO.eprintln s!"could not parse {path} as a JSON array"; return 1
+  -- `ELABCHECK_IDS=a,b,c` restricts the census to those record ids. A full pass is minutes; while
+  -- fixing one failure class you want seconds. Unset = every record, so the reported totals are only
+  -- ever the full-corpus ones. The results file is left alone on a filtered run.
+  let idFilter := (← IO.getEnv "ELABCHECK_IDS").map (fun s => (s.splitOn ",").map String.trim)
+  let recs := match idFilter with
+    | none => recs0
+    | some keep => recs0.filter fun r => keep.contains ((r.getObjValAs? String "id").toOption.getD "?")
   -- `maxRecDepth` is enforced from the *options* (default 512); deep many-partition `UNION`s exceed it,
   -- so raise the option, not just the Core.Context field. A finite `maxHeartbeats` caps records whose
   -- full elaboration blows up (e.g. a 28-way partition UNION) so the census can't hang.
@@ -56,6 +63,9 @@ unsafe def main (args : List String) : IO UInt32 := do
     else IO.println s!"FAIL {id}: {errStr.take 140}"
     results := results.push (Json.mkObj [("id", Json.str id), ("status", Json.str status),
       ("error", if status == "ok" then Json.null else Json.str errStr)])
+  if idFilter.isSome then
+    IO.println s!"\n(filtered run: {ok}/{recs.size} of the named ids; results file not written)"
+    return 0
   IO.FS.writeFile s!"Bench/{dataset}/elab_results.json"
     ((Json.mkObj [("elaborates", Json.num ok), ("timeout", Json.num timeout),
                   ("total", Json.num recs.size), ("results", Json.arr results)]).pretty)

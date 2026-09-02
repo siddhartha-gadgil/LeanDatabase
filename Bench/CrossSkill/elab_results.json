@@ -18,8 +18,7 @@
   {"status": "ok", "id": "sf_bq003", "error": null},
   {"status": "fail",
    "id": "sf_bq004",
-   "error":
-   "Invalid field `fullvisitorid`: The environment does not contain `LeanDatabase.TypedRelation.fullvisitorid`, so it is not possible to project the field `fullvisitorid` from an expression\n  ga_sessions_20170711\nof type\n  LeanDatabase.TypedRelation\n    (LeanDatabase.colTypeOfList\n      [LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.int,\n        LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string,\n        LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string,\n        LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string,\n        LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string,\n        LeanDatabase.SQLTypeProxy.string])"},
+   "error": "elaborated with unresolved metavariables"},
   {"status": "fail",
    "id": "sf_bq005",
    "error":
@@ -32,10 +31,7 @@
    "error":
    "Failed to parse SQL query: <input>:1:2253: expected 'AS' or identifier\n--- input ---\nWITH users_7day AS ( SELECT DISTINCT USER_PSEUDO_ID FROM (SELECT USER_PSEUDO_ID FROM «GA4».«GA4_OBFUSCATED_SAMPLE_ECOMMERCE».«EVENTS_20210101», LATERALFLATTEN(EVENT_PARAMS) AS f(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE CAST(JSON_EXTRACT_PATH(f.value, \"key\") AS TEXT) = \"engagement_time_msec\" AND CAST(JSON_EXTRACT_PATH(f.value, \"value\", \"int_value\") AS INT) > 0 UNION ALL SELECT USER_PSEUDO_ID FROM «GA4».«GA4_OBFUSCATED_SAMPLE_ECOMMERCE».«EVENTS_20210102», LATERALFLATTEN(EVENT_PARAMS) AS f(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE CAST(JSON_EXTRACT_PATH(f.value, \"key\") AS TEXT) = \"engagement_time_msec\" AND CAST(JSON_EXTRACT_PATH(f.value, \"value\", \"int_value\") AS INT) > 0 UNION ALL SELECT USER_PSEUDO_ID FROM «GA4».«GA4_OBFUSCATED_SAMPLE_ECOMMERCE».«EVENTS_20210103», LATERALFLATTEN(EVENT_PARAMS) AS f(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE CAST(JSON_EXTRACT_PATH(f.value, \"key\") AS TEXT) = \"engagement_time_msec\" AND CAST(JSON_EXTRACT_PATH(f.value, \"value\", \"int_value\") AS INT) > 0 UNION ALL SELECT USER_PSEUDO_ID FROM «GA4».«GA4_OBFUSCATED_SAMPLE_ECOMMERCE».«EVENTS_20210104», LATERALFLATTEN(EVENT_PARAMS) AS f(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE CAST(JSON_EXTRACT_PATH(f.value, \"key\") AS TEXT) = \"engagement_time_msec\" AND CAST(JSON_EXTRACT_PATH(f.value, \"value\", \"int_value\") AS INT) > 0 UNION ALL SELECT USER_PSEUDO_ID FROM «GA4».«GA4_OBFUSCATED_SAMPLE_ECOMMERCE».«EVENTS_20210105», LATERALFLATTEN(EVENT_PARAMS) AS f(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE CAST(JSON_EXTRACT_PATH(f.value, \"key\") AS TEXT) = \"engagement_time_msec\" AND CAST(JSON_EXTRACT_PATH(f.value, \"value\", \"int_value\") AS INT) > 0 UNION ALL SELECT USER_PSEUDO_ID FROM «GA4».«GA4_OBFUSCATED_SAMPLE_ECOMMERCE».«EVENTS_20210106», LATERALFLATTEN(EVENT_PARAMS) AS f(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE CAST(JSON_EXTRACT_PATH(f.value, \"key\") AS TEXT) = \"engagement_time_msec\" AND CAST(JSON_EXTRACT_PATH(f.value, \"value\", \"int_value\") AS INT) > 0 UNION ALL SELECT USER_PSEUDO_ID FROM «GA4».«GA4_OBFUSCATED_SAMPLE_ECOMMERCE».«EVENTS_20210107», LATERALFLATTEN(EVENT_PARAMS) AS f(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE CAST(JSON_EXTRACT_PATH(f.value, \"key\") AS TEXT) = \"engagement_time_msec\" AND CAST(JSON_EXTRACT_PATH(f.value, \"value\", \"int_value\") AS INT) > 0)), users_2day AS ( SELECT DISTINCT USER_PSEUDO_ID FROM (SELECT USER_PSEUDO_ID FROM «GA4».«GA4_OBFUSCATED_SAMPLE_ECOMMERCE».«EVENTS_20210106», LATERALFLATTEN(EVENT_PARAMS) AS f(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE CAST(JSON_EXTRACT_PATH(f.value, \"key\") AS TEXT) = \"engagement_time_msec\" AND CAST(JSON_EXTRACT_PATH(f.value, \"value\", \"int_value\") AS INT) > 0 UNION ALL SELECT USER_PSEUDO_ID FROM «GA4».«GA4_OBFUSCATED_SAMPLE_ECOMMERCE».«EVENTS_20210107», LATERALFLATTEN(EVENT_PARAMS) AS f(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE CAST(JSON_EXTRACT_PATH(f.value, \"key\") AS TEXT) = \"engagement_time_msec\" AND CAST(JSON_EXTRACT_PATH(f.value, \"value\", \"int_value\") AS INT) > 0)) SELECT COUNT(*) AS N_DAY_INACTIVE_USERS_COUNT FROM users_7day WHERE USER_PSEUDO_ID NOT IN (SELECT USER_PSEUDO_ID FROM users_2day)"},
   {"status": "ok", "id": "sf_bq014", "error": null},
-  {"status": "fail",
-   "id": "sf_bq015",
-   "error":
-   "Failed to parse SQL query: <input>:1:489: expected 'BY'\n--- input ---\nWITH mentions AS (SELECT CAST(REGEXP_EXTRACT(«text», \"stackoverflow\\\\.com/questions/([0-9]+)\", 1, 1, \"e\", 1) AS INT) AS question_id FROM «STACKOVERFLOW_PLUS».«HACKERNEWS».«COMMENTS» WHERE «text» LIKE \"%stackoverflow.com/questions/%\" AND EXTRACT(YEAR FROM TO_TIMESTAMP(«time»)) >= 2014) SELECT t.VALUE AS TAG, COUNT(*) AS «COUNT» FROM mentions AS m JOIN «STACKOVERFLOW_PLUS».«STACKOVERFLOW».«POSTS_QUESTIONS» AS q ON m.question_id = q.«id», LATERAL SPLIT_TO_TABLE(q.«tags», \"|\") AS t GROUP «BY» t.VALUE ORDER «BY» «COUNT» DESC LIMIT 10"},
+  {"status": "ok", "id": "sf_bq015", "error": null},
   {"status": "fail",
    "id": "sf_bq016",
    "error":
@@ -43,7 +39,7 @@
   {"status": "timeout",
    "id": "sf_bq018",
    "error":
-   "(deterministic) timeout at `whnf`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
+   "(deterministic) timeout at `isDefEq`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
   {"status": "ok", "id": "sf_bq019", "error": null},
   {"status": "ok", "id": "sf_bq020", "error": null},
   {"status": "ok", "id": "sf_bq021", "error": null},
@@ -60,7 +56,7 @@
   {"status": "timeout",
    "id": "sf_bq030",
    "error":
-   "(deterministic) timeout at `isDefEq`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
+   "(deterministic) timeout at `whnf`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
   {"status": "fail",
    "id": "sf_bq031",
    "error":
@@ -79,10 +75,7 @@
    "error":
    "Failed to parse SQL query: <input>:1:2839: unexpected end of input; expected string literal\n--- input ---\nSELECT «year» || \"-\" || «mo» || \"-\" || «da» || \" 00:00:00.000000 UTC\" AS «TIMESTAMP», CAST(«temp» AS DOUBLE PRECISION) AS TEMPERATURE, CAST(«wdsp» AS DOUBLE PRECISION) AS WIND_SPEED, CAST(«prcp» AS DOUBLE PRECISION) AS PRECIPITATION FROM «NOAA_DATA».«NOAA_GSOD».«GSOD2011» WHERE «stn» = \"725030\" AND «mo» = \"06\" AND «da» = \"12\" UNION ALL SELECT «year» || \"-\" || «mo» || \"-\" || «da» || \" 00:00:00.000000 UTC\", CAST(«temp» AS DOUBLE PRECISION), CAST(«wdsp» AS DOUBLE PRECISION), CAST(«prcp» AS DOUBLE PRECISION) FROM «NOAA_DATA».«NOAA_GSOD».«GSOD2012» WHERE «stn» = \"725030\" AND «mo» = \"06\" AND «da» = \"12\" UNION ALL SELECT «year» || \"-\" || «mo» || \"-\" || «da» || \" 00:00:00.000000 UTC\", CAST(«temp» AS DOUBLE PRECISION), CAST(«wdsp» AS DOUBLE PRECISION), CAST(«prcp» AS DOUBLE PRECISION) FROM «NOAA_DATA».«NOAA_GSOD».«GSOD2013» WHERE «stn» = \"725030\" AND «mo» = \"06\" AND «da» = \"12\" UNION ALL SELECT «year» || \"-\" || «mo» || \"-\" || «da» || \" 00:00:00.000000 UTC\", CAST(«temp» AS DOUBLE PRECISION), CAST(«wdsp» AS DOUBLE PRECISION), CAST(«prcp» AS DOUBLE PRECISION) FROM «NOAA_DATA».«NOAA_GSOD».«GSOD2014» WHERE «stn» = \"725030\" AND «mo» = \"06\" AND «da» = \"12\" UNION ALL SELECT «year» || \"-\" || «mo» || \"-\" || «da» || \" 00:00:00.000000 UTC\", CAST(«temp» AS DOUBLE PRECISION), CAST(«wdsp» AS DOUBLE PRECISION), CAST(«prcp» AS DOUBLE PRECISION) FROM «NOAA_DATA».«NOAA_GSOD».«GSOD2015» WHERE «stn» = \"725030\" AND «mo» = \"06\" AND «da» = \"12\" UNION ALL SELECT «year» || \"-\" || «mo» || \"-\" || «da» || \" 00:00:00.000000 UTC\", CAST(«temp» AS DOUBLE PRECISION), CAST(«wdsp» AS DOUBLE PRECISION), CAST(«prcp» AS DOUBLE PRECISION) FROM «NOAA_DATA».«NOAA_GSOD».«GSOD2016» WHERE «stn» = \"725030\" AND «mo» = \"06\" AND «da» = \"12\" UNION ALL SELECT «year» || \"-\" || «mo» || \"-\" || «da» || \" 00:00:00.000000 UTC\", CAST(«temp» AS DOUBLE PRECISION), CAST(«wdsp» AS DOUBLE PRECISION), CAST(«prcp» AS DOUBLE PRECISION) FROM «NOAA_DATA».«NOAA_GSOD».«GSOD2017» WHERE «stn» = \"725030\" AND «mo» = \"06\" AND «da» = \"12\" UNION ALL SELECT «year» || \"-\" || «mo» || \"-\" || «da» || \" 00:00:00.000000 UTC\", CAST(«temp» AS DOUBLE PRECISION), CAST(«wdsp» AS DOUBLE PRECISION), CAST(«prcp» AS DOUBLE PRECISION) FROM «NOAA_DATA».«NOAA_GSOD».«GSOD2018» WHERE «stn» = \"725030\" AND «mo» = \"06\" AND «da» = \"12\" UNION ALL SELECT «year» || \"-\" || «mo» || \"-\" || «da» || \" 00:00:00.000000 UTC\", CAST(«temp» AS DOUBLE PRECISION), CAST(«wdsp» AS DOUBLE PRECISION), CAST(«prcp» AS DOUBLE PRECISION) FROM «NOAA_DATA».«NOAA_GSOD».«GSOD2019» WHERE «stn» = \"725030\" AND «mo» = \"06\" AND «da» = \"12\" UNION ALL SELECT «year» || \"-\" || «mo» || \"-\" || «da» || \" 00:00:00.000000 UTC\", CAST(«temp» AS DOUBLE PRECISION), CAST(«wdsp» AS DOUBLE PRECISION), CAST(«prcp» AS DOUBLE PRECISION) FROM «NOAA_DATA».«NOAA_GSOD».«GSOD2020» WHERE «stn» = \"725030\" AND «mo» = \"06\" AND «da» = \"12\" ORDER BY TIMESTAMP"},
   {"status": "ok", "id": "sf_bq044", "error": null},
-  {"status": "fail",
-   "id": "sf_bq045",
-   "error":
-   "Failed to parse SQL query: <input>:1:157: expected 'END'\n--- input ---\nWITH wa_2023 AS (SELECT g.«stn» AS STATION_ID, g.«wban» AS WBAN_ID, s.«name» AS STATION_NAME, COUNT(CASE WHEN g.«prcp» > 0 AND g.«prcp» <> 99.99 THEN 1 «END») AS RAINY_DAYS_2023 FROM «NOAA_DATA».«NOAA_GSOD».«GSOD2023» AS g JOIN «NOAA_DATA».«NOAA_GSOD».«STATIONS» AS s ON g.«stn» = s.«usaf» AND g.«wban» = s.«wban» WHERE s.«state» = \"WA\" GROUP BY g.«stn», g.«wban», s.«name» HAVING RAINY_DAYS_2023 > 150), wa_2022 AS (SELECT g.«stn» AS STATION_ID, g.«wban» AS WBAN_ID, COUNT(CASE WHEN g.«prcp» > 0 AND g.«prcp» <> 99.99 THEN 1 «END») AS RAINY_DAYS_2022 FROM «NOAA_DATA».«NOAA_GSOD».«GSOD2022» AS g JOIN «NOAA_DATA».«NOAA_GSOD».«STATIONS» AS s ON g.«stn» = s.«usaf» AND g.«wban» = s.«wban» WHERE s.«state» = \"WA\" GROUP BY g.«stn», g.«wban») SELECT t23.STATION_ID, t23.STATION_NAME, t23.RAINY_DAYS_2023, t22.RAINY_DAYS_2022 FROM wa_2023 AS t23 JOIN wa_2022 AS t22 ON t23.STATION_ID = t22.STATION_ID AND t23.WBAN_ID = t22.WBAN_ID WHERE t23.RAINY_DAYS_2023 < t22.RAINY_DAYS_2022 ORDER BY t23.RAINY_DAYS_2023 DESC"},
+  {"status": "ok", "id": "sf_bq045", "error": null},
   {"status": "ok", "id": "sf_bq046", "error": null},
   {"status": "fail",
    "id": "sf_bq047",
@@ -105,12 +98,9 @@
   {"status": "timeout",
    "id": "sf_bq061",
    "error":
-   "(deterministic) timeout at `isDefEq`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
+   "(deterministic) timeout at `whnf`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
   {"status": "ok", "id": "sf_bq062", "error": null},
-  {"status": "fail",
-   "id": "sf_bq064",
-   "error":
-   "Type mismatch\n  some censustract_2017_5yr.total_pop * proportion\nhas type\n  Option ℚ\nbut is expected to have type\n  ℚ"},
+  {"status": "ok", "id": "sf_bq064", "error": null},
   {"status": "fail",
    "id": "sf_bq065",
    "error":
@@ -118,11 +108,11 @@
   {"status": "fail",
    "id": "sf_bq067",
    "error":
-   "AS clause `CAST(vb.body_type AS DOUBLE PRECISION)`: CAST(_ AS FLOAT): unsupported source type Option ℤ"},
+   "AS clause `CASE WHEN NOT s.avg_abs_speed_diff IS NULL THEN\n  CAST(LEAST(FLOOR(CAST(s.avg_abs_speed_diff AS DOUBLE PRECISION) / 20),4)AS DOUBLE PRECISION)ELSE NULL END`: failed to synthesize instance of type class\n  OfNat (Option ℚ) 4\nnumerals are polymorphic in Lean, but the numeral `4` cannot be used in a context where the expected type is\n  Option ℚ\ndue to the absence of the instance above\n\nHint: Type class instance resolution failures can be inspected with the `set_option trace.Meta.synthInstance true` command."},
   {"status": "timeout",
    "id": "sf_bq069",
    "error":
-   "(deterministic) timeout at `isDefEq`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
+   "(deterministic) timeout at `whnf`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
   {"status": "ok", "id": "sf_bq071", "error": null},
   {"status": "timeout",
    "id": "sf_bq073",
@@ -131,7 +121,7 @@
   {"status": "timeout",
    "id": "sf_bq074",
    "error":
-   "(deterministic) timeout at `whnf`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
+   "(deterministic) timeout at `isDefEq`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
   {"status": "fail",
    "id": "sf_bq075",
    "error":
@@ -149,14 +139,14 @@
   {"status": "fail",
    "id": "sf_bq084",
    "error":
-   "AS clause `ROUND(CAST(CAST(__agg1 AS DOUBLE PRECISION) /\n      CASE WHEN EXTRACT(MONTH FROM transactions.block_timestamp) IN (1, 3, 5, 7, 8, 10, 12)THEN 31 * 24 * 3600WHEN\n        EXTRACT(MONTH FROM transactions.block_timestamp) IN (4, 6, 9, 11)THEN 30 * 24 * 3600WHEN\n        EXTRACT(MONTH FROM transactions.block_timestamp) = 2THEN\n        CASE WHEN\n            EXTRACT(YEAR FROM transactions.block_timestamp) % 4 =\n                0AND(EXTRACT(YEAR FROM transactions.block_timestamp) % 100 <> 0 OR\n                EXTRACT(YEAR FROM transactions.block_timestamp) % 400 = 0)THEN\n            29 * 24 * 3600ELSE 28 * 24 * 3600END END\n        AS\n    DECIMAL),6)`: CAST(_ AS FLOAT): unsupported source type ?m.1844"},
+   "AS clause `ROUND(CAST(CAST(__agg1 AS DOUBLE PRECISION) /\n      CASE WHEN EXTRACT(MONTH FROM transactions.block_timestamp) IN (1, 3, 5, 7, 8, 10, 12)THEN 31 * 24 * 3600WHEN\n        EXTRACT(MONTH FROM transactions.block_timestamp) IN (4, 6, 9, 11)THEN 30 * 24 * 3600WHEN\n        EXTRACT(MONTH FROM transactions.block_timestamp) = 2THEN\n        CASE WHEN\n            EXTRACT(YEAR FROM transactions.block_timestamp) % 4 = 0 AND\n              (EXTRACT(YEAR FROM transactions.block_timestamp) % 100 <> 0 OR\n                EXTRACT(YEAR FROM transactions.block_timestamp) % 400 = 0)THEN\n            29 * 24 * 3600ELSE 28 * 24 * 3600END END\n        AS\n    DECIMAL),6)`: CAST(_ AS FLOAT): unsupported source type ?m.1848"},
   {"status": "fail",
    "id": "sf_bq085",
    "error": "elaborated with unresolved metavariables"},
   {"status": "timeout",
    "id": "sf_bq086",
    "error":
-   "(deterministic) timeout at `isDefEq`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
+   "(deterministic) timeout at `whnf`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
   {"status": "timeout",
    "id": "sf_bq087",
    "error":
@@ -164,7 +154,7 @@
   {"status": "timeout",
    "id": "sf_bq088",
    "error":
-   "(deterministic) timeout at `isDefEq`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
+   "(deterministic) timeout at `whnf`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
   {"status": "fail",
    "id": "sf_bq090",
    "error":
@@ -175,7 +165,7 @@
   {"status": "fail",
    "id": "sf_bq096",
    "error":
-   "Failed to parse SQL query: <input>:1:509: expected end of input\n--- input ---\nWITH daily_counts AS (SELECT «year», «month», «day», COUNT(*) AS daily_sightings FROM «GBIF».«GBIF».«OCCURRENCES» WHERE «species» = \"Sterna paradisaea\" AND «decimallatitude» > 40 AND «month» >= 2 AND NOT «year» IS NULL AND NOT «month» IS NULL AND NOT «day» IS NULL GROUP BY «year», «month», «day» HAVING COUNT(*) > 10), earliest_per_year AS (SELECT «year», MIN(DATE_FROM_PARTS(«year», «month», «day»)) AS earliest_date FROM daily_counts GROUP BY «year») SELECT «year» AS OUTPUT FROM earliest_per_year «ORDER» BY DAY_OF_YEAR(earliest_date) LIMIT 1"},
+   "Type mismatch\n  LeanDatabase.Scalar.dateFromParts occurrences.year occurrences.month occurrences.day\nhas type\n  String\nbut is expected to have type\n  ℚ"},
   {"status": "ok", "id": "sf_bq098", "error": null},
   {"status": "ok", "id": "sf_bq100", "error": null},
   {"status": "fail",
@@ -235,13 +225,13 @@
   {"status": "fail",
    "id": "sf_bq141",
    "error":
-   "Application type mismatch: The argument\n  some r.htseq__fpkm_uq\nhas type\n  Option ℚ\nbut is expected to have type\n  ℚ\nin the application\n  ite (decide (r.gene_name = \"MT-CO1\") = true) (some r.htseq__fpkm_uq)"},
+   "AS clause `SQRT(COALESCE(POWER(te.co1 - sc.avg_co1,2), 0) + COALESCE(POWER(te.co2 - sc.avg_co2,2), 0) +\n    COALESCE(POWER(te.co3 - sc.avg_co3,2), 0))`: failed to synthesize instance of type class\n  OfNat (Option ?m.407) 2\nnumerals are polymorphic in Lean, but the numeral `2` cannot be used in a context where the expected type is\n  Option ?m.407\ndue to the absence of the instance above\n\nHint: Type class instance resolution failures can be inspected with the `set_option trace.Meta.synthInstance true` command."},
   {"status": "ok", "id": "sf_bq144", "error": null},
   {"status": "ok", "id": "sf_bq148", "error": null},
   {"status": "timeout",
    "id": "sf_bq151",
    "error":
-   "(deterministic) timeout at `whnf`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
+   "(deterministic) timeout at `isDefEq`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
   {"status": "timeout",
    "id": "sf_bq154",
    "error":
@@ -250,10 +240,7 @@
    "id": "sf_bq156",
    "error":
    "Type mismatch\n  log_expr\nhas type\n  Bool\nbut is expected to have type\n  ℚ"},
-  {"status": "fail",
-   "id": "sf_bq157",
-   "error":
-   "Application type mismatch: The argument\n  some n\nhas type\n  Option ℤ\nbut is expected to have type\n  ℚ\nin the application\n  ite (decide (has_tp53 = 1) = true) (some n)"},
+  {"status": "ok", "id": "sf_bq157", "error": null},
   {"status": "fail",
    "id": "sf_bq160",
    "error": "scalar subquery column must be a single aggregate (SUM/COUNT)"},
@@ -272,10 +259,7 @@
    "id": "sf_bq180",
    "error":
    "Failed to parse SQL query: <input>:1:73: expected ')'\n--- input ---\nWITH python_imports AS (SELECT COALESCE(REGEXP_EXTRACT(TRIM(LEADING \" \u0009\" FROM CAST(f.value AS TEXT)), \"^import\\\\s+(\\\\w+)\", 1, 1, \"e\", 0), REGEXP_EXTRACT(TRIM(LEADING \" \u0009\" FROM CAST(f.value AS TEXT)), \"^from\\\\s+(\\\\w+)\", 1, 1, \"e\", 0)) AS module_name FROM «GITHUB_REPOS».«GITHUB_REPOS».«SAMPLE_CONTENTS», LATERALFLATTEN(SPLIT(«content», \"\n\")) AS f(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE LOWER(«sample_path») LIKE \"%.py\" AND (TRIM(LEADING \" \u0009\" FROM CAST(f.value AS TEXT)) LIKE \"import %\" OR TRIM(LEADING \" \u0009\" FROM CAST(f.value AS TEXT)) LIKE \"from %\")), r_imports AS (SELECT REGEXP_EXTRACT(CAST(f.value AS TEXT), \"library\\\\((\\\\w+)\", 1, 1, \"e\", 0) AS module_name FROM «GITHUB_REPOS».«GITHUB_REPOS».«SAMPLE_CONTENTS», LATERALFLATTEN(SPLIT(«content», \"\n\")) AS f(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE LOWER(«sample_path») LIKE \"%.r\" AND CAST(f.value AS TEXT) LIKE \"%library(%\"), all_imports AS (SELECT module_name FROM python_imports WHERE NOT module_name IS NULL UNION ALL SELECT module_name FROM r_imports WHERE NOT module_name IS NULL) SELECT module_name, COUNT(*) AS frequency FROM all_imports GROUP BY module_name ORDER BY frequency DESC LIMIT 5"},
-  {"status": "fail",
-   "id": "sf_bq181",
-   "error":
-   "Failed to parse SQL query: <input>:1:199: expected 'END'\n--- input ---\nWITH station_valid_days AS (SELECT «stn», SUM(CASE WHEN NOT «temp» IS NULL AND «temp» <> 9999.9 AND NOT «max» IS NULL AND «max» <> 9999.9 AND NOT «min» IS NULL AND «min» <> 9999.9 THEN 1 ELSE 0 «END») AS valid_day_count FROM «NOAA_DATA».«NOAA_GSOD».«GSOD2022» WHERE «stn» <> \"999999\" GROUP BY «stn»), qualifying_stations AS (SELECT COUNT(*) AS num_qualifying FROM station_valid_days WHERE valid_day_count >= 0.9 * 365), total_stations AS (SELECT COUNT(*) AS num_total FROM «NOAA_DATA».«NOAA_GSOD».«STATIONS» WHERE «usaf» <> \"999999\") SELECT CAST(q.num_qualifying * 100.0 AS DOUBLE PRECISION) / t.num_total AS percentage_of_stations_with_90_percent_coverage FROM qualifying_stations AS q, total_stations AS t"},
+  {"status": "ok", "id": "sf_bq181", "error": null},
   {"status": "fail",
    "id": "sf_bq184",
    "error":
@@ -285,8 +269,7 @@
   {"status": "ok", "id": "sf_bq188", "error": null},
   {"status": "fail",
    "id": "sf_bq189",
-   "error":
-   "Type mismatch\n  pct_growth\nhas type\n  Option ℚ\nbut is expected to have type\n  ℚ"},
+   "error": "scalar subquery column must be a single aggregate (SUM/COUNT)"},
   {"status": "ok", "id": "sf_bq192", "error": null},
   {"status": "fail",
    "id": "sf_bq194",
@@ -326,14 +309,8 @@
   {"status": "ok", "id": "sf_bq220", "error": null},
   {"status": "ok", "id": "sf_bq225", "error": null},
   {"status": "ok", "id": "sf_bq226", "error": null},
-  {"status": "fail",
-   "id": "sf_bq227",
-   "error":
-   "Application type mismatch: The argument\n  some (↑cy.cat_total * 100.0 / ↑yt.total)\nhas type\n  Option ℚ\nbut is expected to have type\n  ℚ\nin the application\n  ite (decide (tr.rn = 1) = true) (some (↑cy.cat_total * 100.0 / ↑yt.total))"},
-  {"status": "fail",
-   "id": "sf_bq229",
-   "error":
-   "Invalid field `image_id`: The environment does not contain `LeanDatabase.TypedRelation.image_id`, so it is not possible to project the field `image_id` from an expression\n  images\nof type\n  LeanDatabase.TypedRelation\n    (LeanDatabase.colTypeOfList\n      [LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string,\n        LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string,\n        LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.int,\n        LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string])"},
+  {"status": "ok", "id": "sf_bq227", "error": null},
+  {"status": "ok", "id": "sf_bq229", "error": null},
   {"status": "ok", "id": "sf_bq230", "error": null},
   {"status": "ok", "id": "sf_bq232", "error": null},
   {"status": "ok", "id": "sf_bq235", "error": null},
@@ -363,10 +340,7 @@
    "id": "sf_bq268",
    "error":
    "(deterministic) timeout at `isDefEq`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
-  {"status": "fail",
-   "id": "sf_bq269",
-   "error":
-   "Application type mismatch: The argument\n  some total_pageviews\nhas type\n  Option ℤ\nbut is expected to have type\n  ℚ\nin the application\n  ite (decide (session_type = \"purchase\") = true) (some total_pageviews)"},
+  {"status": "ok", "id": "sf_bq269", "error": null},
   {"status": "fail",
    "id": "sf_bq270",
    "error":
@@ -395,10 +369,7 @@
    "id": "sf_bq288",
    "error":
    "Failed to parse SQL query: <input>:1:345: expected 'FROM'\n--- input ---\nWITH filtered_banks AS (SELECT «state_name», SUM(«total_assets») AS sum_assets FROM «FDA».«FDIC_BANKS».«INSTITUTIONS» WHERE «institution_name» LIKE \"Bank%\" AND «established_date» >= \"1900-01-01\" AND «established_date» <= \"2000-12-31\" GROUP BY «state_name» ORDER BY sum_assets DESC NULLS LAST LIMIT 1) SELECT COUNT(«institution_name») AS «COUNT(»«INSTITUTION_NAME»«)» FROM «FDA».«FDIC_BANKS».«INSTITUTIONS» WHERE «state_name» = (SELECT «state_name» FROM filtered_banks)"},
-  {"status": "fail",
-   "id": "sf_bq290",
-   "error":
-   "Failed to parse SQL query: <input>:1:85: expected 'END'\n--- input ---\nWITH us_daily AS (SELECT g.«date», AVG(CASE WHEN g.«max» <> 9999.9 THEN g.«max» «END») AS avg_max_temp, AVG(CASE WHEN g.«min» <> 9999.9 THEN g.«min» «END») AS avg_min_temp, AVG(CASE WHEN g.«temp» <> 9999.9 THEN g.«temp» «END») AS avg_temp FROM «NOAA_DATA».«NOAA_GSOD».«GSOD2023» AS g JOIN «NOAA_DATA».«NOAA_GSOD».«STATIONS» AS s ON g.«stn» = s.«usaf» AND g.«wban» = s.«wban» WHERE s.«country» = \"US\" AND g.«date» >= \"2023-10-01\" AND g.«date» <= \"2023-10-31\" AND g.«max» <> 9999.9 AND g.«min» <> 9999.9 AND g.«temp» <> 9999.9 GROUP BY g.«date»), uk_daily AS (SELECT g.«date», AVG(CASE WHEN g.«max» <> 9999.9 THEN g.«max» «END») AS avg_max_temp, AVG(CASE WHEN g.«min» <> 9999.9 THEN g.«min» «END») AS avg_min_temp, AVG(CASE WHEN g.«temp» <> 9999.9 THEN g.«temp» «END») AS avg_temp FROM «NOAA_DATA».«NOAA_GSOD».«GSOD2023» AS g JOIN «NOAA_DATA».«NOAA_GSOD».«STATIONS» AS s ON g.«stn» = s.«usaf» AND g.«wban» = s.«wban» WHERE s.«country» = \"UK\" AND g.«date» >= \"2023-10-01\" AND g.«date» <= \"2023-10-31\" AND g.«max» <> 9999.9 AND g.«min» <> 9999.9 AND g.«temp» <> 9999.9 GROUP BY g.«date») SELECT u.«date», u.avg_max_temp - k.avg_max_temp AS DIFF_MAX_TEMP, u.avg_min_temp - k.avg_min_temp AS DIFF_MIN_TEMP, u.avg_temp - k.avg_temp AS DIFF_AVG_TEMP FROM us_daily AS u JOIN uk_daily AS k ON u.«date» = k.«date» ORDER BY u.«date»"},
+  {"status": "ok", "id": "sf_bq290", "error": null},
   {"status": "fail",
    "id": "sf_bq292",
    "error": "Unknown identifier `t.outputs`"},
@@ -422,7 +393,7 @@
   {"status": "timeout",
    "id": "sf_bq324",
    "error":
-   "(deterministic) timeout at `isDefEq`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
+   "(deterministic) timeout at `whnf`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
   {"status": "ok", "id": "sf_bq325", "error": null},
   {"status": "ok", "id": "sf_bq326", "error": null},
   {"status": "ok", "id": "sf_bq327", "error": null},
@@ -437,16 +408,13 @@
   {"status": "ok", "id": "sf_bq338", "error": null},
   {"status": "ok", "id": "sf_bq339", "error": null},
   {"status": "ok", "id": "sf_bq340", "error": null},
-  {"status": "fail",
-   "id": "sf_bq342",
-   "error":
-   "Application type mismatch: The argument\n  some avg_hourly_change\nhas type\n  Option ℚ\nbut is expected to have type\n  ℚ\nin the application\n  ite (decide (yr = 2020) = true) (some avg_hourly_change)"},
+  {"status": "ok", "id": "sf_bq342", "error": null},
   {"status": "ok", "id": "sf_bq348", "error": null},
   {"status": "ok", "id": "sf_bq350", "error": null},
   {"status": "fail",
    "id": "sf_bq352",
    "error":
-   "Application type mismatch: The argument\n  (some a.commute_45_59_mins / if (a.employed_pop == 0) = true then none else some a.employed_pop) > some 5e-2\nhas type\n  Prop\nbut is expected to have type\n  Bool\nin the application\n  decide (LeanDatabase.Scalar.yearOf n.year = 2018) &&\n    (some a.commute_45_59_mins / if (a.employed_pop == 0) = true then none else some a.employed_pop) > some 5e-2"},
+   "Application type mismatch: The argument\n  (some a.commute_45_59_mins / if (a.employed_pop == 0) = true then none else some a.employed_pop) > some 5e-2\nhas type\n  Prop\nbut is expected to have type\n  Bool\nin the application\n  LeanDatabase.strLike \"%, WI\" n.county_of_residence && decide (LeanDatabase.Scalar.yearOf n.year = 2018) &&\n    (some a.commute_45_59_mins / if (a.employed_pop == 0) = true then none else some a.employed_pop) > some 5e-2"},
   {"status": "ok", "id": "sf_bq354", "error": null},
   {"status": "ok", "id": "sf_bq355", "error": null},
   {"status": "ok", "id": "sf_bq356", "error": null},
@@ -454,7 +422,7 @@
   {"status": "timeout",
    "id": "sf_bq360",
    "error":
-   "(deterministic) timeout at `whnf`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
+   "(deterministic) timeout at `isDefEq`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
   {"status": "fail",
    "id": "sf_bq361",
    "error":
@@ -493,7 +461,7 @@
   {"status": "fail",
    "id": "sf_bq393",
    "error":
-   "Failed to parse SQL query: <input>:1:264: expected 'BY'\n--- input ---\nWITH user_activity_months AS ( SELECT «by» AS user_id, DATE_TRUNC(\"MONTH\", TO_TIMESTAMP(«time»)) AS activity_month FROM «HACKER_NEWS».«HACKER_NEWS».«FULL» WHERE NOT «by» IS NULL AND «time» > 0 AND «time» < 2000000000 AND TO_TIMESTAMP(«time») <= \"2024-09-10\" GROUP «BY» «by», DATE_TRUNC(\"MONTH\", TO_TIMESTAMP(«time»))), user_span AS ( SELECT user_id, MIN(activity_month) AS first_month, MAX(activity_month) AS last_month, COUNT(DISTINCT activity_month) AS active_months, CAST(EXTRACT(year FROM AGE(CAST(MAX(activity_month) AS TIMESTAMP), CAST(MIN(activity_month) AS TIMESTAMP))) * 12 + EXTRACT(month FROM AGE(CAST(MAX(activity_month) AS TIMESTAMP), CAST(MIN(activity_month) AS TIMESTAMP))) AS BIGINT) + 1 AS span_months FROM user_activity_months GROUP «BY» user_id), qualified_users AS (   SELECT user_id, first_month, last_month, span_months, CAST(EXTRACT(year FROM AGE(CAST(last_month AS TIMESTAMP), CAST(first_month AS TIMESTAMP))) * 12 + EXTRACT(month FROM AGE(CAST(last_month AS TIMESTAMP), CAST(first_month AS TIMESTAMP))) AS BIGINT)     + 2 AS month_number FROM user_span WHERE span_months > active_months  AND last_month < \"2024-09-01\" ) SELECT user_id AS USER_ID, month_number AS MONTH_NUMBER FROM qualified_users ORDER «BY» month_number DESC LIMIT 1"},
+   "Failed to parse SQL query: <input>:1:495: expected ')'\n--- input ---\nWITH user_activity_months AS ( SELECT «by» AS user_id, DATE_TRUNC(\"MONTH\", TO_TIMESTAMP(«time»)) AS activity_month FROM «HACKER_NEWS».«HACKER_NEWS».«FULL» WHERE NOT «by» IS NULL AND «time» > 0 AND «time» < 2000000000 AND TO_TIMESTAMP(«time») <= \"2024-09-10\" GROUP BY «by», DATE_TRUNC(\"MONTH\", TO_TIMESTAMP(«time»))), user_span AS ( SELECT user_id, MIN(activity_month) AS first_month, MAX(activity_month) AS last_month, COUNT(DISTINCT activity_month) AS active_months, CAST(EXTRACT(year FROM AGE(CAST(MAX(activity_month) AS TIMESTAMP), CAST(MIN(activity_month) AS TIMESTAMP))) * 12 + EXTRACT(month FROM AGE(CAST(MAX(activity_month) AS TIMESTAMP), CAST(MIN(activity_month) AS TIMESTAMP))) AS BIGINT) + 1 AS span_months FROM user_activity_months GROUP BY user_id), qualified_users AS (   SELECT user_id, first_month, last_month, span_months, CAST(EXTRACT(year FROM AGE(CAST(last_month AS TIMESTAMP), CAST(first_month AS TIMESTAMP))) * 12 + EXTRACT(month FROM AGE(CAST(last_month AS TIMESTAMP), CAST(first_month AS TIMESTAMP))) AS BIGINT)     + 2 AS month_number FROM user_span WHERE span_months > active_months  AND last_month < \"2024-09-01\" ) SELECT user_id AS USER_ID, month_number AS MONTH_NUMBER FROM qualified_users ORDER BY month_number DESC LIMIT 1"},
   {"status": "ok", "id": "sf_bq394", "error": null},
   {"status": "ok", "id": "sf_bq395", "error": null},
   {"status": "ok", "id": "sf_bq396", "error": null},
@@ -550,20 +518,17 @@
   {"status": "fail",
    "id": "sf_bq451",
    "error":
-   "Failed to parse SQL query: <input>:1:778: expected 'END'\n--- input ---\nWITH genotype_calls AS (SELECT CAST(VARIANTGET(c.value, \"call_set_name\") AS TEXT) AS call_set_name, CAST(VARIANTGET(c.value, \"genotype\")[1] AS INT) AS allele0, CAST(VARIANTGET(c.value, \"genotype\")[2] AS INT) AS allele1 FROM «_1000_GENOMES».«_1000_GENOMES».«VARIANTS» AS v, LATERALFLATTEN(v.«call») AS c(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE v.«reference_name» = \"X\" AND v.«VT» = \"SNP\" AND NOT (v.«start» BETWEEN 59999 AND 2699519) AND NOT (v.«start» BETWEEN 154931042 AND 155260559) AND ARRAY_LENGTH(VARIANTGET(c.value, \"genotype\"), 1) >= 2), classified AS (SELECT call_set_name, CASE WHEN allele0 = 0 AND allele1 = 0 THEN \"hom_ref\" WHEN allele0 = allele1 AND allele0 > 0 THEN \"hom_alt\" WHEN allele0 <> allele1 AND (allele0 > 0 OR allele1 > 0) THEN \"het\" ELSE \"other\" «END» AS genotype_class FROM genotype_calls), aggregated AS (SELECT call_set_name AS CALL_SET_NAME, COUNT(*) AS TOTAL_CALLABLE_SITES, SUM(CASE WHEN genotype_class = \"hom_ref\" THEN 1 ELSE 0 «END») AS HOMOZYGOUS_REFERENCE_COUNT, SUM(CASE WHEN genotype_class = \"hom_alt\" THEN 1 ELSE 0 «END») AS HOMOZYGOUS_ALTERNATE_COUNT, SUM(CASE WHEN genotype_class = \"het\" THEN 1 ELSE 0 «END») AS HETEROZYGOUS_COUNT, SUM(CASE WHEN genotype_class IN (\"hom_alt\", \"het\") THEN 1 ELSE 0 «END») AS TOTAL_SNVS, ROUND(CAST(CAST(SUM(CASE WHEN genotype_class = \"het\" THEN 1 ELSE 0 «END») * 100.0 AS DOUBLE PRECISION) / NULLIF(SUM(CASE WHEN genotype_class IN (\"hom_alt\", \"het\") THEN 1 ELSE 0 «END»), 0) AS DECIMAL), 2) AS PERCENTAGE_HETEROZYGOUS_AMONG_SNVS, ROUND(CAST(CAST(SUM(CASE WHEN genotype_class = \"hom_alt\" THEN 1 ELSE 0 «END») * 100.0 AS DOUBLE PRECISION) / NULLIF(SUM(CASE WHEN genotype_class IN (\"hom_alt\", \"het\") THEN 1 ELSE 0 «END»), 0) AS DECIMAL), 2) AS PERCENTAGE_HOMOZYGOUS_ALTERNATE_AMONG_SNVS FROM classified GROUP BY call_set_name) SELECT * FROM aggregated ORDER BY PERCENTAGE_HETEROZYGOUS_AMONG_SNVS DESC, CALL_SET_NAME ASC"},
+   "AS clause `CAST(VARIANTGET(c.value,\"genotype\")[1]AS INT)`: failed to prove index is valid, possible solutions:\n  - Use `have`-expressions to prove the index is valid\n  - Use `a[i]!` notation instead, runtime check is performed, and 'Panic' error message is produced if index is not valid\n  - Use `a[i]?` notation instead, result is an `Option` type\n  - Use `a[i]'h` notation instead, where `h` is a proof that index is valid\nvariants :\n  LeanDatabase.TypedRelationOfList\n    [LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.int,\n      LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.float,\n      LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string,\n      LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.int,\n      LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.float,\n      LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.float,\n      LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string,\n      LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.float,\n      LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.string,\n      LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.float,\n      LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.string,\n      LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string,\n      LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.float,\n      LeanDatabase.SQLTypeProxy.string]\ncoords :\n  LeanDatabase.TypedTupleOfList\n    [LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.int,\n      LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.float,\n      LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string,\n      LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.int,\n      LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.float,\n      LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.float,\n      LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string,\n      LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.float,\n      LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.string,\n      LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.float,\n      LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.string,\n      LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string,\n      LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.float,\n      LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.string,\n      LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.string,\n      LeanDatabase.SQLTypeProxy.string]\nc.value.proj : LeanDatabase.TypedTupleOfList\n    [LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.int,\n      LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.float,\n      LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string,\n      LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.int,\n      LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.float,\n      LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.float,\n      LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string,\n      LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.float,\n      LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.string,\n      LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.float,\n      LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.string,\n      LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string,\n      LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.float,\n      LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.string,\n      LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.string,\n      LeanDatabase.SQLTypeProxy.string] →\n  String :=\n  fun typedTuple => typedTuple 44\nc.value : String := coords 44\n⊢ ?m.118 (LeanDatabase.Scalar.variantGet c.value \"genotype\") 1"},
   {"status": "fail",
    "id": "sf_bq452",
    "error":
-   "Failed to parse SQL query: <input>:1:256: expected 'END'\n--- input ---\nWITH allele_counts AS (SELECT v.«start» AS start_pos, v.«end» AS end_pos, SUM(CASE WHEN s.«Super_Population» = \"EAS\" THEN 2 - (CAST(JSON_EXTRACT_PATH(c.value, \"genotype\", \"0\") AS INT) + CAST(JSON_EXTRACT_PATH(c.value, \"genotype\", \"1\") AS INT)) ELSE 0 «END») AS case_ref, SUM(CASE WHEN s.«Super_Population» = \"EAS\" THEN CAST(JSON_EXTRACT_PATH(c.value, \"genotype\", \"0\") AS INT) + CAST(JSON_EXTRACT_PATH(c.value, \"genotype\", \"1\") AS INT) ELSE 0 «END») AS case_alt, SUM(CASE WHEN s.«Super_Population» <> \"EAS\" THEN 2 - (CAST(JSON_EXTRACT_PATH(c.value, \"genotype\", \"0\") AS INT) + CAST(JSON_EXTRACT_PATH(c.value, \"genotype\", \"1\") AS INT)) ELSE 0 «END») AS ctrl_ref, SUM(CASE WHEN s.«Super_Population» <> \"EAS\" THEN CAST(JSON_EXTRACT_PATH(c.value, \"genotype\", \"0\") AS INT) + CAST(JSON_EXTRACT_PATH(c.value, \"genotype\", \"1\") AS INT) ELSE 0 «END») AS ctrl_alt FROM «_1000_GENOMES».«_1000_GENOMES».«VARIANTS» AS v, LATERALFLATTEN(v.«call») AS c(SEQ, KEY, PATH, INDEX, VALUE, THIS) JOIN «_1000_GENOMES».«_1000_GENOMES».«SAMPLE_INFO» AS s ON CAST(JSON_EXTRACT_PATH(c.value, \"call_set_name\") AS TEXT) = s.«Sample» WHERE v.«reference_name» = \"12\" GROUP BY v.«start», v.«end»), chi_calc AS (SELECT start_pos AS «start», end_pos AS «end», case_ref AS a, case_alt AS b, ctrl_ref AS c, ctrl_alt AS d, (case_ref + case_alt + ctrl_ref + ctrl_alt) AS N, (case_ref + case_alt) AS R1 , (ctrl_ref + ctrl_alt) AS R2, (case_ref + ctrl_ref) AS C1 , (case_alt + ctrl_alt) AS C2, CAST(((case_ref + case_alt) * (case_ref + ctrl_ref))  * 1.0 AS DOUBLE PRECISION) / (case_ref + case_alt + ctrl_ref + ctrl_alt) AS E_a, CAST(((case_ref + case_alt) * (case_alt + ctrl_alt)) * 1.0 AS DOUBLE PRECISION) / (case_ref + case_alt + ctrl_ref + ctrl_alt) AS E_b, CAST(((ctrl_ref + ctrl_alt) * (case_ref + ctrl_ref)) * 1.0 AS DOUBLE PRECISION) / (case_ref + case_alt + ctrl_ref + ctrl_alt) AS E_c, CAST(((ctrl_ref + ctrl_alt) * (case_alt + ctrl_alt)) * 1.0 AS DOUBLE PRECISION) / (case_ref + case_alt + ctrl_ref + ctrl_alt) AS E_d, CAST((case_ref + case_alt + ctrl_ref + ctrl_alt)  * POWER(ABS(case_ref * ctrl_alt - case_alt * ctrl_ref) - CAST((case_ref + case_alt + ctrl_ref + ctrl_alt) AS DOUBLE PRECISION) / 2.0, 2) AS DOUBLE PRECISION) / NULLIF((case_ref + case_alt) * 1.0 * (ctrl_ref + ctrl_alt) * (case_ref + ctrl_ref) * (case_alt + ctrl_alt), 0) AS «CHI2» FROM allele_counts) SELECT «start», «end», «CHI2» FROM chi_calc WHERE E_a >= 5 AND E_b >= 5 AND E_c >= 5 AND E_d >= 5 AND «CHI2» >= 29.71679 ORDER BY «CHI2» DESC"},
-  {"status": "fail",
-   "id": "sf_bq453",
-   "error":
-   "Failed to parse SQL query: <input>:1:440: expected 'END'\n--- input ---\nWITH genotype_counts AS (SELECT v.«reference_name», v.«start», v.«end», v.«reference_bases», v.«alternate_bases» AS DISTINCT_ALTERNATE_BASES, v.«VT» AS VARIANT_TYPE, v.«AF» AS KG_OVERALL_ALT_ALLELE_FREQ, v.«AFR_AF», v.«EUR_AF», v.«AMR_AF», v.«ASN_AF», COUNT(*) AS TOTAL_GENOTYPES, SUM(CASE WHEN CAST(JSON_EXTRACT_PATH(f.value, \"genotype\", \"0\") AS INT) = 0 AND CAST(JSON_EXTRACT_PATH(f.value, \"genotype\", \"1\") AS INT) = 0 THEN 1 ELSE 0 «END») AS OBS_HOM_REF, SUM(CASE WHEN (CAST(JSON_EXTRACT_PATH(f.value, \"genotype\", \"0\") AS INT) = 0 AND CAST(JSON_EXTRACT_PATH(f.value, \"genotype\", \"1\") AS INT) = 1) OR (CAST(JSON_EXTRACT_PATH(f.value, \"genotype\", \"0\") AS INT) = 1 AND CAST(JSON_EXTRACT_PATH(f.value, \"genotype\", \"1\") AS INT) = 0) THEN 1 ELSE 0 «END») AS OBS_HET, SUM(CASE WHEN CAST(JSON_EXTRACT_PATH(f.value, \"genotype\", \"0\") AS INT) = 1 AND CAST(JSON_EXTRACT_PATH(f.value, \"genotype\", \"1\") AS INT) = 1 THEN 1 ELSE 0 «END») AS OBS_HOM_ALT FROM «_1000_GENOMES».«_1000_GENOMES».«VARIANTS» AS v, LATERALFLATTEN(v.«call») AS f(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE v.«reference_name» = \"17\" AND v.«start» >= 41196311 AND v.«start» <= 41277499 GROUP BY v.«reference_name», v.«start», v.«end», v.«reference_bases», v.«alternate_bases», v.«VT», v.«AF», v.«AFR_AF», v.«EUR_AF», v.«AMR_AF», v.«ASN_AF»), hwe_calc AS (SELECT «reference_name», «start», «end», «reference_bases», DISTINCT_ALTERNATE_BASES, VARIANT_TYPE, TOTAL_GENOTYPES, OBS_HOM_REF, OBS_HET, OBS_HOM_ALT, CAST((2.0 * OBS_HOM_REF + OBS_HET)  AS DOUBLE PRECISION) / (2.0 * TOTAL_GENOTYPES) AS COMPUTED_REF_ALLELE_FREQ, CAST((2.0 * OBS_HOM_ALT + OBS_HET) AS DOUBLE PRECISION) / (2.0 * TOTAL_GENOTYPES) AS COMPUTED_ALT_ALLELE_FREQ, KG_OVERALL_ALT_ALLELE_FREQ, AFR_AF, EUR_AF, AMR_AF, ASN_AF FROM genotype_counts) SELECT «reference_name», «start», «end», «reference_bases», DISTINCT_ALTERNATE_BASES, VARIANT_TYPE, CAST(POWER(OBS_HOM_REF - (POWER(COMPUTED_REF_ALLELE_FREQ, 2) * TOTAL_GENOTYPES), 2) AS DOUBLE PRECISION) / (POWER(COMPUTED_REF_ALLELE_FREQ, 2) * TOTAL_GENOTYPES) + CAST(POWER(OBS_HET - (2.0 * COMPUTED_REF_ALLELE_FREQ * COMPUTED_ALT_ALLELE_FREQ * TOTAL_GENOTYPES), 2) AS DOUBLE PRECISION) / (2.0 * COMPUTED_REF_ALLELE_FREQ * COMPUTED_ALT_ALLELE_FREQ * TOTAL_GENOTYPES) + CAST(POWER(OBS_HOM_ALT - (POWER(COMPUTED_ALT_ALLELE_FREQ, 2) * TOTAL_GENOTYPES), 2) AS DOUBLE PRECISION) / (POWER(COMPUTED_ALT_ALLELE_FREQ, 2) * TOTAL_GENOTYPES) AS HWE_CHI_SQUARED, TOTAL_GENOTYPES, OBS_HOM_REF, OBS_HET, OBS_HOM_ALT, POWER(COMPUTED_REF_ALLELE_FREQ, 2) * TOTAL_GENOTYPES AS EXP_HOM_REF, 2.0 * COMPUTED_REF_ALLELE_FREQ * COMPUTED_ALT_ALLELE_FREQ * TOTAL_GENOTYPES AS EXP_HET, POWER(COMPUTED_ALT_ALLELE_FREQ, 2) * TOTAL_GENOTYPES AS EXP_HOM_ALT, COMPUTED_REF_ALLELE_FREQ, COMPUTED_ALT_ALLELE_FREQ, KG_OVERALL_ALT_ALLELE_FREQ, AFR_AF, EUR_AF, AMR_AF, ASN_AF FROM hwe_calc ORDER BY «start»"},
+   "Application type mismatch: The argument\n  chi2 ≥ some 29.71679\nhas type\n  Prop\nbut is expected to have type\n  Bool\nin the application\n  decide (e_a ≥ 5) && decide (e_b ≥ 5) && decide (e_c ≥ 5) && decide (e_d ≥ 5) && chi2 ≥ some 29.71679"},
+  {"status": "ok", "id": "sf_bq453", "error": null},
   {"status": "ok", "id": "sf_bq454", "error": null},
   {"status": "timeout",
    "id": "sf_bq456",
    "error":
-   "(deterministic) timeout at `isDefEq`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
+   "(deterministic) timeout at `whnf`, maximum number of heartbeats (400000) has been reached\n\nNote: Use `set_option maxHeartbeats <num>` to set the limit.(invalid MessageData.lazy, missing context)"},
   {"status": "fail",
    "id": "sf_bq457",
    "error":
@@ -594,7 +559,7 @@
   {"status": "fail",
    "id": "sf_ga009",
    "error":
-   "Application type mismatch: The argument\n  some (LeanDatabase.Scalar.getPath3 ep.value \"value\" \"int_value\")\nhas type\n  Option String\nbut is expected to have type\n  ℚ\nin the application\n  ite (decide (LeanDatabase.Scalar.getPath ep.value \"key\" = \"ga_session_id\") = true)\n    (some (LeanDatabase.Scalar.getPath3 ep.value \"value\" \"int_value\"))"},
+   "Application type mismatch: The argument\n  LeanDatabase.Scalar.getPath3 ep.value \"value\" \"int_value\"\nhas type\n  String\nbut is expected to have type\n  ℚ\nin the application\n  some (LeanDatabase.Scalar.getPath3 ep.value \"value\" \"int_value\")"},
   {"status": "fail",
    "id": "sf_ga010",
    "error":
@@ -634,11 +599,11 @@
   {"status": "fail",
    "id": "sf_ga031",
    "error":
-   "Application type mismatch: The argument\n  some (LeanDatabase.Scalar.getPath3 f.value \"value\" \"int_value\")\nhas type\n  Option String\nbut is expected to have type\n  ℚ\nin the application\n  ite (decide (LeanDatabase.Scalar.getPath f.value \"key\" = \"ga_session_id\") = true)\n    (some (LeanDatabase.Scalar.getPath3 f.value \"value\" \"int_value\"))"},
+   "Application type mismatch: The argument\n  LeanDatabase.Scalar.getPath3 f.value \"value\" \"int_value\"\nhas type\n  String\nbut is expected to have type\n  ℚ\nin the application\n  some (LeanDatabase.Scalar.getPath3 f.value \"value\" \"int_value\")"},
   {"status": "fail",
    "id": "sf_ga032",
    "error":
-   "Application type mismatch: The argument\n  some (LeanDatabase.Scalar.getPath3 f.value \"value\" \"string_value\")\nhas type\n  Option String\nbut is expected to have type\n  ℚ\nin the application\n  ite (decide (LeanDatabase.Scalar.getPath f.value \"key\" = \"page_title\") = true)\n    (some (LeanDatabase.Scalar.getPath3 f.value \"value\" \"string_value\"))"},
+   "Application type mismatch: The argument\n  LeanDatabase.Scalar.getPath3 f.value \"value\" \"string_value\"\nhas type\n  String\nbut is expected to have type\n  ℚ\nin the application\n  some (LeanDatabase.Scalar.getPath3 f.value \"value\" \"string_value\")"},
   {"status": "fail",
    "id": "sf_local002",
    "error":
@@ -662,7 +627,7 @@
   {"status": "fail",
    "id": "sf_local025",
    "error":
-   "AS clause `ROUND(CAST(AVG(bo.total_runs)OVER()AS DECIMAL),3)`: typeclass instance problem is stuck\n  Inhabited ?m.112\n\nNote: Lean will not try to resolve this typeclass instance problem because the type argument to `Inhabited` is a metavariable. This argument must be fully determined before Lean will try to resolve the typeclass.\n\nHint: Adding type annotations and supplying implicit arguments to functions can give Lean more information for typeclass resolution. For example, if you have a variable `x` that you intend to be a `Nat`, but Lean reports it as having an unresolved type like `?m`, replacing `x` with `(x : Nat)` can get typeclass resolution un-stuck."},
+   "AS clause `ROUND(CAST(AVG(bo.total_runs)OVER()AS DECIMAL),3)`: typeclass instance problem is stuck\n  Inhabited ?m.118\n\nNote: Lean will not try to resolve this typeclass instance problem because the type argument to `Inhabited` is a metavariable. This argument must be fully determined before Lean will try to resolve the typeclass.\n\nHint: Adding type annotations and supplying implicit arguments to functions can give Lean more information for typeclass resolution. For example, if you have a variable `x` that you intend to be a `Nat`, but Lean reports it as having an unresolved type like `?m`, replacing `x` with `(x : Nat)` can get typeclass resolution un-stuck."},
   {"status": "fail",
    "id": "sf_local029",
    "error":
@@ -678,16 +643,12 @@
    "Type mismatch\n  olist_geolocation.geolocation_city\nhas type\n  String\nbut is expected to have type\n  ℤ"},
   {"status": "fail",
    "id": "sf_local040",
-   "error":
-   "Type mismatch\n  income_trees.estimate_mean_income\nhas type\n  Option ℤ\nbut is expected to have type\n  ℚ"},
+   "error": "elaborated with unresolved metavariables"},
   {"status": "ok", "id": "sf_local041", "error": null},
   {"status": "fail",
    "id": "sf_local049",
    "error": "scalar subquery column must be a single aggregate (SUM/COUNT)"},
-  {"status": "fail",
-   "id": "sf_local050",
-   "error":
-   "Application type mismatch: The argument\n  some total_sales\nhas type\n  Option ℚ\nbut is expected to have type\n  ℚ\nin the application\n  ite (decide (yr = 2019) = true) (some total_sales)"},
+  {"status": "ok", "id": "sf_local050", "error": null},
   {"status": "fail",
    "id": "sf_local054",
    "error": "scalar subquery column must be a single aggregate (SUM/COUNT)"},
@@ -699,10 +660,7 @@
   {"status": "ok", "id": "sf_local059", "error": null},
   {"status": "ok", "id": "sf_local060", "error": null},
   {"status": "ok", "id": "sf_local061", "error": null},
-  {"status": "fail",
-   "id": "sf_local063",
-   "error":
-   "Invalid field `cust_city`: The environment does not contain `LeanDatabase.TypedRelation.cust_city`, so it is not possible to project the field `cust_city` from an expression\n  customers\nof type\n  LeanDatabase.TypedRelation\n    (LeanDatabase.colTypeOfList\n      [LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string,\n        LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.string,\n        LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string,\n        LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.int,\n        LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string,\n        LeanDatabase.SQLTypeProxy.float, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string,\n        LeanDatabase.SQLTypeProxy.int, LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string,\n        LeanDatabase.SQLTypeProxy.string, LeanDatabase.SQLTypeProxy.string])"},
+  {"status": "ok", "id": "sf_local063", "error": null},
   {"status": "ok", "id": "sf_local065", "error": null},
   {"status": "ok", "id": "sf_local066", "error": null},
   {"status": "ok", "id": "sf_local067", "error": null},
@@ -778,10 +736,7 @@
   {"status": "ok", "id": "sf_local228", "error": null},
   {"status": "ok", "id": "sf_local229", "error": null},
   {"status": "ok", "id": "sf_local230", "error": null},
-  {"status": "fail",
-   "id": "sf_local253",
-   "error":
-   "Type mismatch\n  salary_num\nhas type\n  Option ℚ\nbut is expected to have type\n  ℚ"},
+  {"status": "ok", "id": "sf_local253", "error": null},
   {"status": "fail",
    "id": "sf_local258",
    "error":
@@ -818,4 +773,4 @@
    "Failed to parse SQL query: <input>:1:301: expected ')'\n--- input ---\nWITH ordered_visits AS (SELECT «session», «stamp», CASE WHEN «path» IN (\"/detail\", \"/detail/\") THEN \"/detail\" WHEN «path» IN (\"/search_list\", \"/search_list/\") THEN \"/search_list\" WHEN «path» IN (\"/search_input\", \"/search_input/\") THEN \"/search_input\" WHEN «path» = \"/\" THEN \"/\" ELSE TRIM(TRAILING \"/\" FROM «path») END AS normalized_path, ROW_NUMBER() OVER (PARTITION BY «session» ORDER BY «stamp») AS rn FROM «LOG».«LOG».«ACTIVITY_LOG»), with_leads AS (SELECT normalized_path, LEAD(normalized_path, 1) OVER (PARTITION BY «session» ORDER BY rn) AS next_path, LEAD(normalized_path, 2) OVER (PARTITION BY «session» ORDER BY rn) AS third_path FROM ordered_visits) SELECT third_path AS THIRD_PAGE, COUNT(*) AS OCCURRENCES FROM with_leads WHERE normalized_path = \"/detail\" AND next_path = \"/detail\" AND NOT third_path IS NULL GROUP BY third_path ORDER BY OCCURRENCES DESC LIMIT 3"},
   {"status": "ok", "id": "sf_local356", "error": null},
   {"status": "ok", "id": "sf_local358", "error": null}],
- "elaborates": 185}
+ "elaborates": 199}

@@ -1,0 +1,486 @@
+processing 461 files with 8 workers
+[1/461] Literature/15: DISPROVED (plausible_sql) 0.1639¢ 13.9s yes
+[2/461] Literature/11_fix: DISPROVED (plausible_sql) 0.1983¢ 14.6s yes
+[3/461] Literature/12: DISPROVED (plausible_sql) 0.2172¢ 16.3s yes
+[4/461] Literature/13: DISPROVED (plausible_sql) 0.1936¢ 19.4s yes
+[5/461] Literature/1: PROVED (llm) 0.2153¢ 18.5s yes
+[6/461] Literature/14: PROVED (llm) 0.2592¢ 20.9s yes
+[7/461] Literature/17: PROVED (sql_equiv) 0.0¢ 4.4s yes
+[8/461] Literature/0: PROVED (llm) 0.2251¢ 24.1s yes
+[9/461] Literature/21: PROVED (sql_equiv) 0.0¢ 4.4s yes
+[10/461] Literature/18: PROVED (llm) 0.2148¢ 12.7s yes
+[11/461] Literature/10: PROVED (llm) 0.2241¢ 29.5s yes
+[12/461] Literature/16: PROVED (llm) 0.2319¢ 16.9s yes
+[13/461] Literature/19: PROVED (llm) 0.2166¢ 13.6s yes
+[14/461] Literature/22: PROVED (sql_equiv) 0.0¢ 4.7s yes
+[15/461] Literature/2: PROVED (llm) 0.216¢ 12.4s yes
+[16/461] Literature/20: PROVED (llm) 0.2164¢ 12.3s yes
+[17/461] Literature/23: PROVED (sql_equiv) 0.0¢ 4.6s yes
+[18/461] Literature/24: PROVED (sql_equiv) 0.0¢ 4.5s yes
+[19/461] Literature/25: PROVED (sql_equiv) 0.0¢ 5.1s yes
+[20/461] Literature/27: PROVED (sql_equiv) 0.0¢ 4.5s yes
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[21/461] Literature/30: PROVED (sql_equiv) 0.0¢ 6.0s yes
+[22/461] Literature/28: PROVED (llm) 0.223¢ 10.4s yes
+[23/461] Literature/32: PROVED (sql_equiv) 0.0¢ 4.5s yes
+[24/461] Literature/29: PROVED (llm) 0.214¢ 11.6s yes
+[25/461] Literature/3: PROVED (llm) 0.2169¢ 12.1s yes
+[26/461] Literature/31: PROVED (llm) 0.225¢ 11.2s yes
+[27/461] Literature/26: PROVED (llm) 0.293¢ 17.9s yes
+[28/461] Literature/36: PROVED (sql_equiv) 0.0¢ 5.0s yes
+[29/461] Literature/37: PROVED (sql_equiv) 0.0¢ 4.4s yes
+[30/461] Literature/33: PROVED (llm) 0.2272¢ 14.2s yes
+[31/461] Literature/35: PROVED (llm) 0.2029¢ 12.2s yes
+[32/461] Literature/34: PROVED (llm) 0.2222¢ 12.7s yes
+[33/461] Literature/41: PROVED (sql_equiv) 0.0¢ 6.7s yes
+[34/461] Literature/38: DISPROVED (plausible_sql) 0.1881¢ 39.2s yes
+[35/461] Literature/45: DISPROVED (plausible_sql) 0.214¢ 25.0s yes
+[36/461] Literature/40: PROVED (sql_equiv) 0.0¢ 21.5s yes(safe)
+[37/461] Literature/44: DISPROVED (plausible_sql) 0.2373¢ 42.1s yes
+[38/461] Literature/39: DISPROVED (plausible_sql) 0.2257¢ 56.0s yes
+[39/461] Literature/42: ELAB_ERROR () 0.0¢ 61.3s 
+[40/461] Literature/5: DISPROVED (plausible_sql) 0.2196¢ 19.1s yes
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[41/461] Literature/46: ELAB_ERROR () 0.0¢ 66.5s 
+[42/461] Literature/47: ELAB_ERROR () 0.0¢ 61.7s 
+[43/461] Literature/50: DISPROVED (plausible_sql) 0.2189¢ 38.4s yes
+[44/461] Literature/43: DISPROVED (plausible_sql) 0.2755¢ 100.3s yes
+[45/461] Literature/51: DISPROVED (plausible_sql) 0.2115¢ 44.5s yes
+[46/461] Literature/56: PROVED (sql_equiv) 0.0¢ 7.3s yes
+[47/461] Literature/4: PROVED (llm) 2.0336¢ 150.7s yes
+[48/461] Literature/55: PROVED (sql_equiv) 0.0¢ 20.7s yes(safe)
+[49/461] Literature/52: DISPROVED (plausible_sql) 0.2291¢ 52.9s yes
+[50/461] Literature/59: DISPROVED (plausible_sql) 0.1828¢ 14.1s yes
+[51/461] Literature/6: PROVED (llm) 0.231¢ 17.7s yes
+[52/461] Literature/60: PROVED (sql_equiv) 0.0¢ 5.0s yes(safe)
+[53/461] Literature/54: DISPROVED(unverified-artifact) (plausible_sql) 0.2052¢ 87.7s NO
+[54/461] Literature/53: DISPROVED(unverified-artifact) (plausible_sql) 0.2209¢ 92.3s NO
+[55/461] Literature/57: ELAB_ERROR () 0.0¢ 61.8s 
+[56/461] Literature/8: DISPROVED (plausible_sql) 0.1742¢ 10.5s yes
+[57/461] Literature/63: DISPROVED (plausible_sql) 0.2632¢ 26.6s yes
+[58/461] Literature/9: DISPROVED (plausible_sql) 0.207¢ 13.4s yes
+[59/461] Calcite/1: PROVED (sql_equiv) 0.0¢ 4.4s yes
+[60/461] Literature/49: INCONCLUSIVE (exhausted) 2.4108¢ 191.6s 
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[61/461] Literature/58: DISPROVED (plausible_sql) 0.2526¢ 94.3s yes
+[62/461] Literature/61: DISPROVED(unverified-artifact) (plausible_sql) 0.5802¢ 63.9s NO
+[63/461] Calcite/102: PROVED (sql_equiv) 0.0¢ 4.4s yes
+[64/461] Literature/7: PROVED (llm) 1.0572¢ 72.4s yes
+[65/461] Literature/62: DISPROVED(unverified-artifact) (plausible_sql) 0.2498¢ 85.8s NO
+[66/461] Calcite/105: PROVED (sql_equiv) 0.0¢ 4.7s yes
+[67/461] Calcite/106: INCONCLUSIVE (exhausted) 0.6819¢ 21.5s 
+[68/461] Calcite/108: PROVED (sql_equiv) 0.0¢ 4.6s yes
+[69/461] Calcite/101: DISPROVED(unverified-artifact) (plausible_sql) 0.2533¢ 89.3s NO
+[70/461] Calcite/103: DISPROVED(unverified-artifact) (plausible_sql) 0.2235¢ 110.7s NO
+[71/461] Calcite/10: DISPROVED(unverified-artifact) (plausible_sql) 0.5112¢ 131.9s NO
+[72/461] Calcite/110: PROVED (sql_equiv) 0.0¢ 4.7s yes
+[73/461] Calcite/11: DISPROVED(unverified-artifact) (plausible_sql) 0.2444¢ 36.9s NO
+[74/461] Calcite/100: ELAB_ERROR () 0.0¢ 174.0s 
+[75/461] Literature/48: INCONCLUSIVE (exhausted) 5.1854¢ 422.0s 
+[76/461] Calcite/113: ELAB_ERROR () 0.0¢ 125.5s 
+[77/461] Calcite/112: ELAB_ERROR () 0.0¢ 146.7s 
+[78/461] Calcite/111: ELAB_ERROR () 0.0¢ 153.6s 
+[79/461] Calcite/114: ELAB_ERROR () 0.0¢ 134.2s 
+[80/461] Calcite/115: ELAB_ERROR () 0.0¢ 143.2s 
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[81/461] Calcite/116: ELAB_ERROR () 0.0¢ 145.3s 
+[82/461] Calcite/117: ELAB_ERROR () 0.0¢ 127.3s 
+[83/461] Calcite/118: ELAB_ERROR () 0.0¢ 147.0s 
+[84/461] Calcite/122: PROVED (sql_equiv) 0.0¢ 4.6s yes
+[85/461] Calcite/12: INCONCLUSIVE (exhausted) 1.6345¢ 102.6s 
+[86/461] Calcite/124: DISPROVED (plausible_sql) 0.2489¢ 19.8s yes
+[87/461] Calcite/119: ELAB_ERROR () 0.0¢ 209.4s 
+[88/461] Calcite/126: INCONCLUSIVE (exhausted) 0.7524¢ 26.3s 
+[89/461] Calcite/125: PROVED (llm) 0.2419¢ 33.6s yes
+[90/461] Calcite/123: ELAB_ERROR () 0.0¢ 104.5s 
+[91/461] Calcite/121: DISPROVED(unverified-artifact) (plausible_sql) 0.6647¢ 138.2s NO
+[92/461] Calcite/107: INCONCLUSIVE (exhausted) 6.6621¢ 514.7s 
+[93/461] Calcite/128: INCONCLUSIVE (exhausted) 0.7605¢ 29.5s 
+[94/461] Calcite/129: DISPROVED(unverified-artifact) (plausible_sql) 0.2294¢ 33.6s NO
+[95/461] Calcite/132: ELAB_ERROR () 0.0¢ 4.5s 
+[96/461] Calcite/104: INCONCLUSIVE (exhausted) 6.9106¢ 572.3s 
+[97/461] Calcite/130: PROVED (llm) 0.4968¢ 21.8s yes
+[98/461] Calcite/133: INCONCLUSIVE (exhausted) 0.6894¢ 19.8s 
+[99/461] Calcite/131: DISPROVED (plausible_sql) 0.1886¢ 29.5s yes
+[100/461] Calcite/135: PROVED (sql_equiv) 0.0¢ 6.0s yes(safe)
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[101/461] Calcite/136: PROVED (sql_equiv) 0.0¢ 4.5s yes
+[102/461] Calcite/127: DISPROVED(unverified-artifact) (plausible_sql) 0.4758¢ 98.3s NO
+[103/461] Calcite/13: DISPROVED(unverified-artifact) (plausible_sql) 0.2248¢ 96.7s NO
+[104/461] Calcite/140: PROVED (sql_equiv) 0.0¢ 4.7s yes
+[105/461] Calcite/138: DISPROVED(unverified-artifact) (plausible_sql) 0.3161¢ 63.1s NO
+[106/461] Calcite/142: PROVED (sql_equiv) 0.0¢ 4.5s yes
+[107/461] Calcite/137: INCONCLUSIVE (exhausted) 0.8854¢ 97.6s 
+[108/461] Calcite/144: PROVED (sql_equiv) 0.0¢ 4.5s yes
+[109/461] Calcite/139: ELAB_ERROR () 0.0¢ 98.5s 
+[110/461] Calcite/109: TIMEOUT () 0.0¢ 700.1s 
+[111/461] Calcite/120: INCONCLUSIVE (exhausted) 4.5963¢ 370.2s 
+[112/461] Calcite/145: INCONCLUSIVE (exhausted) 1.4392¢ 88.7s 
+[113/461] Calcite/143: DISPROVED(unverified-artifact) (plausible_sql) 0.364¢ 126.6s NO
+[114/461] Calcite/148: DISPROVED (plausible_sql) 0.4698¢ 58.3s yes
+[115/461] Calcite/147: DISPROVED(unverified-artifact) (plausible_sql) 0.2259¢ 74.5s NO
+[116/461] Calcite/146: DISPROVED (plausible_sql) 0.3509¢ 134.9s yes
+[117/461] Calcite/152: INCONCLUSIVE (exhausted) 0.7104¢ 23.0s 
+[118/461] Calcite/134: INCONCLUSIVE (exhausted) 3.7536¢ 317.9s 
+[119/461] Calcite/15: DISPROVED(unverified-artifact) (plausible_sql) 0.8071¢ 94.8s NO
+[120/461] Calcite/155: PROVED (sql_equiv) 0.0¢ 4.7s yes
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[121/461] Calcite/150: DISPROVED (plausible_sql) 0.3875¢ 93.5s yes
+[122/461] Calcite/153: INCONCLUSIVE (exhausted) 1.6999¢ 115.2s 
+[123/461] Calcite/141: INCONCLUSIVE (exhausted) 4.5116¢ 340.0s 
+[124/461] Calcite/154: DISPROVED(unverified-artifact) (plausible_sql) 0.7526¢ 100.3s NO
+[125/461] Calcite/157: INCONCLUSIVE (exhausted) 1.3394¢ 79.9s 
+[126/461] Calcite/158: INCONCLUSIVE (exhausted) 0.9632¢ 47.4s 
+[127/461] Calcite/16: DISPROVED(unverified-artifact) (plausible_sql) 0.2301¢ 26.6s NO
+[128/461] Calcite/161: INCONCLUSIVE (exhausted) 0.7702¢ 31.0s 
+[129/461] Calcite/14: INCONCLUSIVE (exhausted) 5.9684¢ 448.0s 
+[130/461] Calcite/159: INCONCLUSIVE (exhausted) 1.9824¢ 132.6s 
+[131/461] Calcite/162: ELAB_ERROR () 0.0¢ 102.9s 
+[132/461] Calcite/166: DISPROVED(unverified-artifact) (plausible_sql) 0.2814¢ 62.1s NO
+[133/461] Calcite/167: PROVED (llm) 0.3018¢ 17.2s yes
+[134/461] Calcite/164: INCONCLUSIVE (exhausted) 1.7699¢ 153.2s 
+[135/461] Calcite/168: PROVED (sql_equiv) 0.0¢ 5.4s yes(safe)
+[136/461] Calcite/169: PROVED (sql_equiv) 0.0¢ 5.2s yes(safe)
+[137/461] Calcite/163: DISPROVED(unverified-artifact) (plausible_sql) 0.2651¢ 184.2s NO
+[138/461] Calcite/151: INCONCLUSIVE (exhausted) 5.3124¢ 410.7s 
+[139/461] Calcite/170: PROVED (sql_equiv) 0.0¢ 5.5s yes(safe)
+[140/461] Calcite/171: PROVED (sql_equiv) 0.0¢ 5.6s yes(safe)
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[141/461] Calcite/172: PROVED (sql_equiv) 0.0¢ 5.0s yes(safe)
+[142/461] Calcite/149: INCONCLUSIVE (exhausted) 6.9538¢ 498.8s 
+[143/461] Calcite/175: DISPROVED(unverified-artifact) (plausible_sql) 0.4232¢ 61.6s NO
+[144/461] Calcite/165: INCONCLUSIVE (exhausted) 2.7706¢ 225.6s 
+[145/461] Calcite/173: DISPROVED(unverified-artifact) (plausible_sql) 0.9936¢ 98.7s NO
+[146/461] Calcite/17: ELAB_ERROR () 0.0¢ 130.3s 
+[147/461] Calcite/18: PROVED (sql_equiv) 0.0¢ 5.3s yes
+[148/461] Calcite/179: PROVED (llm) 0.2309¢ 13.6s yes
+[149/461] Calcite/156: INCONCLUSIVE (exhausted) 6.5694¢ 474.4s 
+[150/461] Calcite/177: INCONCLUSIVE (exhausted) 1.1019¢ 59.8s 
+[151/461] Calcite/181: PROVED (llm) 0.2314¢ 14.5s yes
+[152/461] Calcite/180: DISPROVED(unverified-artifact) (plausible_sql) 0.3558¢ 44.5s NO
+[153/461] Calcite/174: DISPROVED (plausible_sql) 0.3668¢ 165.6s yes
+[154/461] Calcite/183: DISPROVED (plausible_sql) 0.3094¢ 39.3s yes
+[155/461] Calcite/185: INCONCLUSIVE (exhausted) 0.9502¢ 44.4s 
+[156/461] Calcite/182: DISPROVED(unverified-artifact) (plausible_sql) 0.2806¢ 87.2s NO
+[157/461] Calcite/187: DISPROVED (plausible_sql) 0.244¢ 69.0s yes
+[158/461] Calcite/160: INCONCLUSIVE (exhausted) 7.1932¢ 504.1s 
+[159/461] Calcite/19: PROVED (sql_equiv) 0.0¢ 4.9s yes
+[160/461] Calcite/186: DISPROVED(unverified-artifact) (plausible_sql) 0.2271¢ 81.5s NO
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[161/461] Calcite/188: PROVED (llm) 0.7843¢ 55.9s yes
+[162/461] Calcite/189: DISPROVED(unverified-artifact) (plausible_sql) 0.5086¢ 61.2s NO
+[163/461] Calcite/194: ELAB_ERROR () 0.0¢ 94.0s 
+[164/461] Calcite/178: DISPROVED(unverified-artifact) (plausible_sql) 3.1196¢ 303.0s NO
+[165/461] Calcite/193: ELAB_ERROR () 0.0¢ 129.2s 
+[166/461] Calcite/190: ELAB_ERROR () 0.0¢ 154.6s 
+[167/461] Calcite/196: INCONCLUSIVE (exhausted) 0.7302¢ 22.7s 
+[168/461] Calcite/192: ELAB_ERROR () 0.0¢ 167.2s 
+[169/461] Calcite/191: ELAB_ERROR () 0.0¢ 178.5s 
+[170/461] Calcite/195: INCONCLUSIVE (exhausted) 1.07¢ 65.3s 
+[171/461] Calcite/20: PROVED (sql_equiv) 0.0¢ 4.4s yes
+[172/461] Calcite/176: INCONCLUSIVE (exhausted) 5.7252¢ 437.6s 
+[173/461] Calcite/2: DISPROVED(unverified-artifact) (plausible_sql) 0.2856¢ 63.5s NO
+[174/461] Calcite/202: DISPROVED(unverified-artifact) (plausible_sql) 0.3437¢ 32.9s NO
+[175/461] Calcite/203: DISPROVED(unverified-artifact) (plausible_sql) 0.3657¢ 47.0s NO
+[176/461] Calcite/184: ELAB_ERROR () 0.0¢ 420.9s 
+[177/461] Calcite/201: INCONCLUSIVE (exhausted) 2.3505¢ 162.2s 
+[178/461] Calcite/206: ELAB_ERROR () 0.0¢ 57.1s 
+[179/461] Calcite/205: DISPROVED(unverified-artifact) (plausible_sql) 0.5559¢ 81.3s NO
+[180/461] Calcite/208: PROVED (sql_equiv) 0.0¢ 5.0s yes(safe)
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[181/461] Calcite/21: PROVED (sql_equiv) 0.0¢ 4.4s yes
+[182/461] Calcite/210: DISPROVED(unverified-artifact) (plausible_sql) 0.2559¢ 56.7s NO
+[183/461] Calcite/209: DISPROVED(unverified-artifact) (plausible_sql) 0.4261¢ 102.0s NO
+[184/461] Calcite/200: ELAB_ERROR () 0.0¢ 296.6s 
+[185/461] Calcite/213: PROVED (sql_equiv) 0.0¢ 4.6s yes
+[186/461] Calcite/214: PROVED (sql_equiv) 0.0¢ 4.8s yes
+[187/461] Calcite/212: DISPROVED(unverified-artifact) (plausible_sql) 0.2647¢ 84.0s NO
+[188/461] Calcite/199: INCONCLUSIVE (exhausted) 5.5629¢ 410.9s 
+[189/461] Calcite/217: PROVED (sql_equiv) 0.0¢ 4.6s yes
+[190/461] Calcite/216: DISPROVED (plausible_sql) 0.1901¢ 12.6s yes
+[191/461] Calcite/204: INCONCLUSIVE (exhausted) 4.4342¢ 349.0s 
+[192/461] Calcite/219: DISPROVED(unverified-artifact) (plausible_sql) 0.2197¢ 39.4s NO
+[193/461] Calcite/220: PROVED (sql_equiv) 0.0¢ 4.9s yes
+[194/461] Calcite/22: DISPROVED(unverified-artifact) (plausible_sql) 0.2992¢ 63.8s NO
+[195/461] Calcite/218: ELAB_ERROR () 0.0¢ 100.7s 
+[196/461] Calcite/197: INCONCLUSIVE (exhausted) 6.8754¢ 543.1s 
+[197/461] Calcite/223: PROVED (sql_equiv) 0.0¢ 5.0s yes
+[198/461] Calcite/198: INCONCLUSIVE (exhausted) 6.8225¢ 587.8s 
+[199/461] Calcite/221: ELAB_ERROR () 0.0¢ 100.4s 
+[200/461] Calcite/226: PROVED (sql_equiv) 0.0¢ 5.8s yes
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[201/461] Calcite/227: ELAB_ERROR () 0.0¢ 101.8s 
+[202/461] Calcite/207: INCONCLUSIVE (exhausted) 6.3706¢ 509.2s 
+[203/461] Calcite/222: INCONCLUSIVE (exhausted) 2.7572¢ 198.4s 
+[204/461] Calcite/211: ELAB_ERROR () 0.0¢ 414.9s 
+[205/461] Calcite/231: PROVED (sql_equiv) 0.0¢ 4.4s yes
+[206/461] Calcite/215: INCONCLUSIVE (exhausted) 5.3744¢ 400.4s 
+[207/461] Calcite/233: PROVED (sql_equiv) 0.0¢ 5.5s yes(safe)
+[208/461] Calcite/232: DISPROVED(unverified-artifact) (plausible_sql) 0.2495¢ 44.2s NO
+[209/461] Calcite/224: INCONCLUSIVE (exhausted) 3.3868¢ 256.4s 
+[210/461] Calcite/229: ELAB_ERROR () 0.0¢ 99.7s 
+[211/461] Calcite/230: DISPROVED(unverified-artifact) (plausible_sql) 0.3246¢ 86.0s NO
+[212/461] Calcite/238: PROVED (sql_equiv) 0.0¢ 4.4s yes
+[213/461] Calcite/234: DISPROVED(unverified-artifact) (plausible_sql) 0.2663¢ 38.7s NO
+[214/461] Calcite/239: DISPROVED (plausible_sql) 0.2216¢ 21.8s yes
+[215/461] Calcite/225: INCONCLUSIVE (exhausted) 3.8012¢ 311.6s 
+[216/461] Calcite/24: DISPROVED(unverified-artifact) (plausible_sql) 0.5461¢ 34.5s NO
+[217/461] Calcite/235: DISPROVED(unverified-artifact) (plausible_sql) 0.2195¢ 83.1s NO
+[218/461] Calcite/228: ELAB_ERROR () 0.0¢ 300.8s 
+[219/461] Calcite/23: DISPROVED(unverified-artifact) (plausible_sql) 0.5906¢ 185.2s NO
+[220/461] Calcite/240: INCONCLUSIVE (exhausted) 1.1654¢ 92.1s 
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[221/461] Calcite/243: INCONCLUSIVE (exhausted) 0.9392¢ 70.4s 
+[222/461] Calcite/241: INCONCLUSIVE (exhausted) 0.9849¢ 96.6s 
+[223/461] Calcite/242: ELAB_ERROR () 0.0¢ 101.3s 
+[224/461] Calcite/248: INCONCLUSIVE (exhausted) 0.6458¢ 15.0s 
+[225/461] Calcite/247: DISPROVED (plausible_sql) 0.2361¢ 30.4s yes
+[226/461] Calcite/237: DISPROVED(unverified-artifact) (plausible_sql) 0.6944¢ 180.2s NO
+[227/461] Calcite/25: INCONCLUSIVE (exhausted) 0.7784¢ 27.2s 
+[228/461] Calcite/245: ELAB_ERROR () 0.0¢ 100.4s 
+[229/461] Calcite/249: DISPROVED(unverified-artifact) (plausible_sql) 0.2578¢ 54.4s NO
+[230/461] Calcite/254: INCONCLUSIVE (exhausted) 0.0¢ 10.4s 
+[231/461] Calcite/255: INCONCLUSIVE (exhausted) 0.0¢ 8.9s 
+[232/461] Calcite/246: ELAB_ERROR () 0.0¢ 104.7s 
+[233/461] Calcite/256: PROVED (sql_equiv) 0.0¢ 4.5s yes
+[234/461] Calcite/258: INCONCLUSIVE (exhausted) 0.0¢ 6.9s 
+[235/461] Calcite/259: PROVED (sql_equiv) 0.0¢ 4.6s yes
+[236/461] Calcite/252: INCONCLUSIVE (exhausted) 0.7457¢ 77.9s 
+[237/461] Calcite/26: PROVED (sql_equiv) 0.0¢ 4.3s yes
+[238/461] Calcite/261: INCONCLUSIVE (exhausted) 0.0¢ 7.8s 
+[239/461] Calcite/251: DISPROVED(unverified-artifact) (plausible_sql) 0.2591¢ 96.3s NO
+[240/461] Calcite/244: INCONCLUSIVE (exhausted) 2.3028¢ 184.8s 
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[241/461] Calcite/260: INCONCLUSIVE (unprovable-unverified) 0.2725¢ 18.8s 
+[242/461] Calcite/263: INCONCLUSIVE (exhausted) 0.0¢ 9.1s 
+[243/461] Calcite/265: PROVED (sql_equiv) 0.0¢ 4.5s yes
+[244/461] Calcite/257: DISPROVED(unverified-artifact) (plausible_sql) 0.2121¢ 61.9s NO
+[245/461] Calcite/267: INCONCLUSIVE (exhausted) 0.0¢ 7.4s 
+[246/461] Calcite/266: PROVED (sql_equiv) 0.0¢ 5.9s yes(safe)
+[247/461] Calcite/250: INCONCLUSIVE (exhausted) 1.9215¢ 144.0s 
+[248/461] Calcite/268: INCONCLUSIVE (exhausted) 0.0¢ 8.9s 
+[249/461] Calcite/27: INCONCLUSIVE (exhausted) 0.0¢ 6.6s 
+[250/461] Calcite/270: INCONCLUSIVE (exhausted) 0.0¢ 7.3s 
+[251/461] Calcite/271: INCONCLUSIVE (unprovable-unverified) 0.2017¢ 8.4s 
+[252/461] Calcite/272: PROVED (sql_equiv) 0.0¢ 4.5s yes
+[253/461] Calcite/236: INCONCLUSIVE (exhausted) 4.2982¢ 332.3s 
+[254/461] Calcite/274: PROVED (sql_equiv) 0.0¢ 4.5s yes
+[255/461] Calcite/273: INCONCLUSIVE (exhausted) 0.2291¢ 12.5s 
+[256/461] Calcite/275: PROVED (sql_equiv) 0.0¢ 4.7s yes
+[257/461] Calcite/277: INCONCLUSIVE (exhausted) 0.0¢ 6.4s 
+[258/461] Calcite/278: INCONCLUSIVE (exhausted) 0.0¢ 8.3s 
+[259/461] Calcite/279: INCONCLUSIVE (exhausted) 0.0¢ 7.4s 
+[260/461] Calcite/276: INCONCLUSIVE (unprovable-unverified) 0.2309¢ 15.5s 
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[261/461] Calcite/28: PROVED (sql_equiv) 0.0¢ 4.5s yes
+[262/461] Calcite/281: ELAB_ERROR () 0.0¢ 6.9s 
+[263/461] Calcite/280: PROVED (sql_equiv) 0.0¢ 4.5s yes
+[264/461] Calcite/283: PROVED (sql_equiv) 0.0¢ 4.5s yes
+[265/461] Calcite/284: INCONCLUSIVE (exhausted) 0.0¢ 10.3s 
+[266/461] Calcite/285: INCONCLUSIVE (exhausted) 0.0¢ 13.1s 
+[267/461] Calcite/287: INCONCLUSIVE (exhausted) 0.0¢ 7.1s 
+[268/461] Calcite/269: INCONCLUSIVE (exhausted) 0.6605¢ 59.7s 
+[269/461] Calcite/286: INCONCLUSIVE (unprovable-unverified) 0.3264¢ 22.5s 
+[270/461] Calcite/289: INCONCLUSIVE (unprovable-unverified) 0.2904¢ 18.4s 
+[271/461] Calcite/291: INCONCLUSIVE (exhausted) 0.0¢ 6.2s 
+[272/461] Calcite/264: INCONCLUSIVE (exhausted) 1.0744¢ 125.7s 
+[273/461] Calcite/293: INCONCLUSIVE (exhausted) 0.216¢ 22.2s 
+[274/461] Calcite/29: ELAB_ERROR () 0.0¢ 66.0s 
+[275/461] Calcite/282: ELAB_ERROR () 0.0¢ 104.7s 
+[276/461] Calcite/296: PROVED (sql_equiv) 0.0¢ 4.7s yes
+[277/461] Calcite/297: PROVED (sql_equiv) 0.0¢ 4.5s yes
+[278/461] Calcite/298: PROVED (sql_equiv) 0.0¢ 4.6s yes
+[279/461] Calcite/290: INCONCLUSIVE (exhausted) 1.459¢ 111.6s 
+[280/461] Calcite/299: INCONCLUSIVE (exhausted) 0.0¢ 12.4s 
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[281/461] Calcite/262: INCONCLUSIVE (exhausted) 2.7593¢ 215.4s 
+[282/461] Calcite/288: INCONCLUSIVE (unprovable-unverified) 1.6246¢ 133.7s 
+[283/461] Calcite/30: PROVED (sql_equiv) 0.0¢ 4.3s yes
+[284/461] Calcite/3: INCONCLUSIVE (exhausted) 0.0¢ 10.4s 
+[285/461] Calcite/301: PROVED (sql_equiv) 0.0¢ 4.9s yes
+[286/461] Calcite/303: INCONCLUSIVE (exhausted) 0.0¢ 10.4s 
+[287/461] Calcite/302: INCONCLUSIVE (exhausted) 0.0¢ 11.3s 
+[288/461] Calcite/304: INCONCLUSIVE (exhausted) 0.0¢ 5.8s 
+[289/461] Calcite/306: PROVED (sql_equiv) 0.0¢ 5.1s yes
+[290/461] Calcite/253: INCONCLUSIVE (exhausted) 4.1415¢ 324.1s 
+[291/461] Calcite/309: INCONCLUSIVE (unprovable-unverified) 0.257¢ 17.8s 
+[292/461] Calcite/31: INCONCLUSIVE (exhausted) 0.2077¢ 12.6s 
+[293/461] Calcite/310: INCONCLUSIVE (exhausted) 0.0¢ 7.7s 
+[294/461] Calcite/311: INCONCLUSIVE (exhausted) 0.0¢ 5.9s 
+[295/461] Calcite/312: PROVED (sql_equiv) 0.0¢ 4.5s yes
+[296/461] Calcite/292: ELAB_ERROR () 0.0¢ 192.0s 
+[297/461] Calcite/313: INCONCLUSIVE (exhausted) 0.0¢ 14.8s 
+[298/461] Calcite/315: PROVED (sql_equiv) 0.0¢ 4.6s yes
+[299/461] Calcite/316: PROVED (sql_equiv) 0.0¢ 4.4s yes
+[300/461] Calcite/307: ELAB_ERROR () 0.0¢ 100.2s 
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[301/461] Calcite/318: INCONCLUSIVE (exhausted) 0.0¢ 6.0s 
+[302/461] Calcite/319: INCONCLUSIVE (exhausted) 0.0¢ 10.4s 
+[303/461] Calcite/314: INCONCLUSIVE (exhausted) 0.6723¢ 52.7s 
+[304/461] Calcite/295: INCONCLUSIVE (exhausted) 2.211¢ 204.3s 
+[305/461] Calcite/320: INCONCLUSIVE (exhausted) 0.0¢ 8.9s 
+[306/461] Calcite/321: INCONCLUSIVE (exhausted) 0.0¢ 10.9s 
+[307/461] Calcite/294: INCONCLUSIVE (exhausted) 2.8694¢ 222.2s 
+[308/461] Calcite/323: INCONCLUSIVE (exhausted) 0.0¢ 6.5s 
+[309/461] Calcite/325: INCONCLUSIVE (exhausted) 0.0¢ 9.2s 
+[310/461] Calcite/308: INCONCLUSIVE (exhausted) 1.646¢ 150.1s 
+[311/461] Calcite/324: INCONCLUSIVE (unprovable-unverified) 0.263¢ 18.2s 
+[312/461] Calcite/326: INCONCLUSIVE (exhausted) 0.0¢ 8.3s 
+[313/461] Calcite/32: PROVED (sql_equiv) 0.0¢ 18.1s yes(safe)
+[314/461] Calcite/328: INCONCLUSIVE (exhausted) 0.0¢ 8.3s 
+[315/461] Calcite/33: INCONCLUSIVE (exhausted) 0.0¢ 7.6s 
+[316/461] Calcite/329: PROVED (sql_equiv) 0.0¢ 7.0s yes
+[317/461] Calcite/330: INCONCLUSIVE (exhausted) 0.0¢ 9.7s 
+[318/461] Calcite/331: INCONCLUSIVE (exhausted) 0.0¢ 8.3s 
+[319/461] Calcite/300: INCONCLUSIVE (exhausted) 2.2834¢ 198.1s 
+[320/461] Calcite/332: INCONCLUSIVE (exhausted) 0.0¢ 9.6s 
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[321/461] Calcite/333: PROVED (sql_equiv) 0.0¢ 4.6s yes
+[322/461] Calcite/334: INCONCLUSIVE (exhausted) 0.0¢ 12.3s 
+[323/461] Calcite/335: INCONCLUSIVE (exhausted) 0.0¢ 10.9s 
+[324/461] Calcite/338: INCONCLUSIVE (exhausted) 0.0¢ 8.4s 
+[325/461] Calcite/336: PROVED (sql_equiv) 0.0¢ 6.2s yes(safe)
+[326/461] Calcite/327: INCONCLUSIVE (exhausted) 0.2165¢ 44.1s 
+[327/461] Calcite/34: INCONCLUSIVE (exhausted) 0.0¢ 6.6s 
+[328/461] Calcite/337: INCONCLUSIVE (unprovable-unverified) 0.3645¢ 21.5s 
+[329/461] Calcite/340: INCONCLUSIVE (exhausted) 0.0¢ 10.1s 
+[330/461] Calcite/341: PROVED (sql_equiv) 0.0¢ 5.3s yes
+[331/461] Calcite/339: PROVED (llm) 0.2435¢ 17.0s yes
+[332/461] Calcite/343: INCONCLUSIVE (exhausted) 0.0¢ 7.8s 
+[333/461] Calcite/345: INCONCLUSIVE (exhausted) 0.0¢ 7.7s 
+[334/461] Calcite/344: PROVED (sql_equiv) 0.0¢ 4.5s yes
+[335/461] Calcite/346: INCONCLUSIVE (exhausted) 0.0¢ 9.1s 
+[336/461] Calcite/342: INCONCLUSIVE (exhausted) 0.227¢ 20.1s 
+[337/461] Calcite/348: INCONCLUSIVE (exhausted) 0.0¢ 6.2s 
+[338/461] Calcite/349: INCONCLUSIVE (exhausted) 0.0¢ 11.4s 
+[339/461] Calcite/35: PROVED (sql_equiv) 0.0¢ 4.6s yes
+[340/461] Calcite/350: INCONCLUSIVE (exhausted) 0.0¢ 8.6s 
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[341/461] Calcite/351: INCONCLUSIVE (exhausted) 0.0¢ 6.5s 
+[342/461] Calcite/322: ELAB_ERROR () 0.0¢ 103.2s 
+[343/461] Calcite/352: INCONCLUSIVE (exhausted) 0.0¢ 6.1s 
+[344/461] Calcite/305: INCONCLUSIVE (exhausted) 2.8802¢ 242.5s 
+[345/461] Calcite/353: INCONCLUSIVE (exhausted) 0.0¢ 8.9s 
+[346/461] Calcite/355: INCONCLUSIVE (exhausted) 0.0¢ 9.6s 
+[347/461] Calcite/356: PROVED (sql_equiv) 0.0¢ 4.6s yes
+[348/461] Calcite/357: INCONCLUSIVE (exhausted) 0.0¢ 6.3s 
+[349/461] Calcite/360: PROVED (sql_equiv) 0.0¢ 4.6s yes
+[350/461] Calcite/361: INCONCLUSIVE (exhausted) 0.2107¢ 10.3s 
+[351/461] Calcite/362: INCONCLUSIVE (exhausted) 0.0¢ 7.8s 
+[352/461] Calcite/363: INCONCLUSIVE (exhausted) 0.0¢ 10.7s 
+[353/461] Calcite/364: PROVED (sql_equiv) 0.0¢ 4.4s yes
+[354/461] Calcite/365: INCONCLUSIVE (exhausted) 0.0¢ 8.6s 
+[355/461] Calcite/366: INCONCLUSIVE (exhausted) 0.0¢ 6.9s 
+[356/461] Calcite/367: INCONCLUSIVE (exhausted) 0.0¢ 7.1s 
+[357/461] Calcite/36: INCONCLUSIVE (unprovable-unverified) 0.5933¢ 39.8s 
+[358/461] Calcite/369: INCONCLUSIVE (exhausted) 0.0¢ 7.6s 
+[359/461] Calcite/37: INCONCLUSIVE (exhausted) 0.0¢ 7.7s 
+[360/461] Calcite/370: INCONCLUSIVE (exhausted) 0.0¢ 10.5s 
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[361/461] Calcite/371: INCONCLUSIVE (exhausted) 0.0¢ 11.6s 
+[362/461] Calcite/354: INCONCLUSIVE (unprovable-unverified) 0.8946¢ 71.0s 
+[363/461] Calcite/347: INCONCLUSIVE (exhausted) 1.2643¢ 89.5s 
+[364/461] Calcite/359: ELAB_ERROR () 0.0¢ 66.5s 
+[365/461] Calcite/368: INCONCLUSIVE (unprovable-unverified) 0.5153¢ 34.0s 
+[366/461] Calcite/375: PROVED (sql_equiv) 0.0¢ 4.6s yes
+[367/461] Calcite/374: INCONCLUSIVE (exhausted) 0.0¢ 10.4s 
+[368/461] Calcite/376: PROVED (sql_equiv) 0.0¢ 4.6s yes
+[369/461] Calcite/378: INCONCLUSIVE (exhausted) 0.0¢ 6.6s 
+[370/461] Calcite/379: INCONCLUSIVE (exhausted) 0.0¢ 8.4s 
+[371/461] Calcite/373: INCONCLUSIVE (exhausted) 0.2211¢ 24.3s 
+[372/461] Calcite/38: PROVED (sql_equiv) 0.0¢ 4.8s yes
+[373/461] Calcite/317: INCONCLUSIVE (exhausted) 2.6428¢ 233.3s 
+[374/461] Calcite/381: INCONCLUSIVE (exhausted) 0.0¢ 10.3s 
+[375/461] Calcite/382: PROVED (sql_equiv) 0.0¢ 4.6s yes
+[376/461] Calcite/383: INCONCLUSIVE (exhausted) 0.0¢ 7.0s 
+[377/461] Calcite/386: INCONCLUSIVE (exhausted) 0.0¢ 7.5s 
+[378/461] Calcite/358: ELAB_ERROR () 0.0¢ 105.7s 
+[379/461] Calcite/387: PROVED (sql_equiv) 0.0¢ 4.7s yes
+[380/461] Calcite/388: INCONCLUSIVE (exhausted) 0.0¢ 7.1s 
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[381/461] Calcite/389: INCONCLUSIVE (exhausted) 0.0¢ 6.5s 
+[382/461] Calcite/385: INCONCLUSIVE (exhausted) 0.2119¢ 21.6s 
+[383/461] Calcite/391: INCONCLUSIVE (exhausted) 0.0¢ 10.4s 
+[384/461] Calcite/390: INCONCLUSIVE (unprovable-unverified) 0.2591¢ 13.7s 
+[385/461] Calcite/39: INCONCLUSIVE (unprovable-unverified) 0.2846¢ 18.7s 
+[386/461] Calcite/377: ELAB_ERROR () 0.0¢ 57.4s 
+[387/461] Calcite/393: INCONCLUSIVE (exhausted) 0.0¢ 7.5s 
+[388/461] Calcite/395: INCONCLUSIVE (exhausted) 0.0¢ 7.3s 
+[389/461] Calcite/4: INCONCLUSIVE (exhausted) 0.0¢ 7.5s 
+[390/461] Calcite/396: INCONCLUSIVE (exhausted) 0.2243¢ 13.2s 
+[391/461] Calcite/394: PROVED (llm) 0.2242¢ 13.0s yes
+[392/461] Calcite/380: ELAB_ERROR () 0.0¢ 67.2s 
+[393/461] Calcite/397: PROVED (sql_equiv) 0.0¢ 5.6s yes(safe)
+[394/461] Calcite/40: PROVED (sql_equiv) 0.0¢ 4.8s yes
+[395/461] Calcite/41: INCONCLUSIVE (exhausted) 0.0¢ 9.7s 
+[396/461] Calcite/43: INCONCLUSIVE (exhausted) 0.0¢ 9.7s 
+[397/461] Calcite/44: INCONCLUSIVE (exhausted) 0.0¢ 10.3s 
+[398/461] Calcite/372: ELAB_ERROR () 0.0¢ 104.1s 
+[399/461] Calcite/47: INCONCLUSIVE (exhausted) 0.0¢ 9.0s 
+[400/461] Calcite/384: ELAB_ERROR () 0.0¢ 76.0s 
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[401/461] Calcite/45: PROVED (llm) 0.2417¢ 15.5s yes
+[402/461] Calcite/48: INCONCLUSIVE (exhausted) 0.0¢ 13.1s 
+[403/461] Calcite/49: PROVED (sql_equiv) 0.0¢ 5.0s yes
+[404/461] Calcite/50: INCONCLUSIVE (exhausted) 0.0¢ 7.6s 
+[405/461] Calcite/5: INCONCLUSIVE (exhausted) 0.0¢ 10.3s 
+[406/461] Calcite/51: INCONCLUSIVE (exhausted) 0.0¢ 6.2s 
+[407/461] Calcite/52: INCONCLUSIVE (exhausted) 0.0¢ 7.4s 
+[408/461] Calcite/54: INCONCLUSIVE (exhausted) 0.0¢ 8.3s 
+[409/461] Calcite/55: INCONCLUSIVE (exhausted) 0.0¢ 8.3s 
+[410/461] Calcite/53: INCONCLUSIVE (unprovable-unverified) 0.2972¢ 15.6s 
+[411/461] Calcite/57: INCONCLUSIVE (exhausted) 0.0¢ 12.9s 
+[412/461] Calcite/59: INCONCLUSIVE (exhausted) 0.0¢ 7.9s 
+[413/461] Calcite/6: PROVED (sql_equiv) 0.0¢ 4.5s yes
+[414/461] Calcite/61: INCONCLUSIVE (exhausted) 0.0¢ 8.4s 
+[415/461] Calcite/60: INCONCLUSIVE (exhausted) 0.0¢ 10.2s 
+[416/461] Calcite/63: INCONCLUSIVE (exhausted) 0.0¢ 7.8s 
+[417/461] Calcite/64: INCONCLUSIVE (exhausted) 0.0¢ 7.1s 
+[418/461] Calcite/65: INCONCLUSIVE (exhausted) 0.0¢ 6.6s 
+[419/461] Calcite/66: INCONCLUSIVE (unprovable-unverified) 0.2736¢ 19.1s 
+[420/461] Calcite/46: DISPROVED(unverified-artifact) (plausible_sql) 0.2945¢ 79.6s NO
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[421/461] Calcite/68: PROVED (sql_equiv) 0.0¢ 4.5s yes
+[422/461] Calcite/42: ELAB_ERROR () 0.0¢ 101.4s 
+[423/461] Calcite/56: ELAB_ERROR () 0.0¢ 69.2s 
+[424/461] Calcite/7: PROVED (sql_equiv) 0.0¢ 4.4s yes
+[425/461] Calcite/69: INCONCLUSIVE (unprovable-unverified) 0.2166¢ 13.7s 
+[426/461] Calcite/70: INCONCLUSIVE (exhausted) 0.0¢ 9.0s 
+[427/461] Calcite/71: PROVED (sql_equiv) 0.0¢ 4.5s yes
+[428/461] Calcite/73: INCONCLUSIVE (exhausted) 0.0¢ 10.6s 
+[429/461] Calcite/67: INCONCLUSIVE (exhausted) 0.2695¢ 50.6s 
+[430/461] Calcite/75: INCONCLUSIVE (exhausted) 0.0¢ 13.2s 
+[431/461] Calcite/76: INCONCLUSIVE (unprovable-unverified) 0.2546¢ 15.0s 
+[432/461] Calcite/78: INCONCLUSIVE (exhausted) 0.0¢ 8.4s 
+[433/461] Calcite/77: INCONCLUSIVE (exhausted) 0.0¢ 13.7s 
+[434/461] Calcite/79: INCONCLUSIVE (exhausted) 0.0¢ 6.4s 
+[435/461] Calcite/8: PROVED (sql_equiv) 0.0¢ 4.4s yes
+[436/461] Calcite/80: INCONCLUSIVE (exhausted) 0.0¢ 12.5s 
+[437/461] Calcite/81: INCONCLUSIVE (unprovable-unverified) 0.2129¢ 12.1s 
+[438/461] Calcite/82: INCONCLUSIVE (exhausted) 0.0¢ 7.4s 
+[439/461] Calcite/392: INCONCLUSIVE (exhausted) 2.4655¢ 178.0s 
+[440/461] Calcite/72: INCONCLUSIVE (exhausted) 0.2297¢ 47.4s 
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[441/461] Calcite/58: INCONCLUSIVE (exhausted) 1.3082¢ 112.5s 
+[442/461] Calcite/84: INCONCLUSIVE (exhausted) 0.0¢ 7.0s 
+[443/461] Calcite/83: INCONCLUSIVE (exhausted) 0.0¢ 7.6s 
+[444/461] Calcite/86: INCONCLUSIVE (exhausted) 0.0¢ 7.7s 
+[445/461] Calcite/85: INCONCLUSIVE (exhausted) 0.0¢ 11.2s 
+[446/461] Calcite/88: INCONCLUSIVE (exhausted) 0.0¢ 7.4s 
+[447/461] Calcite/89: PROVED (sql_equiv) 0.0¢ 4.7s yes
+[448/461] Calcite/9: PROVED (sql_equiv) 0.0¢ 4.5s yes
+[449/461] Calcite/90: INCONCLUSIVE (exhausted) 0.0¢ 11.6s 
+[450/461] Calcite/93: INCONCLUSIVE (exhausted) 0.0¢ 6.3s 
+[451/461] Calcite/94: INCONCLUSIVE (exhausted) 0.0¢ 12.4s 
+[452/461] Calcite/96: INCONCLUSIVE (exhausted) 0.0¢ 7.7s 
+[453/461] Calcite/91: INCONCLUSIVE (exhausted) 0.23¢ 24.0s 
+[454/461] Calcite/97: INCONCLUSIVE (exhausted) 0.0¢ 8.8s 
+[455/461] Calcite/98: INCONCLUSIVE (exhausted) 0.0¢ 8.1s 
+[456/461] Calcite/99: PROVED (sql_equiv) 0.0¢ 4.6s yes
+[457/461] Calcite/95: ELAB_ERROR () 0.0¢ 65.5s 
+[458/461] Calcite/62: INCONCLUSIVE (exhausted) 2.4693¢ 187.8s 
+[459/461] Calcite/92: INCONCLUSIVE (exhausted) 1.4902¢ 115.2s 
+[460/461] Calcite/74: INCONCLUSIVE (exhausted) 3.126¢ 229.9s 
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv
+[461/461] Calcite/87: INCONCLUSIVE (exhausted) 2.6586¢ 207.0s 
+REPORT WRITTEN: scripts/overnight_report.md + overnight_results.csv

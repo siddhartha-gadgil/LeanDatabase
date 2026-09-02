@@ -280,7 +280,9 @@ macro "sql_cheap_closers" : tactic => `(tactic|
 -- `A.rows = B.rows` shape, unbounded in the closers) + loop + closers. The membership branches can hit
 -- an *uncatchable* deterministic timeout on a pair they cannot close, so this is for standalone use and
 -- the census; `sql_equiv_llm` runs `sql_equiv_safe`, which omits them and so always fails cleanly.
-macro "sql_equiv" : tactic => `(tactic|
+-- This is the blind backtracking SEARCH; `sql_equiv` (below) is the property-directed front-end that
+-- calls it only as a fallback.
+macro "sql_brute_force" : tactic => `(tactic|
   first
   | (sql_guard_erased; simp only [LeanDatabase.dataEqErased]; sql_erased_decide; done)
   | (sql_equiv_head
@@ -289,6 +291,13 @@ macro "sql_equiv" : tactic => `(tactic|
      try sql_where
      sql_equiv_loop
      all_goals (first | sql_cheap_closers | sql_membership | sql_constraints | sql_flatten)))
+
+-- Reshape both sides toward a comparable form and STOP, leaving a simplified residual (may leave goals
+-- open on purpose) instead of forcing `grind` to close it. `sql_equiv` = `sql_normalize` + the closers.
+macro "sql_normalize" : tactic => `(tactic|
+  (sql_equiv_head
+   try sql_where
+   sql_equiv_loop))
 
 -- Membership-free `sql_equiv`: same pipeline without the structural route, so it can only fail
 -- cleanly. `sql_equiv_llm` runs this first (then the LLM), so a genuine failure falls through reliably.
@@ -299,5 +308,73 @@ macro "sql_equiv_safe" : tactic => `(tactic|
      try sql_where
      sql_equiv_loop
      all_goals (first | sql_cheap_closers | sql_constraints)))
+
+-- Opt-in trace of which route the planner picked: `set_option trace.sql_equiv true`.
+initialize Lean.registerTraceClass `sql_equiv
+
+open Lean Lean.Meta Lean.Elab.Tactic in
+/-- **`sql_equiv` — property-directed proof front-end** (the VeriEQL/SPES-style planner).
+
+It inspects the goal's *query properties* to classify the equivalence (traced under `trace.sql_equiv`):
+integrity-constraint hypotheses (`FuncDepEq`/`SamePartition`/`RowsSatisfy`), outer joins, aggregates,
+and — the "beyond mere presence" signal — how the two sides RELATE: do they share a head operator
+(a congruence) and scan the same base tables, or differ (join reorder / set op)?
+
+Execution is two-tier, not a blind cascade: run `sql_normalize` (the congruence loop — which already
+applies the right specialised lemma per goal shape — with NO membership probe) first; it closes most
+equivalences AND skips the timeout-prone membership work, so it also proves goals on which the full
+search's up-front probe would hit an *uncatchable* deterministic timeout. Only the residual falls
+through to the blind `sql_brute_force`. We do NOT pre-attempt individual routes on the raw goal: tactics
+like `sql_group_key` diverge into an uncatchable `whnf` timeout there (they are safe only after
+`sql_normalize`'s head), which `first` cannot catch and which would poison the fallback. -/
+elab "sql_equiv" : tactic => withMainContext do
+  let ty ← instantiateMVars (← getMainTarget)
+  let mut cs := ty.getUsedConstants
+  for decl in (← getLCtx) do
+    unless decl.isImplementationDetail do cs := cs ++ decl.type.getUsedConstants
+  let uses (s : String) : Bool := cs.any (fun n => (n.toString.splitOn s).length ≥ 2)
+  -- The two sides of `A ~= B`, their head operators, and whether they scan the same base relations.
+  let sides : Option (Expr × Expr) :=
+    let a := ty.getAppFnArgs
+    if a.1 == ``LeanDatabase.dataEq && a.2.size ≥ 2 then some (a.2[a.2.size - 2]!, a.2[a.2.size - 1]!)
+    else none
+  let headIs (e : Expr) (s : String) : Bool := (e.getAppFnArgs.1.toString.splitOn s).length ≥ 2
+  let bothHead (s : String) : Bool := match sides with
+    | some (a, b) => headIs a s && headIs b s
+    | none => false
+  let sameBases : Bool := match sides with
+    | some (a, b) =>
+      let fa := (Lean.collectFVars {} a).fvarIds
+      let fb := (Lean.collectFVars {} b).fvarIds
+      fa.all (fun x => fb.contains x) && fb.all (fun x => fa.contains x)
+    | none => true
+  -- Diagnostic shape (traced only): what kind of equivalence this is. We do NOT pre-attempt a route
+  -- on the raw goal — tactics like `sql_group_key`/`sql_outer_join` diverge into an *uncatchable*
+  -- `whnf` timeout there (they are safe only after `sql_equiv_head` normalises), which `first` cannot
+  -- catch and which would poison the fallback. The sound win is ordering, not gambling: run the cheap
+  -- `sql_normalize` (head + congruence loop, NO membership) first — it closes most pairs and, crucially,
+  -- SKIPS the expensive/timeout-prone membership probe — and only fall back to the full blind search
+  -- for the residual.
+  let shape :=
+    if uses "FuncDepEq" || uses "SamePartition" || uses "RowsSatisfy" then "constraint-driven"
+    else if uses "OuterJoin" || uses "ofOuter" then "outer-join"
+    else if uses "group" then "aggregate"
+    else if bothHead "restriction" then "where-congruence"
+    else if bothHead "mapByList" || bothHead "image" || bothHead "distinct" then "projection-congruence"
+    else if !sameBases then "different-base (join reorder / set op)"
+    else "plain"
+  trace[sql_equiv] "sql_equiv shape = {shape}"
+  -- Tier 1 = `sql_equiv_safe` (membership-free normalise+close): closes most equivalences, skips the
+  -- timeout-prone membership work, and only ever fails cleanly. Tier 2 = the blind `sql_brute_force`
+  -- (with the membership route) for the residual. Each tier gets its OWN fresh heartbeat window
+  -- (`withCurrHeartbeats`) — otherwise tier 1's work eats the budget and tier 2's membership starves
+  -- into the uncatchable deterministic timeout. `sql_equiv_llm` runs tier 1 alone as its safe Step 0.
+  let closed ← Lean.Core.withCurrHeartbeats do
+    let s ← saveState
+    try
+      evalTactic (← `(tactic| sql_equiv_safe))
+      if (← getUnsolvedGoals).isEmpty then pure true else do s.restore; pure false
+    catch _ => do s.restore; pure false
+  unless closed do Lean.Core.withCurrHeartbeats (evalTactic (← `(tactic| sql_brute_force)))
 
 end LeanDatabase.SQLEquiv

@@ -1073,6 +1073,9 @@ def escapeReservedNames (env : Environment) (names : List String) (s : String) :
   let mut out := ""
   let mut i := 0
   let mut inStr := false
+  -- How many `CASE`s are open: an `END` that closes one is a keyword, however the schema names its
+  -- columns. Without this a table with an `end` column made every `CASE … END` unparseable.
+  let mut caseDepth := 0
   while h : i < cs.length do
     let c := cs[i]
     if c == '\'' then
@@ -1094,10 +1097,23 @@ def escapeReservedNames (env : Environment) (names : List String) (s : String) :
       let dotted := prev.head? == some '.' || prev.head? == some '«'
       let declared := names.contains word.toLower
       let reserved := (tokens.find? word).isSome || (tokens.find? word.toUpper).isSome
-      if declared && reserved && !isCall && !isCastTarget && !isExtractPart && !dotted then
+      -- A word can also be half of a **keyword phrase**, where it has to stay a keyword even though
+      -- the schema declares a column of that name: `GROUP BY` with a column called `by`, `ORDER BY`
+      -- with one called `order`. Escaping either half mangles the clause.
+      let prevWord := (String.ofList (prev.takeWhile isWordChar).reverse).toUpper
+      let byHead := ["GROUP", "ORDER", "PARTITION"]
+      let isPhrase := (word.toUpper == "BY" && byHead.contains prevWord)
+                    || (byHead.contains word.toUpper && nextWord.toUpper == "BY")
+      let isCaseEnd := word.toUpper == "END" && caseDepth > 0
+      let escape := declared && reserved && !isCall && !isCastTarget && !isExtractPart && !dotted
+                    && !isPhrase && !isCaseEnd
+      if escape then
         out := out ++ "«" ++ word ++ "»"
       else
         out := out ++ word
+      -- Track `CASE`/`END` pairing on the tokens we left as keywords.
+      if !escape && word.toUpper == "CASE" then caseDepth := caseDepth + 1
+      if isCaseEnd then caseDepth := caseDepth - 1
       i := j
   return out
 
