@@ -24,7 +24,11 @@ def elabAsSql (stx: Syntax) : TermElabM (SQLTypeProxy × Expr) := do
       let e ← withoutErrToSorry do
         elabTermEnsuringType stx typeExpr
       Term.synthesizeSyntheticMVarsNoPostponing
-      pure (t, e)
+      -- `withoutErrToSorry` turns a failed candidate into a `sorry` instead of throwing, so a wrong
+      -- type (e.g. `.int` on a `.float` expr) would otherwise be silently accepted here — reject it
+      -- explicitly so the loop moves on to the next candidate.
+      let e ← instantiateMVars e
+      if e.hasSorry || e.hasExprMVar then throwError "not actually clean" else pure (t, e)
     catch _ => pure none
   )
   match res? with

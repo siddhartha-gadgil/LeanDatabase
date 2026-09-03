@@ -310,6 +310,11 @@ def normalizeSqlLiterals (s : String) : String :=
   let s := s.replace " <> ALL (" " NOT IN ("
   let s := s.replace " = ANY (" " IN ("
   let s := s.replace " = SOME (" " IN ("
+  -- `SEQ4()`/`SEQ8()` → the bare column `seq4`, as text (see `Parser/Syntax.lean`'s `sql_from` note).
+  let s := s.replace "SEQ4()" "seq4"
+  let s := s.replace "SEQ4( )" "seq4"
+  let s := s.replace "SEQ8()" "seq4"
+  let s := s.replace "SEQ8( )" "seq4"
   -- `[LEFT|CROSS|INNER] JOIN LATERAL UNNEST(…)` → the comma-lateral the `LATERALFLATTEN` grammar
   -- accepts; and drop UNNEST's trailing named args (`, OUTER => TRUE/FALSE`) that follow the input.
   let s := s.replace "LEFT JOIN LATERAL" ", LATERAL"

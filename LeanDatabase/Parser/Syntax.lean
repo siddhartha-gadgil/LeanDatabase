@@ -79,6 +79,12 @@ syntax "(" sql_query ")" ident ("(" ident,* ")")? : sql_from             -- 2b. 
 -- 2c. Derived table with NO alias at all (`FROM (SELECT …)`, standard and BigQuery both accept it).
 -- Its columns are exposed exactly as the subquery names them — nothing to re-qualify under.
 syntax "(" sql_query ")" : sql_from
+-- `TABLE(GENERATOR(n))`, Snowflake's row generator — always a literal `n` here, so it's `n` concrete
+-- rows `[0, …, n-1]` in one `seq4` column, not an opaque placeholder. `SEQ4()` refers to that column.
+syntax "TABLE" "(" "GENERATOR" "(" num ")" ")" : sql_from
+-- `SEQ4()`/`SEQ8()` → the bare word `seq4`, rewritten as *text* in `Normalize.lean` (not a term macro
+-- here — a macro's un-expanded call site has no `.ident` node for the dead-let-elimination heuristic
+-- in `withLetColumnVars` to find, so the column looked unused and its binding got skipped).
 -- `VALUES (v,…),(v,…)` — an inline literal relation (a query producing constant rows). A cell is a
 -- `term` OR the literal `NULL` (only here — NULL is never a bare term, so `col = NULL` stays unwritable;
 -- see the `NULL` section below). A column with any `NULL` cell becomes a nullable `Option _` column.
@@ -401,6 +407,29 @@ macro "FALSE" : term => `(false)
 macro "DATE" s:str : term => `($s)
 macro "TIMESTAMP" s:str : term => `($s)
 macro "TIME" s:str : term => `($s)
+-- `ts + INTERVAL '<n> <UNIT>' [* <scale>]` → `dateAdd UNIT (±n[*scale]) ts`, as four whole-pattern
+-- macros rather than a standalone `INTERVAL` term composed via generic `+`/`*` — `binop%` picked the
+-- wrong common type across a chain mixing `String`, an interval, and an `Int` scale.
+private def parseInterval (lit : String) : Nat × String :=
+  let parts := lit.trim.splitOn " " |>.filter (· != "")
+  (parts.headD "0" |>.toNat!, (parts.drop 1).headD "" |>.toUpper)
+-- `mkIdent`: this file stays import-free of `Operators/Scalar`, so a bare quoted identifier would
+-- resolve hygienically against *this* file's (empty) scope instead of the importing file's.
+private def dateAddId : Ident := mkIdent `LeanDatabase.Scalar.dateAdd
+macro:65 ts:term:65 " + " "INTERVAL " lit:str : term => do
+  let (amt, unit) := parseInterval lit.getString
+  `($dateAddId $(quote unit) $(quote amt) $ts)
+-- `Int.ofNat $(quote amt)`, not bare: with no expected type flowing in (often a `CAST` argument),
+-- `amt * scale` can default `amt : Nat` and then find no `HMul ℕ ℤ _` once `scale` resolves to `Int`.
+macro:65 ts:term:65 " + " "INTERVAL " lit:str " * " scale:term:66 : term => do
+  let (amt, unit) := parseInterval lit.getString
+  `($dateAddId $(quote unit) ((Int.ofNat $(quote amt)) * $scale) $ts)
+macro:65 ts:term:65 " - " "INTERVAL " lit:str : term => do
+  let (amt, unit) := parseInterval lit.getString
+  `($dateAddId $(quote unit) (-$(quote amt)) $ts)
+macro:65 ts:term:65 " - " "INTERVAL " lit:str " * " scale:term:66 : term => do
+  let (amt, unit) := parseInterval lit.getString
+  `($dateAddId $(quote unit) (-((Int.ofNat $(quote amt)) * $scale)) $ts)
 syntax:max "NULLIFZERO" "(" term ")" : term
 syntax:max "ZEROIFNULL" "(" term ")" : term
 macro_rules

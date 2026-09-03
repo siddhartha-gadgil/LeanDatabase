@@ -75,7 +75,13 @@ elab_rules : term
       let key ← withLocalDeclD `t tupleType fun t => mkLambdaFVars #[t] (mkConst ``Unit.unit)
       mkAppM (if d.kind == .max then ``groupMaxInt else ``groupMinInt)
         #[key, mkConst ``Unit.unit, rel, d.summand.get!]
-    | _ => throwError "scalar subquery: only SUM / COUNT / COUNT(DISTINCT) / MAX / MIN are supported"
+    -- AVG over the whole relation: the constant-key group trick, Rat-valued (`summand` is `→ Rat`).
+    | .avg | .avgDistinct => do
+      let (tupleType, _, _) ← columnProjectionsE d.innerSchema
+      let key ← withLocalDeclD `t tupleType fun t => mkLambdaFVars #[t] (mkConst ``Unit.unit)
+      mkAppM (if d.kind == .avg then ``groupAvgRat else ``groupAvgDistinctRat)
+        #[key, mkConst ``Unit.unit, rel, d.summand.get!]
+    | _ => throwError "scalar subquery: only SUM / COUNT / COUNT(DISTINCT) / MAX / MIN / AVG are supported"
 
 def ofOption : {l : List SQLTypeProxy} →
     ((i : Fin l.length) → Option (colTypeOfList l i)) → TypedTupleOfList (l.map .nullable)
@@ -637,6 +643,10 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       let (lamSub, subSchema) ← elabSqlQueryCore tableVars ctes sub
       let vars := tableVars.map (fun (relVar, _, _) => relVar)
       return (lamSub.beta vars.toArray, subSchema)
+    | `(sql_from| TABLE ( GENERATOR ( $n:num ) )) => do
+      -- `n` literal rows `[0, 1, …, n-1]` in one `seq4` column — see the syntax declaration's comment.
+      let rowLists := (List.range n.getNat).map (fun i => [some (⟨Syntax.mkNumLit (toString i)⟩ : Term)])
+      buildValues rowLists [`seq4] .anonymous
     -- `LATERAL FLATTEN` — correlated unnest appended to the left FROM (see `flattenArm`). Matched
     -- before the plain comma so `f1 , LATERALFLATTEN(e) …` doesn't fall through to a cross product.
     | `(sql_from| $f1:sql_from , LATERALFLATTEN( $e:term ) AS $h:ident ( $cols:ident,* ))
@@ -972,7 +982,11 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
         | .sum => some <$> mkSummand true
         | .countDistinct => some <$> mkSummand false
         | .max | .min => some <$> mkSummand true
-        | _ => throwError "scalar subquery: only SUM / COUNT / COUNT(DISTINCT) / MAX / MIN are supported"
+        -- AVG: summand must be `→ Rat` (int columns coerce via ↑), so groupAvgRat typechecks.
+        | .avg | .avgDistinct => some <$>
+            (withSchemasTupleVars [(.anonymous, schema)] (fun _ => true) fun vars =>
+              mkLambdaLetsFVars vars (elabTermEnsuringType argStx (mkConst ``Rat)))
+        | _ => throwError "scalar subquery: only SUM / COUNT / COUNT(DISTINCT) / MAX / MIN / AVG are supported"
       let idx := (← scalarSubqStash.get).size
       scalarSubqStash.modify (·.push
         { innerRel := rel, innerSchema := schema, kind, summand := summand?, cond := p?.map (·.raw) })

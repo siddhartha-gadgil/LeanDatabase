@@ -58,6 +58,10 @@ opaque datePart (part d : String) : Int := 0
 opaque dateAdd (unit : String) (n : Int) (d : String) : String := d
 opaque lastDay (d : String) : String := d
 
+-- `ts + INTERVAL '30 DAY'` / `ts + INTERVAL '1 DAY' * SEQ4()`: `Parser/Syntax.lean` matches the whole
+-- `ts (+|-) INTERVAL '…' [* scale]` pattern directly to a `dateAdd` call — no operator overload needed
+-- (heterogeneous `+`/`*` chains fought Lean's `binop%` type inference; see the comment there).
+
 /-- Date/timestamp construction and truncation — dates are `String`s, so these are `String`-valued. -/
 opaque toDate {α : Type} (x : α) : String := ""       -- accepts a string or an epoch number
 opaque toTimestamp {α : Type} (x : α) : String := ""  -- `TO_TIMESTAMP(epoch)` / `TO_TIMESTAMP(str)`
