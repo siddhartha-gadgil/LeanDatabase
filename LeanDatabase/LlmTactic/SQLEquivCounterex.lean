@@ -179,9 +179,16 @@ elab "plausible_sql" arg:(str)? : tactic => do
 /-- The second-prompt instruction: rows only, JSON, no text. -/
 def counterexPrompt : String := String.intercalate "\n" [
   "You judged this goal UNPROVABLE. Prove it by giving a COUNTEREXAMPLE database: concrete rows for",
-  "each table binder such that the two queries return DIFFERENT result SETS.",
-  "Base tables are SETS — rows within a table must be DISTINCT (identical rows collapse to one); to make",
-  "a COUNT/GROUP BY differ, rows sharing a group key must still differ in another column.",
+  "each table binder such that the two queries return DIFFERENT results.",
+  "PREFER a SET counterexample — one where the two queries differ even when duplicate output rows are",
+  "ignored. This is the strongest kind and is verified directly. Base tables are SETS: rows within a",
+  "table must be DISTINCT; to make a COUNT/GROUP BY differ, rows sharing a group key must still differ",
+  "in another column.",
+  "If (and only if) the two queries can differ ONLY in row MULTIPLICITY — they are equal as sets but a",
+  "row appears a different number of times (e.g. UNION vs UNION ALL, COUNT vs COUNT(DISTINCT), SUM/AVG",
+  "over repeated values) — then give a MULTISET counterexample instead; it will be checked against a",
+  "real SQL engine with bag (multiset) semantics. A set counterexample is always preferable when one",
+  "exists.",
   "Output ONLY a JSON array; element i is the list of rows for the i-th table binder (t0, t1, … in the",
   "order shown in the goal). Each row is a list of column values in schema order (null for NULL,",
   "true/false for BOOL, numbers for INT, strings for STRING). NO text, NO markdown, NO fences." ]

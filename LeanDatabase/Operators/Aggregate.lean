@@ -368,6 +368,15 @@ opaque groupStddevRat (key : TypedTuple colType → K) (k : K) (rel : TypedRelat
 opaque groupVarianceRat (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
     (f : TypedTuple colType → Rat) : Rat := 0
 
+-- `MAX`/`MIN` over a `String` column (lexicographic, real SQL) — selected when the aggregate's
+-- argument probes to neither `Int` nor `Rat`.
+def groupMaxStr (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
+    (f : TypedTuple colType → String) : String :=
+  if h : (group key k rel).rows.Nonempty then (group key k rel).rows.sup' h f else ""
+def groupMinStr (key : TypedTuple colType → K) (k : K) (rel : TypedRelation colType)
+    (f : TypedTuple colType → String) : String :=
+  if h : (group key k rel).rows.Nonempty then (group key k rel).rows.inf' h f else ""
+
 /-- `STRING_AGG`/`LISTAGG` — order-dependent string concatenation, so opaque like stddev. The summand
 `f` folds the element, delimiter, DISTINCT-ness and ORDER BY keys into one string per row, so two
 aggregations differing in any of those keep distinct summands and never wrongly unify. -/
@@ -543,5 +552,6 @@ end LeanDatabase.TypedAgg
 namespace LeanDatabase
 export LeanDatabase.TypedAgg
   (group groupCount groupSum groupKeys groupMax groupMaxInt groupMinInt groupAvg groupSumDistinct groupCountDistinct groupAvgDistinct groupBoolAnd groupBoolOr groupStddev groupVariance groupStringAgg groupPercentile groupFilterAgg groupSetMark relCount relSum relMax relMin relCountDistinct relAvg groupBy
-   groupSumRat groupMaxRat groupMinRat groupAvgRat groupSumDistinctRat groupAvgDistinctRat groupStddevRat groupVarianceRat)
+   groupSumRat groupMaxRat groupMinRat groupAvgRat groupSumDistinctRat groupAvgDistinctRat groupStddevRat groupVarianceRat
+   groupMaxStr groupMinStr)
 end LeanDatabase

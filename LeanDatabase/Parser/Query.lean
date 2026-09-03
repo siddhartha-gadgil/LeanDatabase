@@ -662,9 +662,31 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       flattenArm f1 (← `($(mkIdent ``LeanDatabase.Scalar.splitOf) $s $d)) h.getId
         [`seq, `key, `path, `index, `value, `this]
     | `(sql_from| $f1:sql_from , $f2:sql_from) => do
-      let (e1, s1) ← productPair f1
-      let (e2, s2) ← productPair f2
-      return (← mkAppM ``TypedRelationOfList.append #[e1, e2], s1 ++ s2)
+      -- A `t1, t2, LATERALFLATTEN(t2.col) …` chain parses left-recursively as `t1, (t2,
+      -- LATERALFLATTEN(...))` — `f2`'s *own* top-level shape is the flatten, with `t2` alone as its
+      -- left side. Elaborating `f2` on its own (via `productPair f2`) then resolves the flatten's
+      -- input against only `t2`'s schema, missing `t1` entirely — "Unknown identifier" for any
+      -- reference to a `t1` column. Detect that shape and fold `t1` into the combined left side
+      -- directly (via `flattenArmFrom`) instead of recursing into `productPair f2` blind.
+      let combineLeft (g1 : TSyntax `sql_from) : TermElabM (Expr × List (Name × SQLTypeProxy)) := do
+        let (e1, s1) ← productPair f1
+        let (e2, s2) ← productPair g1
+        return (← mkAppM ``TypedRelationOfList.append #[e1, e2], s1 ++ s2)
+      match f2 with
+      | `(sql_from| $g1:sql_from , LATERALFLATTEN( $e:term ) AS $h:ident ( $cols:ident,* ))
+      | `(sql_from| $g1:sql_from , LATERALFLATTEN( $e:term ) $h:ident ( $cols:ident,* )) =>
+        flattenArmFrom (← combineLeft g1) e h.getId (cols.getElems.toList.map (·.getId))
+      | `(sql_from| $g1:sql_from , LATERALFLATTEN( $e:term ) AS $h:ident)
+      | `(sql_from| $g1:sql_from , LATERALFLATTEN( $e:term ) $h:ident) =>
+        flattenArmFrom (← combineLeft g1) e h.getId [`seq, `key, `path, `index, `value, `this]
+      | `(sql_from| $g1:sql_from , LATERAL SPLIT_TO_TABLE( $s:term , $d:term ) AS $h:ident)
+      | `(sql_from| $g1:sql_from , LATERAL SPLIT_TO_TABLE( $s:term , $d:term ) $h:ident) =>
+        flattenArmFrom (← combineLeft g1) (← `($(mkIdent ``LeanDatabase.Scalar.splitOf) $s $d)) h.getId
+          [`seq, `key, `path, `index, `value, `this]
+      | _ => do
+        let (e1, s1) ← productPair f1
+        let (e2, s2) ← productPair f2
+        return (← mkAppM ``TypedRelationOfList.append #[e1, e2], s1 ++ s2)
     | `(sql_from| $f1:sql_from LEFT JOIN $t:ident ON $cond:term)
     | `(sql_from| $f1:sql_from LEFT OUTER JOIN $t:ident ON $cond:term) =>
       outerJoin f1 t none cond ``leftOuterJoin ``ofOuterLeft false true
@@ -747,7 +769,12 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
   -- flatten's `h.value`). The opaque `lateralFlatten` keeps it sound (see `Parser/Types.lean`).
   flattenArm (f1 : TSyntax `sql_from) (e : Term) (h : Name) (colNames : List Name) :
       TermElabM (Expr × List (Name × SQLTypeProxy)) := do
-    let (e1, s1) ← productPair f1
+    flattenArmFrom (← productPair f1) e h colNames
+  -- The rest of `flattenArm`, starting from an *already-computed* `(rel, schema)` — used directly by
+  -- the plain-comma reassociation case below, where `f1`'s own left side has already been folded in.
+  flattenArmFrom (r1 : Expr × List (Name × SQLTypeProxy)) (e : Term) (h : Name) (colNames : List Name) :
+      TermElabM (Expr × List (Name × SQLTypeProxy)) := do
+    let (e1, s1) := r1
     -- The flatten input is written bare (`LATERAL UNNEST(input => EVENT_PARAMS)`), same as any other
     -- unqualified column reference — it needs the same `bare name → t.col` re-qualification `ON` and
     -- `WHERE` conditions get elsewhere, or it never resolves against `s1`'s (fully-qualified) labels.

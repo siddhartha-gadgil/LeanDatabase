@@ -313,20 +313,9 @@ macro "sql_equiv_safe" : tactic => `(tactic|
 initialize Lean.registerTraceClass `sql_equiv
 
 open Lean Lean.Meta Lean.Elab.Tactic in
-/-- **`sql_equiv` — property-directed proof front-end** (the VeriEQL/SPES-style planner).
-
-It inspects the goal's *query properties* to classify the equivalence (traced under `trace.sql_equiv`):
-integrity-constraint hypotheses (`FuncDepEq`/`SamePartition`/`RowsSatisfy`), outer joins, aggregates,
-and — the "beyond mere presence" signal — how the two sides RELATE: do they share a head operator
-(a congruence) and scan the same base tables, or differ (join reorder / set op)?
-
-Execution is two-tier, not a blind cascade: run `sql_normalize` (the congruence loop — which already
-applies the right specialised lemma per goal shape — with NO membership probe) first; it closes most
-equivalences AND skips the timeout-prone membership work, so it also proves goals on which the full
-search's up-front probe would hit an *uncatchable* deterministic timeout. Only the residual falls
-through to the blind `sql_brute_force`. We do NOT pre-attempt individual routes on the raw goal: tactics
-like `sql_group_key` diverge into an uncatchable `whnf` timeout there (they are safe only after
-`sql_normalize`'s head), which `first` cannot catch and which would poison the fallback. -/
+/-- `sql_equiv` — proof front-end. Classifies the goal for a `trace.sql_equiv` shape, then runs
+`sql_equiv_safe` (membership-free), else `sql_flatten` (aesop membership route for semantic rewrites),
+else `sql_brute_force`; each in its own heartbeat window. -/
 elab "sql_equiv" : tactic => withMainContext do
   let ty ← instantiateMVars (← getMainTarget)
   let mut cs := ty.getUsedConstants
@@ -364,17 +353,22 @@ elab "sql_equiv" : tactic => withMainContext do
     else if !sameBases then "different-base (join reorder / set op)"
     else "plain"
   trace[sql_equiv] "sql_equiv shape = {shape}"
-  -- Tier 1 = `sql_equiv_safe` (membership-free normalise+close): closes most equivalences, skips the
-  -- timeout-prone membership work, and only ever fails cleanly. Tier 2 = the blind `sql_brute_force`
-  -- (with the membership route) for the residual. Each tier gets its OWN fresh heartbeat window
-  -- (`withCurrHeartbeats`) — otherwise tier 1's work eats the budget and tier 2's membership starves
-  -- into the uncatchable deterministic timeout. `sql_equiv_llm` runs tier 1 alone as its safe Step 0.
-  let closed ← Lean.Core.withCurrHeartbeats do
-    let s ← saveState
-    try
-      evalTactic (← `(tactic| sql_equiv_safe))
-      if (← getUnsolvedGoals).isEmpty then pure true else do s.restore; pure false
-    catch _ => do s.restore; pure false
+  -- Try each route in its own fresh heartbeat window, rolling back on failure; `bound` caps a route
+  -- that can run long (aesop) so it fails fast instead of starving the next.
+  let attempt (bound : Option Nat) (tac : TSyntax `tactic) : TacticM Bool :=
+    Lean.Core.withCurrHeartbeats <| withTheReader Lean.Core.Context
+      (fun c => match bound with | some b => { c with maxHeartbeats := b } | none => c) do
+        let s ← saveState
+        try
+          evalTactic tac
+          if (← getUnsolvedGoals).isEmpty then pure true else do s.restore; pure false
+        catch _ => do s.restore; pure false
+  -- `sql_equiv_safe`: membership-free normalise+close (also the LLM's Step 0).
+  let mut closed ← attempt none (← `(tactic| sql_equiv_safe))
+  -- `sql_flatten`: aesop membership route — proves the semantic rewrites (subquery flattening,
+  -- EXISTS→join, join reorder) that congruence can't align and `grind` times out on.
+  unless closed do closed ← attempt none (← `(tactic| sql_flatten))
+  -- last resort: the blind search, with the membership probe.
   unless closed do Lean.Core.withCurrHeartbeats (evalTactic (← `(tactic| sql_brute_force)))
 
 end LeanDatabase.SQLEquiv

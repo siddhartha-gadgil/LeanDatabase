@@ -467,13 +467,30 @@ def groupAggExprsE (schema : List (Name × SQLTypeProxy)) (groupTerms : List Syn
           let projE ← withSchemasTupleVars [(.anonymous, schema)] (fun _ => true) fun vars =>
             mkLambdaLetsFVars vars (Prod.snd <$> elabAsSql exprStx)
           pure (kind.op, kind.resultType, some projE)
-      | .int => do            -- numeric: `Int` first (identical to the prior path), else `Rat`
+      | .int => do            -- numeric: `Int` first, else `Rat`, else `String` for `MAX`/`MIN`
           let mk (nullable : Bool) := if nullable then mkSummandOpt else mkSummand
-          try
-            let p ← withoutErrToSorry (mk argIsNullable exprStx (mkConst ``Int))
-            pure (kind.op, kind.resultType, some p)
-          catch _ =>
-            pure (kind.ratOp, .float, some (← mk argIsNullable exprStx (mkConst ``Rat)))
+          -- `try` + a post-hoc clean check, both needed: `withoutErrToSorry` masks *most* failures as
+          -- a `sorry` rather than throwing, but a genuine type mismatch still throws through it, and a
+          -- deferred (`binop%`) problem hasn't run until `synthesizeSyntheticMVarsNoPostponing` forces
+          -- it — either alone lets a wrong candidate look like it succeeded.
+          let tryClean (ty : Expr) : TermElabM (Option Expr) := do
+            try
+              let p ← withoutErrToSorry (mk argIsNullable exprStx ty)
+              Term.synthesizeSyntheticMVarsNoPostponing
+              let p ← instantiateMVars p
+              if p.hasSorry || p.hasExprMVar then pure none else pure (some p)
+            catch _ => pure none
+          match ← tryClean (mkConst ``Int) with
+          | some p => pure (kind.op, kind.resultType, some p)
+          | none =>
+            match ← tryClean (mkConst ``Rat) with
+            | some p => pure (kind.ratOp, .float, some p)
+            | none =>
+              -- `MAX`/`MIN` of a `String` is real SQL (lexicographic); `SUM`/`AVG` of one is not.
+              match kind, ← tryClean (mkConst ``String) with
+              | .max, some p => pure (``groupMaxStr, .string, some p)
+              | .min, some p => pure (``groupMinStr, .string, some p)
+              | _, _ => throwError "aggregate argument is neither numeric nor supported otherwise"
     -- `COUNT(e)` counts only rows where `e IS NOT NULL` (SQL semantics). For `COUNT(*)` (the `0`
     -- sentinel) and any non-nullable column `SqlNullable.isNull` is always `false`, so the filter keeps
     -- every row and this stays `COUNT(*)`; only a NULL-able argument drops its NULL rows. Modelling

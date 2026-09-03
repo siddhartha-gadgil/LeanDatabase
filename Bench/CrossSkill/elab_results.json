@@ -9,8 +9,7 @@
    "Failed to parse SQL query: <input>:1:164: expected identifier\n--- input ---\n WITH hours AS (SELECT CAST(\"2022-10-01 00:00:00\" AS TIMESTAMP) + INTERVAL \"1 HOUR\" * seq4 AS dt FROM TABLE(GENERATOR(24))), spine AS (SELECT \"ERCOT\" AS ISO, dt AS DATETIME, \"CDT\" AS TIMEZONE, dt + INTERVAL \"5 HOUR\" AS DATETIME_UTC, 0 AS ONPEAK, CASE WHEN HOUR(dt) BETWEEN 7 AND 22 THEN 0 ELSE 1 END AS OFFPEAK, CASE WHEN HOUR(dt) BETWEEN 7 AND 22 THEN 1 ELSE 0 END AS WEPEAK, 0 AS WDPEAK, CAST(dt AS DATE) AS MARKETDAY FROM hours), dart AS (SELECT «DATETIME», DALMP, RTLMP FROM «YES_ENERGY__SAMPLE_DATA».«YES_ENERGY_SAMPLE».«DART_PRICES_SAMPLE» WHERE OBJECTID = 10000697078 AND CAST(«DATETIME» AS DATE) = \"2022-10-01\"), load_fcst AS (SELECT «DATETIME», VALUE AS LOAD_FORECAST, PUBLISHDATE AS LOAD_FORECAST_PUBLISH_DATE FROM (SELECT «DATETIME», VALUE, PUBLISHDATE, ROW_NUMBER() OVER (PARTITION BY «DATETIME» ORDER BY PUBLISHDATE DESC) AS rn FROM «YES_ENERGY__SAMPLE_DATA».«YES_ENERGY_SAMPLE».«TS_FORECAST_SAMPLE» WHERE OBJECTID = 10000712973 AND DATATYPEID = 19060 AND CAST(«DATETIME» AS DATE) = \"2022-10-01\") WHERE rn = 1), rt_load AS (SELECT «DATETIME», RTLOAD FROM «YES_ENERGY__SAMPLE_DATA».«YES_ENERGY_SAMPLE».«DART_LOADS_SAMPLE» WHERE OBJECTID = 10000712973 AND CAST(«DATETIME» AS DATE) = \"2022-10-01\"), wind_fcst AS (SELECT «DATETIME», VALUE AS WIND_GEN_FORECAST, PUBLISHDATE AS WIND_GEN_FORECAST_PUBLISH_DATE FROM (SELECT «DATETIME», VALUE, PUBLISHDATE, ROW_NUMBER() OVER (PARTITION BY «DATETIME» ORDER BY PUBLISHDATE DESC) AS rn FROM «YES_ENERGY__SAMPLE_DATA».«YES_ENERGY_SAMPLE».«TS_FORECAST_SAMPLE» WHERE OBJECTID = 10000712973 AND DATATYPEID = 9285 AND CAST(«DATETIME» AS DATE) = \"2022-10-01\") WHERE rn = 1), wind_actual AS (SELECT DATE_TRUNC(\"HOUR\", «DATETIME») AS DATETIME, AVG(VALUE) AS WIND_GEN FROM «YES_ENERGY__SAMPLE_DATA».«YES_ENERGY_SAMPLE».«TS_GEN_SAMPLE» WHERE OBJECTID = 10000712973 AND DATATYPEID = 16 AND CAST(«DATETIME» AS DATE) = \"2022-10-01\" GROUP BY DATE_TRUNC(\"HOUR\", «DATETIME»)), solar_fcst AS (SELECT «DATETIME», VALUE AS SOLAR_GEN_FORECAST, PUBLISHDATE AS SOLAR_GEN_FORECAST_PUBLISH_DATE FROM (SELECT «DATETIME», VALUE, PUBLISHDATE, ROW_NUMBER() OVER (PARTITION BY «DATETIME» ORDER BY PUBLISHDATE DESC) AS rn FROM «YES_ENERGY__SAMPLE_DATA».«YES_ENERGY_SAMPLE».«TS_FORECAST_SAMPLE» WHERE OBJECTID = 10000712973 AND DATATYPEID = 662 AND CAST(«DATETIME» AS DATE) = \"2022-10-01\") WHERE rn = 1), solar_actual AS (SELECT DATE_TRUNC(\"HOUR\", «DATETIME») AS DATETIME, AVG(VALUE) AS SOLAR_GEN FROM «YES_ENERGY__SAMPLE_DATA».«YES_ENERGY_SAMPLE».«TS_GEN_SAMPLE» WHERE OBJECTID = 10000712973 AND DATATYPEID = 650 AND CAST(«DATETIME» AS DATE) = \"2022-10-01\" GROUP BY DATE_TRUNC(\"HOUR\", «DATETIME»)) SELECT s.ISO, s.DATETIME, s.TIMEZONE, s.DATETIME_UTC, s.ONPEAK, s.OFFPEAK, s.WEPEAK, s.WDPEAK, s.MARKETDAY, \"HB_NORTH\" AS PRICE_NODE_NAME, 10000697078 AS PRICE_NODE_ID, d.DALMP, d.RTLMP, \"ERCOT\" AS LOAD_ZONE_NAME, 10000712973 AS LOAD_ZONE_ID, lf.LOAD_FORECAST, lf.LOAD_FORECAST_PUBLISH_DATE, rl.RTLOAD, wf.WIND_GEN_FORECAST, wf.WIND_GEN_FORECAST_PUBLISH_DATE, wa.WIND_GEN, sf.SOLAR_GEN_FORECAST, sf.SOLAR_GEN_FORECAST_PUBLISH_DATE, sa.SOLAR_GEN, lf.LOAD_FORECAST - wf.WIND_GEN_FORECAST - sf.SOLAR_GEN_FORECAST AS NET_LOAD_FORECAST, rl.RTLOAD - wa.WIND_GEN - sa.SOLAR_GEN AS NET_LOAD_REAL_TIME FROM spine AS s LEFT JOIN dart AS d ON d.DATETIME = s.DATETIME LEFT JOIN load_fcst AS lf ON lf.DATETIME = s.DATETIME LEFT JOIN rt_load AS rl ON rl.DATETIME = s.DATETIME LEFT JOIN wind_fcst AS wf ON wf.DATETIME = s.DATETIME LEFT JOIN wind_actual AS wa ON wa.DATETIME = s.DATETIME LEFT JOIN solar_fcst AS sf ON sf.DATETIME = s.DATETIME LEFT JOIN solar_actual AS sa ON sa.DATETIME = s.DATETIME ORDER BY s.DATETIME"},
   {"status": "fail",
    "id": "sf_bq001",
-   "error":
-   "Type mismatch\n  LeanDatabase.Scalar.toTimestamp2 a.date \"YYYYMMDD\"\nhas type\n  String\nbut is expected to have type\n  ℚ"},
+   "error": "elaborated with unresolved metavariables"},
   {"status": "timeout",
    "id": "sf_bq002",
    "error":
@@ -52,10 +51,7 @@
   {"status": "ok", "id": "sf_bq036", "error": null},
   {"status": "ok", "id": "sf_bq039", "error": null},
   {"status": "ok", "id": "sf_bq040", "error": null},
-  {"status": "fail",
-   "id": "sf_bq041",
-   "error":
-   "Type mismatch\n  LeanDatabase.Scalar.toTimestamp (LeanDatabase.Scalar.castIntToFloat q.creation_date / 1000000)\nhas type\n  String\nbut is expected to have type\n  ℚ"},
+  {"status": "ok", "id": "sf_bq041", "error": null},
   {"status": "ok", "id": "sf_bq042", "error": null},
   {"status": "ok", "id": "sf_bq044", "error": null},
   {"status": "ok", "id": "sf_bq045", "error": null},
@@ -72,7 +68,8 @@
   {"status": "ok", "id": "sf_bq055", "error": null},
   {"status": "fail",
    "id": "sf_bq056",
-   "error": "Unknown identifier `w.all_tags`"},
+   "error":
+   "Application type mismatch: The argument\n  w1.nodes\nhas type\n  String\nbut is expected to have type\n  Bool\nin the application\n  !w1.nodes"},
   {"status": "ok", "id": "sf_bq059", "error": null},
   {"status": "ok", "id": "sf_bq060", "error": null},
   {"status": "timeout",
@@ -134,10 +131,7 @@
   {"status": "fail", "id": "sf_bq092", "error": "Unknown identifier `t.hash`"},
   {"status": "ok", "id": "sf_bq094", "error": null},
   {"status": "ok", "id": "sf_bq095", "error": null},
-  {"status": "fail",
-   "id": "sf_bq096",
-   "error":
-   "Type mismatch\n  LeanDatabase.Scalar.dateFromParts occurrences.year occurrences.month occurrences.day\nhas type\n  String\nbut is expected to have type\n  ℚ"},
+  {"status": "ok", "id": "sf_bq096", "error": null},
   {"status": "ok", "id": "sf_bq098", "error": null},
   {"status": "ok", "id": "sf_bq100", "error": null},
   {"status": "fail",
@@ -181,7 +175,9 @@
    "id": "sf_bq131",
    "error":
    "Failed to parse SQL query: <input>:1:35: expected ')'\n--- input ---\nWITH denmark AS (SELECT ST_COLLECT(CAST(«geometry» AS GEOGRAPHY)) AS geom FROM «GEO_OPENSTREETMAP».«GEO_OPENSTREETMAP».«PLANET_FEATURES» AS pf, LATERALFLATTEN(pf.«all_tags») AS tag(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE pf.«feature_type» = \"multipolygons\" AND CAST(JSON_EXTRACT_PATH(tag.value, \"key\") AS TEXT) = \"wikidata\" AND CAST(JSON_EXTRACT_PATH(tag.value, \"value\") AS TEXT) = \"Q35\"), bus_stops_in_denmark AS (SELECT pp.«osm_id», pp.«all_tags» FROM «GEO_OPENSTREETMAP».«GEO_OPENSTREETMAP».«PLANET_FEATURES_POINTS» AS pp, LATERALFLATTEN(pp.«all_tags») AS f_hw(SEQ, KEY, PATH, INDEX, VALUE, THIS), denmark AS d WHERE CAST(JSON_EXTRACT_PATH(f_hw.value, \"key\") AS TEXT) = \"highway\" AND CAST(JSON_EXTRACT_PATH(f_hw.value, \"value\") AS TEXT) = \"bus_stop\" AND ST_INTERSECTS(d.geom, CAST(pp.«geometry» AS GEOGRAPHY))), bus_stops_with_network AS (SELECT bs.«osm_id», CAST(JSON_EXTRACT_PATH(f_net.value, \"value\") AS TEXT) AS network FROM bus_stops_in_denmark AS bs, LATERALFLATTEN(bs.«all_tags») AS f_net(SEQ, KEY, PATH, INDEX, VALUE, THIS) WHERE CAST(JSON_EXTRACT_PATH(f_net.value, \"key\") AS TEXT) = \"network\") SELECT network, COUNT(*) AS bus_stop_count FROM bus_stops_with_network GROUP BY network ORDER BY bus_stop_count DESC"},
-  {"status": "fail", "id": "sf_bq135", "error": "Unknown identifier `amount`"},
+  {"status": "fail",
+   "id": "sf_bq135",
+   "error": "aggregate argument is neither numeric nor supported otherwise"},
   {"status": "fail", "id": "sf_bq136", "error": "Unknown identifier `success`"},
   {"status": "fail",
    "id": "sf_bq137",
@@ -240,8 +236,7 @@
   {"status": "ok", "id": "sf_bq198", "error": null},
   {"status": "fail",
    "id": "sf_bq199",
-   "error":
-   "Application type mismatch: The argument\n  some p.per_liter_retail_price\nhas type\n  Option (Option ℚ)\nbut is expected to have type\n  ℚ\nin the application\n  ite (decide (p.sale_year = 2019) = true) (some p.per_liter_retail_price)"},
+   "error": "aggregate argument is neither numeric nor supported otherwise"},
   {"status": "ok", "id": "sf_bq200", "error": null},
   {"status": "fail",
    "id": "sf_bq202",
@@ -332,7 +327,7 @@
   {"status": "fail",
    "id": "sf_bq308",
    "error":
-   "Type mismatch\n  LeanDatabase.Scalar.toTimestamp (LeanDatabase.Scalar.castIntToFloat posts_answers.creation_date / 1000000)\nhas type\n  String\nbut is expected to have type\n  ℚ"},
+   "AS clause `CASE WHEN fa.first_answer_ts ≤ q.question_ts + INTERVAL \"1 HOUR\"THEN 1ELSE 0END`: Type mismatch\n  fa.first_answer_ts ≤ some (LeanDatabase.Scalar.dateAdd \"HOUR\" 1 q.question_ts)\nhas type\n  Prop\nbut is expected to have type\n  Bool"},
   {"status": "ok", "id": "sf_bq309", "error": null},
   {"status": "ok", "id": "sf_bq310", "error": null},
   {"status": "timeout",
@@ -350,10 +345,7 @@
   {"status": "ok", "id": "sf_bq330", "error": null},
   {"status": "ok", "id": "sf_bq331", "error": null},
   {"status": "ok", "id": "sf_bq333", "error": null},
-  {"status": "fail",
-   "id": "sf_bq335",
-   "error":
-   "Type mismatch\n  ts\nhas type\n  String\nbut is expected to have type\n  ℚ"},
+  {"status": "ok", "id": "sf_bq335", "error": null},
   {"status": "ok", "id": "sf_bq338", "error": null},
   {"status": "ok", "id": "sf_bq339", "error": null},
   {"status": "ok", "id": "sf_bq340", "error": null},
@@ -446,8 +438,7 @@
   {"status": "ok", "id": "sf_bq419", "error": null},
   {"status": "fail",
    "id": "sf_bq420",
-   "error":
-   "Type mismatch\n  office_actions.mail_dt\nhas type\n  String\nbut is expected to have type\n  ℚ"},
+   "error": "elaborated with unresolved metavariables"},
   {"status": "ok", "id": "sf_bq423", "error": null},
   {"status": "ok", "id": "sf_bq425", "error": null},
   {"status": "fail",
@@ -484,8 +475,7 @@
   {"status": "ok", "id": "sf_bq462", "error": null},
   {"status": "fail",
    "id": "sf_ga003",
-   "error":
-   "Application type mismatch: The argument\n  LeanDatabase.Scalar.getPath3 f.value \"value\" \"string_value\"\nhas type\n  String\nbut is expected to have type\n  ℚ\nin the application\n  some (LeanDatabase.Scalar.getPath3 f.value \"value\" \"string_value\")"},
+   "error": "aggregate argument is neither numeric nor supported otherwise"},
   {"status": "fail",
    "id": "sf_ga004",
    "error":
@@ -495,8 +485,7 @@
   {"status": "ok", "id": "sf_ga008", "error": null},
   {"status": "fail",
    "id": "sf_ga009",
-   "error":
-   "Application type mismatch: The argument\n  LeanDatabase.Scalar.getPath3 ep.value \"value\" \"int_value\"\nhas type\n  String\nbut is expected to have type\n  ℚ\nin the application\n  some (LeanDatabase.Scalar.getPath3 ep.value \"value\" \"int_value\")"},
+   "error": "aggregate argument is neither numeric nor supported otherwise"},
   {"status": "fail",
    "id": "sf_ga010",
    "error":
@@ -505,12 +494,11 @@
   {"status": "ok", "id": "sf_ga012", "error": null},
   {"status": "fail",
    "id": "sf_ga013",
-   "error":
-   "Application type mismatch: The argument\n  LeanDatabase.Scalar.getPath3 ep.value \"value\" \"int_value\"\nhas type\n  String\nbut is expected to have type\n  ℚ\nin the application\n  some (LeanDatabase.Scalar.getPath3 ep.value \"value\" \"int_value\")"},
+   "error": "aggregate argument is neither numeric nor supported otherwise"},
   {"status": "ok", "id": "sf_ga017", "error": null},
   {"status": "fail",
    "id": "sf_ga019",
-   "error": "elaborated with unresolved metavariables"},
+   "error": "aggregate argument is neither numeric nor supported otherwise"},
   {"status": "fail",
    "id": "sf_ga022",
    "error":
@@ -518,32 +506,25 @@
   {"status": "fail",
    "id": "sf_ga025",
    "error":
-   "Type mismatch\n  events_20180901.event_date\nhas type\n  String\nbut is expected to have type\n  ℚ"},
-  {"status": "fail",
-   "id": "sf_ga028",
-   "error":
-   "Type mismatch\n  LeanDatabase.Scalar.toTimestamp2 events_20180612.event_date \"YYYYMMDD\"\nhas type\n  String\nbut is expected to have type\n  ℚ"},
+   "Application type mismatch: The argument\n  7\nhas type\n  String\nbut is expected to have type\n  ℤ\nin the application\n  LeanDatabase.Scalar.toTimestamp2 e.event_date \"YYYYMMDD\" -\n      LeanDatabase.Scalar.toTimestamp2 f.first_open_date_str \"YYYYMMDD\" ≤\n    7"},
+  {"status": "ok", "id": "sf_ga028", "error": null},
   {"status": "fail",
    "id": "sf_ga030",
    "error":
-   "Type mismatch\n  event_dt\nhas type\n  String\nbut is expected to have type\n  ℚ"},
+   "AS clause `CASE WHEN(CAST(ua.event_dt AS DATE) - CAST(c.first_open_date AS DATE)) BETWEEN 22 AND 28THEN c.user_pseudo_id END`: failed to synthesize instance of type class\n  HSub (Option String) String ?m.1071\n\nHint: Type class instance resolution failures can be inspected with the `set_option trace.Meta.synthInstance true` command."},
   {"status": "fail",
    "id": "sf_ga031",
-   "error":
-   "Application type mismatch: The argument\n  LeanDatabase.Scalar.getPath3 f.value \"value\" \"int_value\"\nhas type\n  String\nbut is expected to have type\n  ℚ\nin the application\n  some (LeanDatabase.Scalar.getPath3 f.value \"value\" \"int_value\")"},
+   "error": "aggregate argument is neither numeric nor supported otherwise"},
   {"status": "fail",
    "id": "sf_ga032",
-   "error":
-   "Application type mismatch: The argument\n  LeanDatabase.Scalar.getPath3 f.value \"value\" \"string_value\"\nhas type\n  String\nbut is expected to have type\n  ℚ\nin the application\n  some (LeanDatabase.Scalar.getPath3 f.value \"value\" \"string_value\")"},
+   "error": "aggregate argument is neither numeric nor supported otherwise"},
   {"status": "fail",
    "id": "sf_local002",
-   "error":
-   "Type mismatch\n  p2.pred_price\nhas type\n  Bool\nbut is expected to have type\n  ℚ"},
+   "error": "aggregate argument is neither numeric nor supported otherwise"},
   {"status": "ok", "id": "sf_local007", "error": null},
   {"status": "fail",
    "id": "sf_local008",
-   "error":
-   "Application type mismatch: The argument\n  b.r\nhas type\n  String\nbut is expected to have type\n  Option ℚ\nin the application\n  Option.getD b.r"},
+   "error": "aggregate argument is neither numeric nor supported otherwise"},
   {"status": "fail",
    "id": "sf_local017",
    "error":
@@ -594,15 +575,9 @@
   {"status": "ok", "id": "sf_local066", "error": null},
   {"status": "ok", "id": "sf_local067", "error": null},
   {"status": "ok", "id": "sf_local068", "error": null},
-  {"status": "fail",
-   "id": "sf_local070",
-   "error":
-   "Type mismatch\n  cities.insert_date\nhas type\n  String\nbut is expected to have type\n  ℚ"},
+  {"status": "ok", "id": "sf_local070", "error": null},
   {"status": "ok", "id": "sf_local071", "error": null},
-  {"status": "fail",
-   "id": "sf_local072",
-   "error":
-   "Type mismatch\n  cities.insert_date\nhas type\n  String\nbut is expected to have type\n  ℚ"},
+  {"status": "ok", "id": "sf_local072", "error": null},
   {"status": "fail",
    "id": "sf_local073",
    "error":
@@ -618,7 +593,7 @@
   {"status": "ok", "id": "sf_local114", "error": null},
   {"status": "fail",
    "id": "sf_local131",
-   "error": "elaborated with unresolved metavariables"},
+   "error": "aggregate argument is neither numeric nor supported otherwise"},
   {"status": "ok", "id": "sf_local132", "error": null},
   {"status": "ok", "id": "sf_local133", "error": null},
   {"status": "ok", "id": "sf_local141", "error": null},
@@ -626,22 +601,16 @@
   {"status": "ok", "id": "sf_local163", "error": null},
   {"status": "ok", "id": "sf_local167", "error": null},
   {"status": "ok", "id": "sf_local168", "error": null},
-  {"status": "fail",
-   "id": "sf_local169",
-   "error":
-   "Type mismatch\n  legislators_terms.term_start\nhas type\n  String\nbut is expected to have type\n  ℚ"},
+  {"status": "ok", "id": "sf_local169", "error": null},
   {"status": "fail",
    "id": "sf_local170",
    "error":
-   "Type mismatch\n  legislators_terms.term_start\nhas type\n  String\nbut is expected to have type\n  ℚ"},
+   "AS clause `CASE WHEN\n  EXISTS(SELECT 1 FROM city_legislation.city_legislation.legislators_terms AS t WHERE\n      t.id_bioguide = c.id_bioguide AND t.state = c.state AND\n          CAST(t.term_start AS DATE) ≤ DATE_FROM_PARTS(EXTRACT(YEAR FROM c.first_term_date) + y.yr,12,31) AND\n        CAST(t.term_end AS DATE) ≥ DATE_FROM_PARTS(EXTRACT(YEAR FROM c.first_term_date) + y.yr,12,31))THEN\n  c.id_bioguide END`: elaboration function for `LeanDatabase.«termEXISTS(_)»` has not been implemented\n  EXISTS(SELECT 1 FROM city_legislation.city_legislation.legislators_terms AS t WHERE\n      t.id_bioguide = c.id_bioguide AND t.state = c.state AND\n          CAST(t.term_start AS DATE) ≤ DATE_FROM_PARTS(EXTRACT(YEAR FROM c.first_term_date) + y.yr,12,31) AND\n        CAST(t.term_end AS DATE) ≥ DATE_FROM_PARTS(EXTRACT(YEAR FROM c.first_term_date) + y.yr,12,31))"},
   {"status": "fail",
    "id": "sf_local171",
    "error":
    "Failed to parse SQL query: <input>:1:645: expected ')'\n--- input ---\nWITH first_terms AS ( SELECT t.«id_bioguide», MIN(CAST(TO_TIMESTAMP(t.«term_start», \"YYYY-MM-DD\") AS DATE)) AS first_term_date FROM «CITY_LEGISLATION».«CITY_LEGISLATION».«LEGISLATORS_TERMS» AS t JOIN «CITY_LEGISLATION».«CITY_LEGISLATION».«LEGISLATORS» AS l ON t.«id_bioguide» = l.«id_bioguide» WHERE l.«gender» = \"M\" GROUP BY t.«id_bioguide»), year_range  AS (SELECT ROW_NUMBER() OVER (ORDER BY seq4) + 1799 AS yr FROM TABLE(GENERATOR(250))), dec31_dates AS (SELECT yr, CAST(TO_TIMESTAMP(yr || \"-12-31\", \"YYYY-MM-DD\") AS DATE) AS dec31 FROM year_range), actively_serving  AS (SELECT DISTINCT t.«id_bioguide», d.dec31, CAST(EXTRACT(year FROM AGE(CAST(d.dec31 AS TIMESTAMP), CAST(ft.first_term_date AS TIMESTAMP))) AS BIGINT) AS years_since_first_term FROM «CITY_LEGISLATION».«CITY_LEGISLATION».«LEGISLATORS_TERMS» AS t JOIN «CITY_LEGISLATION».«CITY_LEGISLATION».«LEGISLATORS» AS l ON t.«id_bioguide» = l.«id_bioguide» JOIN first_terms AS ft ON t.«id_bioguide» = ft.«id_bioguide» JOIN dec31_dates AS d ON CAST(TO_TIMESTAMP(t.«term_start», \"YYYY-MM-DD\") AS DATE) <= d.dec31 AND CAST(TO_TIMESTAMP(t.«term_end», \"YYYY-MM-DD\") AS DATE) >= d.dec31 WHERE l.«gender» = \"M\" AND t.«state» = \"LA\"), years_range  AS (SELECT 30 + ROW_NUMBER() OVER (ORDER BY seq4) AS years_elapsed FROM TABLE(GENERATOR(19))), counts  AS (SELECT years_since_first_term, COUNT(DISTINCT «id_bioguide») AS cnt FROM actively_serving WHERE years_since_first_term > 30 AND years_since_first_term < 50 GROUP BY years_since_first_term) SELECT yr.years_elapsed AS YEARS_ELAPSED, COALESCE(c.cnt, 0) AS DISTINCT_LEGISLATORS_ACTIVE FROM years_range AS yr LEFT JOIN counts AS c ON yr.years_elapsed = c.years_since_first_term ORDER BY yr.years_elapsed"},
-  {"status": "fail",
-   "id": "sf_local196",
-   "error":
-   "Type mismatch\n  payment.payment_date\nhas type\n  String\nbut is expected to have type\n  ℚ"},
+  {"status": "ok", "id": "sf_local196", "error": null},
   {"status": "ok", "id": "sf_local197", "error": null},
   {"status": "ok", "id": "sf_local198", "error": null},
   {"status": "fail",
@@ -680,7 +649,7 @@
    "AS clause `(rc.intercept + rc.slope * ((24.0 : Rat✝) + si.month_num)) * si.seasonal_index`: failed to synthesize instance of type class\n  HAdd ℚ ℤ ?m.2138\n\nHint: Type class instance resolution failures can be inspected with the `set_option trace.Meta.synthInstance true` command."},
   {"status": "fail",
    "id": "sf_local284",
-   "error": "Unknown identifier `«loss_rate_%»`"},
+   "error": "aggregate argument is neither numeric nor supported otherwise"},
   {"status": "ok", "id": "sf_local286", "error": null},
   {"status": "ok", "id": "sf_local297", "error": null},
   {"status": "ok", "id": "sf_local301", "error": null},
@@ -696,4 +665,4 @@
    "Failed to parse SQL query: <input>:1:301: expected ')'\n--- input ---\nWITH ordered_visits AS (SELECT «session», «stamp», CASE WHEN «path» IN (\"/detail\", \"/detail/\") THEN \"/detail\" WHEN «path» IN (\"/search_list\", \"/search_list/\") THEN \"/search_list\" WHEN «path» IN (\"/search_input\", \"/search_input/\") THEN \"/search_input\" WHEN «path» = \"/\" THEN \"/\" ELSE TRIM(TRAILING \"/\" FROM «path») END AS normalized_path, ROW_NUMBER() OVER (PARTITION BY «session» ORDER BY «stamp») AS rn FROM «LOG».«LOG».«ACTIVITY_LOG»), with_leads AS (SELECT normalized_path, LEAD(normalized_path, 1) OVER (PARTITION BY «session» ORDER BY rn) AS next_path, LEAD(normalized_path, 2) OVER (PARTITION BY «session» ORDER BY rn) AS third_path FROM ordered_visits) SELECT third_path AS THIRD_PAGE, COUNT(*) AS OCCURRENCES FROM with_leads WHERE normalized_path = \"/detail\" AND next_path = \"/detail\" AND NOT third_path IS NULL GROUP BY third_path ORDER BY OCCURRENCES DESC LIMIT 3"},
   {"status": "ok", "id": "sf_local356", "error": null},
   {"status": "ok", "id": "sf_local358", "error": null}],
- "elaborates": 228}
+ "elaborates": 236}

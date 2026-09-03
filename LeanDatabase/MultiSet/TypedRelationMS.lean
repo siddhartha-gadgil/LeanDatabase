@@ -1,5 +1,6 @@
 import Mathlib
 import LeanDatabase.TypedRelation
+import LeanDatabase.Operators.Aggregate
 
 /-!
 # Multiset semantics for SQL
@@ -83,5 +84,23 @@ theorem setEq_not_imp_bagEq :
   refine ⟨⟨fun _ => "", {r}⟩, ⟨fun _ => "", r ::ₘ {r}⟩, ?_, ?_⟩
   · simp [dataEqSet]
   · simp [dataEqMS]
+
+/-- Bag (multiset) `COUNT(*)` — the real-SQL count, WITH multiplicity. -/
+def relCountMS (r : TypedRelationMS colType) : Nat := Multiset.card r.rows
+
+/-- **Our `COUNT(*)` is a DISTINCT count** — `relCount` over the set view is `Finset.card`, i.e. the number
+of distinct rows, which is ≤ the real-SQL bag count. Not a bug: a `COUNT(*)` over a projection that dropped
+a key sees the collapsed rows. This is *why* the Calcite `COUNT(*)`-over-projection pairs looked different. -/
+theorem relCount_toSet_le_bag (r : TypedRelationMS colType) :
+    relCount r.toSet ≤ relCountMS r := by
+  simpa [relCount, TypedRelationMS.toSet, relCountMS] using Multiset.toFinset_card_le r.rows
+
+/-- **The exact boundary: our set `COUNT(*)` equals real bag `COUNT(*)` iff the rows are `Nodup`** — i.e. the
+relation carries a key / is `DISTINCT`. So a set-proof about `COUNT(*)` is a genuine real-SQL fact exactly
+when both sides' rows are duplicate-free; otherwise it is set-only. Same `Nodup` boundary governs SUM/AVG. -/
+theorem relCount_toSet_eq_bag_iff_nodup (r : TypedRelationMS colType) :
+    relCount r.toSet = relCountMS r ↔ r.rows.Nodup := by
+  simpa [relCount, TypedRelationMS.toSet, relCountMS] using
+    (Multiset.toFinset_card_eq_card_iff_nodup (m := r.rows))
 
 end LeanDatabase
