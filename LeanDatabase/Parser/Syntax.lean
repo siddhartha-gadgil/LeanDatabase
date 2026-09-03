@@ -76,6 +76,9 @@ syntax ident ident : sql_from                         -- 1c. Bare alias (`t x`) 
 -- Subquery with alias, and an optional column-alias list `(c1, c2)` (used by `VALUES` and renames).
 syntax "(" sql_query ")" "AS" ident ("(" ident,* ")")? : sql_from       -- 2. Subquery with AS-alias
 syntax "(" sql_query ")" ident ("(" ident,* ")")? : sql_from             -- 2b. Subquery with bare alias
+-- 2c. Derived table with NO alias at all (`FROM (SELECT …)`, standard and BigQuery both accept it).
+-- Its columns are exposed exactly as the subquery names them — nothing to re-qualify under.
+syntax "(" sql_query ")" : sql_from
 -- `VALUES (v,…),(v,…)` — an inline literal relation (a query producing constant rows). A cell is a
 -- `term` OR the literal `NULL` (only here — NULL is never a bare term, so `col = NULL` stays unwritable;
 -- see the `NULL` section below). A column with any `NULL` cell becomes a nullable `Option _` column.
@@ -166,6 +169,12 @@ syntax:max (priority := low) ident noWs "(" ident,* ")" : term
 -- `GROUP BY` items are full terms: a bare column, an expression (`UPPER(col)`, `ROUND(lat, 2)`), or a
 -- positional `1` (nth SELECT column). See `Parser/GroupBy.lean` for how the group *key* is built.
 syntax "SELECT " (" DISTINCT ")? sql_cols " FROM " sql_from (" WHERE " term)?  (" GROUP " " BY " term,* (" HAVING " term)?)? (" ORDER " " BY " sql_order_item,*)? (" LIMIT " num)? (" OFFSET " num)? (";")? : sql_query
+
+-- A `SELECT` with **no** `FROM`: a single constant row, standard SQL (`SELECT 1 AS n`) and the
+-- idiom a numbers/spine table is usually built from (`SELECT 1 AS g UNION ALL SELECT 2 …`). Its
+-- columns can only be literals — there is no table in scope to reference — so it elaborates like an
+-- inline `VALUES` row, just with real column names instead of `VALUES`'s placeholder `c0, c1, …`.
+syntax "SELECT " (" DISTINCT ")? sql_cols (";")? : sql_query
 
 -- Binary set operators on whole queries, as one keyword-parameterised production. Our relations
 -- are `Finset`s (sets), so `UNION ALL` maps to set `union` too (no bag semantics).

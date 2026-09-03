@@ -393,6 +393,20 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
     let names := (List.range ncols).map (fun i => Name.mkSimple s!"c{i}")
     let (rel, schema) ← buildValues rowLists names .anonymous
     return (← mkLambdaFVars vars.toArray rel, schema)
+  | `(sql_query| SELECT $[DISTINCT%$_d]? $sel:sql_cols $[;]?) => do
+    -- No FROM: a single constant row. A column can still be a **scalar subquery**
+    -- (`(SELECT COUNT(*) FROM t) - (SELECT COUNT(*) FROM u) AS diff`, `ROUND(CAST(100.0 * (SELECT …)
+    -- AS …) / (SELECT …), 2)`) — stash those first, same as a FROM-having SELECT's column list.
+    -- A stashed subquery is self-contained (it builds its own inner relation from its own FROM), so
+    -- elaborating its placeholder needs no outer row context here — there is none. Anything else must
+    -- be a literal (there is no table in scope to reference a name against).
+    let `(sql_cols| $cols:sql_col,*) := sel
+      | throwError "SELECT with no FROM must be a plain column list (no `*`)"
+    let colStxs ← preprocessScalarSubqueries cols.getElems
+    let names := colStxs.map sqlColName |>.toList
+    let cells := colStxs.map (some ∘ sqlColTerm) |>.toList
+    let (rel, schema) ← buildValues [cells] names .anonymous
+    return (← mkLambdaFVars vars.toArray rel, schema)
   | `(sql_query| WITH $cs:sql_cte,* $body:sql_query) => do
     -- Non-recursive CTEs: elaborate each body to a relation over the current base vars, re-qualify
     -- its columns under the CTE name, and make it available for lookup (inlined at each reference).
@@ -617,6 +631,12 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
         -- `outerJoinSub` label a subquery RHS, so `t.sal` resolves when this subquery is a join operand.
         return (lamSub.beta vars.toArray,
           subSchema.map (fun (n, ty) => (al.getId ++ (n.components.getLast?).getD n, ty)))
+    | `(sql_from| ( $sub:sql_query )) => do
+      -- No alias: expose the subquery's own output columns unchanged (nothing to re-qualify under —
+      -- there is no name for a `sub.col` reference to use even if the query tried one).
+      let (lamSub, subSchema) ← elabSqlQueryCore tableVars ctes sub
+      let vars := tableVars.map (fun (relVar, _, _) => relVar)
+      return (lamSub.beta vars.toArray, subSchema)
     -- `LATERAL FLATTEN` — correlated unnest appended to the left FROM (see `flattenArm`). Matched
     -- before the plain comma so `f1 , LATERALFLATTEN(e) …` doesn't fall through to a cross product.
     | `(sql_from| $f1:sql_from , LATERALFLATTEN( $e:term ) AS $h:ident ( $cols:ident,* ))
@@ -718,6 +738,10 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
   flattenArm (f1 : TSyntax `sql_from) (e : Term) (h : Name) (colNames : List Name) :
       TermElabM (Expr × List (Name × SQLTypeProxy)) := do
     let (e1, s1) ← productPair f1
+    -- The flatten input is written bare (`LATERAL UNNEST(input => EVENT_PARAMS)`), same as any other
+    -- unqualified column reference — it needs the same `bare name → t.col` re-qualification `ON` and
+    -- `WHERE` conditions get elsewhere, or it never resolves against `s1`'s (fully-qualified) labels.
+    let e : Term := ⟨resolveInScope (s1.map (·.1)) e⟩
     let fFn ← withSchemasTupleVars [(.anonymous, s1)] e.raw.hasIdent fun vars =>
       mkLambdaLetsFVars vars (elabTermEnsuringType e (mkConst ``String))
     let out ← mkAppM ``lateralFlatten #[e1, fFn]
@@ -925,8 +949,18 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       let `(sql_cols| $c:sql_col,*) := sel | throwError "scalar subquery must SELECT one aggregate"
       let #[col1] := c.getElems | throwError "scalar subquery must SELECT one aggregate"
       let (_, aggs) ← (liftAggExprs (sqlColTerm col1)).run #[]
-      let #[(_, kind, argStx)] := aggs
-        | throwError "scalar subquery column must be a single aggregate (SUM/COUNT)"
+      -- A scalar subquery need not select an aggregate at all — `x = (SELECT yr FROM lowest_year)`,
+      -- where `lowest_year` is itself constrained (`LIMIT 1`/an equi-join key) to at most one row.
+      -- "The value of a bare column from an at-most-one-row relation" is exactly what `MAX` computes
+      -- over that relation, so a bare column defaults to that reading rather than being rejected —
+      -- sound for the same reason an explicit `MAX(x)` scalar subquery is (and identical if the
+      -- relation genuinely has one row; on more than one, `MAX` is a defined, congruence-sound answer
+      -- rather than the ambiguity SQL itself would raise at runtime).
+      -- The bare column may be qualified differently than the subquery's own schema labels it
+      -- (`industry` selected from a CTE whose column is `i.industry`) — `resolveInScope` is the same
+      -- fix-up every other bare/mismatched reference in the codebase gets.
+      let (_, kind, argStx) :=
+        aggs.getD 0 (Name.anonymous, AggKind.max, ⟨resolveInScope (schema.map (·.1)) (sqlColTerm col1)⟩)
       let mkSummand (asInt : Bool) : TermElabM Expr :=
         withSchemasTupleVars [(.anonymous, schema)] (fun _ => true) fun vars =>
           mkLambdaLetsFVars vars (if asInt then elabTermEnsuringType argStx (mkConst ``Int)
@@ -962,9 +996,23 @@ partial def elabSqlQueryCore (tableVars : List (Expr × Name × List (Name × SQ
       TermElabM (Array (TSyntax `sql_col)) := do
     let mut out := #[]
     for col in cols do
+      -- The whole column *is* one scalar subquery: the simple, common case, kept as its own path.
       match col with
       | `(sql_col| ( $q:sql_query ) AS $name:ident) => out := out.push (← stashSubq q name)
-      | _ => out := out.push col
+      | _ =>
+        -- General case: a scalar subquery used as *part* of a larger expression
+        -- (`100.0 * (SELECT COUNT(*) FROM t) / (SELECT COUNT(*) FROM u) AS pct`).
+        -- `stashTermSubqueries` (already used for WHERE/HAVING) finds and stashes every such subquery
+        -- anywhere in the term tree; only the top-level-column shape above needs its own case. The
+        -- alias, if the column had none, is computed from the *original* text — after stashing, the
+        -- term is placeholder references, and naming from that would depend on stash-slot numbering
+        -- rather than the query.
+        let t := sqlColTerm col
+        let t' ← stashTermSubqueries t
+        if t'.raw.reprint == t.raw.reprint then out := out.push col
+        else match col with
+          | `(sql_col| $_:term AS $name:ident) => out := out.push (← `(sql_col| $t':term AS $name:ident))
+          | _ => out := out.push (← `(sql_col| $t':term AS $(mkIdent (autoColName t.raw)):ident))
     return out
 
   -- The SELECT projection: `*`, qualified star `t.*`, or a column list. A column list is *grouped*
@@ -1117,10 +1165,33 @@ def escapeReservedNames (env : Environment) (names : List String) (s : String) :
       i := j
   return out
 
+/-- Every word already `«guillemet»`-quoted in the (already-normalized) SQL text.
+
+`Normalize.lean`'s own `AS <keyword>` pass already wraps a reserved-word SELECT alias at its
+*definition* (`EXTRACT(MONTH FROM …) AS «MONTH»`), but a later **unqualified reference** to that same
+alias — `GROUP BY MONTH`, `ORDER BY MONTH` — is untouched text, still the bare keyword, and fails to
+parse. Rather than re-detect aliases from scratch, read back what that pass already decided: every
+name it (or `unquoteIdent`) wrapped in `«…»` is a name this query treats as an identifier, so feeding
+it to `escapeReservedNames` makes every *other*, still-bare occurrence of the same word eligible for
+the same escaping. Over-collecting is harmless — eligibility alone does nothing unless the word is
+also a reserved token. -/
+def extractAliasNames (s : String) : List String := Id.run do
+  let cs := s.toList
+  let mut out : List String := []
+  let mut i := 0
+  while h : i < cs.length do
+    if cs[i] == '«' then
+      let word := (cs.drop (i + 1)).takeWhile (· != '»')
+      out := (String.ofList word).toLower :: out
+      i := i + word.length + 2
+    else i := i + 1
+  return out
+
 def parseSqlQuery (tables : List (Name × List (Name × SQLTypeProxy))) (str : String) : TermElabM (Expr × List (Name × SQLTypeProxy)) := do
   let str := normalizeSqlLiterals str
   let str := escapeReservedNames (← getEnv)
-    (tables.flatMap (fun (t, cols) => t.toString.toLower :: cols.map (·.1.toString.toLower))) str
+    (tables.flatMap (fun (t, cols) => t.toString.toLower :: cols.map (·.1.toString.toLower))
+      ++ extractAliasNames str) str
   -- Case-insensitive identifiers: fold the schema and the query's idents to a common (lower) case.
   let tables := tables.map (fun (t, cols) => (lowerName t, cols.map (fun (c, ty) => (lowerName c, ty))))
   let tables := tables.map (fun (tableName, columns) => (tableName, schemaWithFullNames tableName columns))

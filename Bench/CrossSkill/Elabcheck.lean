@@ -40,8 +40,12 @@ unsafe def main (args : List String) : IO UInt32 := do
   let ctx : Core.Context :=
     { fileName := "", fileMap := { source := "", positions := #[] },
       options := Lean.maxRecDepth.set {} 1000000, maxHeartbeats := 400000000, maxRecDepth := 1000000 }
-  let mut ok := 0
-  let mut timeout := 0
+  -- Explicit `Nat` ascriptions: left as bare numeral literals, the elaborator is free to solve `ok`'s
+  -- and `timeout`'s type directly as `JsonNumber` (satisfying `Json.num ok` below without a coercion),
+  -- which then makes `ok := ok + 1` ill-typed (`HAdd JsonNumber ℕ JsonNumber` has no instance). Pinning
+  -- them to `Nat` up front is what lets `Json.num` insert its `Nat → JsonNumber` coercion instead.
+  let mut ok : Nat := 0
+  let mut timeout : Nat := 0
   let mut results : Array Json := #[]
   for rec in recs do
     let id := (rec.getObjValAs? String "id").toOption.getD "?"
